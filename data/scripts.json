@@ -1,0 +1,122 @@
+[
+  {
+    "id": "preset-playerinfo",
+    "name": "Player Info",
+    "description": "Detailed snapshot: job, HP, MP, gil, zone, position",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal jn = {}\nfor k,v in pairs(xi.job) do jn[v]=k end\nlocal x,y,z = p:getPos()\nreturn string.format(\n  '%s | %s%d/%s%d | HP:%d/%d MP:%d/%d | Gil:%d | Zone:%d | Pos:(%.1f,%.1f,%.1f)',\n  p:getName(), jn[p:getMainJob()]or'?', p:getMainLvl(),\n  jn[p:getSubJob()]or'?', p:getSubLvl(),\n  p:getHP(), p:getMaxHP(), p:getMP(), p:getMaxMP(),\n  p:getGil(), p:getZoneID(), x, y, z\n)",
+    "created": 1782117300000,
+    "updated": 1782117300000
+  },
+  {
+    "id": "preset-fullheal",
+    "name": "Full Heal",
+    "description": "Restore HP and MP to max for a player",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\np:addHP(p:getMaxHP())\np:addMP(p:getMaxMP())\nreturn p:getName()..' healed to full'",
+    "created": 1782117300001,
+    "updated": 1782117300001
+  },
+  {
+    "id": "preset-addgil",
+    "name": "Add Gil",
+    "description": "Give a player a specific amount of gil",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal amount = 100000\np:addGil(amount)\nreturn p:getName()..' now has '..p:getGil()..' gil'",
+    "created": 1782117300002,
+    "updated": 1782117300002
+  },
+  {
+    "id": "preset-addexp",
+    "name": "Add EXP",
+    "description": "Give a player experience points on their main job",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal exp = 10000\np:addExp(exp)\nreturn p:getName()..' received '..exp..' exp'",
+    "created": 1782117300003,
+    "updated": 1782117300003
+  },
+  {
+    "id": "preset-setmerits",
+    "name": "Set Merit Points",
+    "description": "Set a player's total merit point count (0–127)",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal amount = 30\np:setMerits(amount)\nreturn p:getName()..' now has '..p:getMeritCount()..' merits'",
+    "created": 1782117300004,
+    "updated": 1782117300004
+  },
+  {
+    "id": "preset-addcp",
+    "name": "Add Capacity Points",
+    "description": "Add capacity points to a player's current main job",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal amount = 5000\np:addCapacityPoints(amount)\nreturn p:getName()..' received '..amount..' capacity points'",
+    "created": 1782117300005,
+    "updated": 1782117300005
+  },
+  {
+    "id": "preset-addjp",
+    "name": "Add Job Points",
+    "description": "Add job points to a player's current main job (max 500)",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal jp = 100\np:addJobPoints(p:getMainJob(), jp)\nreturn p:getName()..' received '..jp..' job points'",
+    "created": 1782117300006,
+    "updated": 1782117300006
+  },
+  {
+    "id": "preset-addsparks",
+    "name": "Add Sparks of Eminence",
+    "description": "Add sparks currency to a player",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal amount = 10000\np:addCurrency('spark_of_eminence', amount)\nreturn p:getName()..' received '..amount..' sparks. Total: '..p:getCurrency('spark_of_eminence')",
+    "created": 1782117300007,
+    "updated": 1782117300007
+  },
+  {
+    "id": "preset-addaccolades",
+    "name": "Add Accolades",
+    "description": "Add unity accolades to a player",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal amount = 1000\np:addCurrency('unity_accolades', amount)\nreturn p:getName()..' received '..amount..' accolades. Total: '..p:getCurrency('unity_accolades')",
+    "created": 1782117300008,
+    "updated": 1782117300008
+  },
+  {
+    "id": "preset-clearstatus",
+    "name": "Clear Status Effects",
+    "description": "Remove all detrimental status effects from a player",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\np:delStatusEffectsByFlag(xi.effectFlag.DETRIMENTAL)\nreturn 'Status effects cleared for '..p:getName()",
+    "created": 1782117300009,
+    "updated": 1782117300009
+  },
+  {
+    "id": "preset-warp",
+    "name": "Warp to Home Point",
+    "description": "Warp a player to their home point",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\np:warp()\nreturn p:getName()..' warped to home point'",
+    "created": 1782117300010,
+    "updated": 1782117300010
+  },
+  {
+    "id": "preset-setweather",
+    "name": "Set Zone Weather",
+    "description": "Set weather in a player's current zone (player must be online in that zone)",
+    "code": "-- xi.weather constants: NONE=0, SUNSHINE=1, CLOUDS=2, FOG=3, WIND=4,\n-- WINDY_CLOUDS=5, RAIN=6, SQUALL=7, THUNDER=8, THUNDERSTORM=9,\n-- SNOW=10, BLIZZARD=11, SANDSTORM=12, HOT_SPELL=14, GLOOM=16\nlocal p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal weather = xi.weather.RAIN\np:setWeather(weather)\nreturn 'Weather set in zone '..p:getZoneID()",
+    "created": 1782117300011,
+    "updated": 1782117300011
+  },
+  {
+    "id": "preset-spawnnm",
+    "name": "Spawn Mob by ID",
+    "description": "Force-spawn a mob by its entity ID from mob_spawn_points table",
+    "code": "local mobId = 0  -- replace with mobid from mob_spawn_points table\nlocal mob = GetMobByID(mobId)\nif not mob then return 'Mob ID not found' end\nif mob:isSpawned() then return mob:getName()..' is already spawned' end\nSpawnMob(mob:getID())\nreturn 'Spawned: '..mob:getName()",
+    "created": 1782117300012,
+    "updated": 1782117300012
+  },
+  {
+    "id": "preset-despawnnm",
+    "name": "Despawn Mob by ID",
+    "description": "Despawn a specific live mob by its entity ID",
+    "code": "local mobId = 0  -- replace with live entity ID\nlocal mob = GetMobByID(mobId)\nif not mob then return 'Mob not found' end\nlocal name = mob:getName()\nDespawnMob(mobId)\nreturn 'Despawned: '..name",
+    "created": 1782117300013,
+    "updated": 1782117300013
+  },
+  {
+    "id": "preset-addkeyitem",
+    "name": "Add Key Item",
+    "description": "Give a player a key item by ID (see DB tab → Key Items)",
+    "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal kiId = 1  -- replace with key item ID\np:addKeyItem(kiId)\nreturn 'Key item '..kiId..' added to '..p:getName()",
+    "created": 1782117300014,
+    "updated": 1782117300014
+  }
+]

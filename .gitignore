@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment — never commit secrets
+.env
+
+# Runtime state
+calibrations.json
+
+# Map images (648 MB — download separately; see README)
+public/maps/
+
+# User-uploaded custom images (server.js creates these dirs on startup)
+public/uploads/
+
+# Bulk map extraction working directory
+map_download/
+
+# Logs
+*.log
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+
+# Claude Code internal settings (project-specific)
+.claude/

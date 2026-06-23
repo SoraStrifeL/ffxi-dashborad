@@ -1,0 +1,39 @@
+services:
+  dashboard:
+    build: .
+    image: ffxi-dashboard
+    container_name: ffxi-dashboard
+    restart: unless-stopped
+    environment:
+      DB_HOST: ffxi-database-1
+      DB_USER: xiadmin
+      DB_PASS: "${DB_PASS:-changeme}"
+      DB_NAME: xidb
+      PORT: 3000
+      DASHBOARD_JWT_SECRET: "${DASHBOARD_JWT_SECRET}"
+      CORS_ORIGIN: "${CORS_ORIGIN:-}"
+      WINDOWER_API_KEY: "${WINDOWER_API_KEY}"
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./public:/app/public
+      - ./data:/app/data
+      - ffxi_ffxi-logs:/ffxi-log:ro
+      - /opt/stacks/ffxi/settings:/ffxi-settings
+      - /opt/stacks/ffxi/scripts/globals/quests.lua:/ffxi-scripts/quests.lua:ro
+      - /opt/stacks/ffxi/scripts/enum/effect.lua:/ffxi-scripts/effect.lua:ro
+      - /opt/stacks/ffxi/scripts/enum/merit.lua:/ffxi-scripts/merit.lua:ro
+      - /opt/stacks/ffxi/scripts/enum/key_item.lua:/ffxi-scripts/key_item.lua:ro
+      - /opt/stacks/ffxi/scripts/enum/title.lua:/ffxi-scripts/title.lua:ro
+      - /opt/stacks/ffxi/scripts/globals/roe_records.lua:/ffxi-scripts/roe_records.lua:ro
+      - /opt/stacks/ffxi/scripts/globals/missions.lua:/ffxi-scripts/missions.lua:ro
+      - /opt/stacks/ffxi/scripts/quests:/ffxi-scripts/quests:ro
+      - /opt/stacks/ffxi/scripts:/ffxi-server-scripts
+    networks:
+      - ffxi_default
+networks:
+  ffxi_default:
+    external: true
+volumes:
+  ffxi_ffxi-logs:
+    external: true
