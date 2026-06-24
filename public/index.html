@@ -824,6 +824,7 @@
 // ════════════════════════════════════════════════════════
 const state = { token:null, tier:null, login:null, accid:null, chars:[], zones:[] };
 const livePositions = {}; // charid → {pos_x,pos_y,pos_z,pos_zone} from positions feed
+const windowerLivePos = {}; // charname → {x,y,z,zone,ts} from Windower addon (updated every 2 s)
 
 function saveToken(t){ state.token = t; try{ localStorage.setItem('dash_token', t); }catch(_){} }
 function loadToken(){ try{ return localStorage.getItem('dash_token'); }catch(_){ return null; } }
@@ -3008,6 +3009,22 @@ const calState = { active:false, step:0, pts:[], pendingPx:null, pendingPy:null,
 function _calOnlineChar() {
   return (state.chars||[]).find(c=>c.online);
 }
+// Returns the Windower live position entry for any character currently in zoneId,
+// or null if Windower isn't active / no char in the zone.
+function _windowerCharForZone(zoneId) {
+  const zid=parseInt(zoneId);
+  const cutoff=Date.now()-10000; // stale after 10 s
+  const entry=Object.values(windowerLivePos).find(p=>p.zone===zid&&p.ts>cutoff);
+  return entry||null;
+}
+// Best live position source for calibration: Windower (2 s) beats DB (updated on zone change)
+function _calLivePos(zoneId) {
+  const w=_windowerCharForZone(zoneId);
+  if(w) return { x:w.x, z:w.z, label:w.name, source:'windower' };
+  const oc=_calOnlineChar();
+  if(oc) return { x:oc.pos_x, z:oc.pos_z, label:oc.charname, source:'db' };
+  return null;
+}
 function _saveCalibration(zoneId, b) {
   ZONE_BOUNDS[parseInt(zoneId)]=b;
   api('/api/calibrations/'+zoneId,{method:'POST',body:JSON.stringify(b)})
@@ -3023,32 +3040,37 @@ function _updateCalStatus(zoneId) {
   const hasCustom=!!_serverCals[zoneId];
   document.getElementById('calBtn').innerHTML=`📍 Calibrate Zone <span style="font-size:10px;font-weight:400;margin-left:4px;color:${hasCustom?'var(--ok)':'var(--text3)'}">${hasCustom?'✓ custom':'default'}</span>`;
 }
-function _calHintText() {
-  const oc=_calOnlineChar();
-  if(oc){
+function _calHintText(lp) {
+  if(lp){
+    const src=lp.source==='windower'?'⚡ Windower':'DB';
     return calState.step===1
-      ? 'Stand in-game at a recognizable spot, then click that spot on the map.'
-      : 'Move to a second in-game location, then click it on the map.';
+      ? `Stand at a recognizable spot in-game, then click that spot on the map. (${src} coords will be captured automatically)`
+      : `Move to a second spot, then click it on the map. (${src} coords captured automatically)`;
   }
   return calState.pendingPx!=null
     ? `Enter the /pos X and Z for the point you clicked, then confirm.`
     : `Click a landmark on the map whose in-game /pos you know.`;
 }
 function _calUpdateUI() {
-  const oc=_calOnlineChar();
   const zoneId=document.getElementById('zoneSelect').value;
+  const lp=_calLivePos(zoneId);
   document.getElementById('calStepLabel').textContent=calState.quickFix?'Quick fix':`Step ${calState.step} / 2`;
   document.getElementById('calHint').textContent=calState.quickFix
     ?'Stand where you are in-game, then click that exact spot on the map.'
-    :_calHintText();
+    :_calHintText(lp);
   const ezEl=document.getElementById('calEzStatus');
-  if(oc){ ezEl.innerHTML=`<span style="color:var(--ok)">●</span> Using <b>${esc(oc.charname)}</b>'s live position`; }
-  else { ezEl.innerHTML=`<span style="color:var(--text3)">○</span> No online character — enter coords manually`; }
-  document.getElementById('calCoordFields').style.display=(!oc&&calState.pendingPx!=null)?'block':'none';
+  if(lp){
+    const icon=lp.source==='windower'?'<span style="color:var(--gold)">⚡</span>':'<span style="color:var(--ok)">●</span>';
+    const badge=lp.source==='windower'?`<span style="color:var(--gold);font-size:10px;margin-left:4px">Windower</span>`:`<span style="color:var(--text3);font-size:10px;margin-left:4px">DB position</span>`;
+    ezEl.innerHTML=`${icon} <b>${esc(lp.label)}</b>${badge}`;
+  } else {
+    ezEl.innerHTML=`<span style="color:var(--text3)">○</span> No live position — enter coords manually`;
+  }
+  document.getElementById('calCoordFields').style.display=(!lp&&calState.pendingPx!=null)?'block':'none';
   document.getElementById('calConfirm').textContent=calState.step===2?'Confirm & Save':'Confirm Point';
   document.getElementById('calBack').style.display=(calState.step===2&&!calState.quickFix)?'block':'none';
-  // Quick fix: available when online, zone has existing bounds, not already in quick fix mode
-  const showQF=oc&&ZONE_BOUNDS[parseInt(zoneId)]&&!calState.quickFix&&calState.step===1;
+  // Quick fix: available when live pos exists, zone has existing bounds, not already in quick fix mode
+  const showQF=lp&&ZONE_BOUNDS[parseInt(zoneId)]&&!calState.quickFix&&calState.step===1;
   document.getElementById('calQuickFix').style.display=showQF?'block':'none';
 }
 function _closeCalibration() {
@@ -3079,18 +3101,19 @@ document.getElementById('mapCanvas').addEventListener('click', function(e){
   const px=(rawX-_stagePanX)/_stageZoom;
   const py=(rawY-_stagePanY)/_stageZoom;
 
+  const zoneId=document.getElementById('zoneSelect').value;
+  const lp=_calLivePos(zoneId);
+
   if(calState.quickFix){
-    const oc=_calOnlineChar();
-    if(!oc){ alert('No online character — quick fix requires a live position.'); return; }
-    const zoneId=document.getElementById('zoneSelect').value;
+    if(!lp){ alert('No live position — quick fix requires Windower or an online character.'); return; }
     const b=ZONE_BOUNDS[parseInt(zoneId)];
     if(!b){ alert('No existing bounds — use full 2-point calibration first.'); return; }
     const W=this.width, H=this.height, pad=mapAdj.pad;
     const rangeX=b.maxX-b.minX, rangeZ=b.maxZ-b.minZ;
     const prePx=mapAdj.sx?((px-mapAdj.ox)/mapAdj.sx):px;
     const prePy=mapAdj.sy?((py-mapAdj.oy)/mapAdj.sy):py;
-    const newMinX=oc.pos_x-(prePx-pad)/(W-pad*2)*rangeX;
-    const newMaxZ=oc.pos_z+(prePy-pad)/(H-pad*2)*rangeZ;
+    const newMinX=lp.x-(prePx-pad)/(W-pad*2)*rangeX;
+    const newMaxZ=lp.z+(prePy-pad)/(H-pad*2)*rangeZ;
     const nb={minX:+newMinX.toFixed(3),maxX:+(newMinX+rangeX).toFixed(3),
                minZ:+(newMaxZ-rangeZ).toFixed(3),maxZ:+newMaxZ.toFixed(3)};
     _saveCalibration(zoneId,nb);
@@ -3098,14 +3121,13 @@ document.getElementById('mapCanvas').addEventListener('click', function(e){
     return;
   }
 
-  const oc=_calOnlineChar();
-  if(oc){
-    // EZ Cal: auto-confirm with live position, no typing needed.
-    calState.pts.push({px, py, x:oc.pos_x, z:oc.pos_z});
+  if(lp){
+    // Live position available (Windower preferred, DB fallback) — auto-confirm, no typing.
+    calState.pts.push({px, py, x:lp.x, z:lp.z});
     if(calState.step===1){ calState.step=2; _calUpdateUI(); updateEntities(); }
     else { _calFinish(); }
   } else {
-    // Manual fallback: show coord fields for the user to fill in.
+    // No live position — show manual coord entry fields.
     calState.pendingPx=px; calState.pendingPy=py;
     document.getElementById('calX').value=''; document.getElementById('calZ').value='';
     _calUpdateUI(); document.getElementById('calX').focus();
@@ -3445,6 +3467,13 @@ function connectWS(){
 
         // Otherwise just refresh the current zone's player dots (preserves live coords).
         if(currentZone){ currentZoneData.chars=state.chars.filter(p=>p.pos_zone==currentZone); updateEntities(); }
+      }
+      if(type==='windower_positions'){
+        Object.assign(windowerLivePos, data);
+        // Evict entries older than 30 s
+        const cutoff=Date.now()-30000;
+        Object.keys(windowerLivePos).forEach(n=>{ if(windowerLivePos[n].ts<cutoff) delete windowerLivePos[n]; });
+        if(calState.active) _calUpdateUI();
       }
       if(type==='log') appendLogLines(data.file, data.lines);
       if(type==='positions'){
