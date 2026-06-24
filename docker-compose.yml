@@ -23,7 +23,9 @@ services:
       DASHBOARD_JWT_SECRET: "${DASHBOARD_JWT_SECRET}"
       CORS_ORIGIN: "${CORS_ORIGIN:-}"
       WINDOWER_API_KEY: "${WINDOWER_API_KEY}"
+      ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
       REDIS_URL: "${REDIS_URL:-redis://ffxi-redis:6379}"
+      AUTOLOGIN: "${AUTOLOGIN:-true}"
     ports:
       - "3001:3000"
     volumes:

@@ -16,7 +16,7 @@ export const LSB_LOG_DIR      = process.env.LSB_LOG_DIR      || '/ffxi-log';
 ['items', 'npcs', 'mobs'].forEach(d => fs.mkdirSync(path.join(UPLOADS_DIR, d), { recursive: true }));
 
 // ── Calibration store ─────────────────────────────────────────────────────────
-export const CAL_FILE = path.join(__dirname, '..', 'calibrations.json');
+export const CAL_FILE = path.join(__dirname, '..', 'data', 'calibrations.json');
 export let calStore: Record<string, unknown> = {};
 try { calStore = JSON.parse(fs.readFileSync(CAL_FILE, 'utf8')); } catch (_) {}
 export function saveCalStore(): void {

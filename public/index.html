@@ -3028,7 +3028,8 @@ function _calLivePos(zoneId) {
 function _saveCalibration(zoneId, b) {
   ZONE_BOUNDS[parseInt(zoneId)]=b;
   api('/api/calibrations/'+zoneId,{method:'POST',body:JSON.stringify(b)})
-    .then(()=>{ _serverCals[zoneId]=b; _updateCalStatus(zoneId); }).catch(()=>{});
+    .then(()=>{ _serverCals[zoneId]=b; _updateCalStatus(zoneId); })
+    .catch(e=>alert('Calibration save failed: '+e.message));
 }
 function _clearCalibration(zoneId) {
   delete ZONE_BOUNDS[parseInt(zoneId)];
@@ -3433,13 +3434,13 @@ function _redrawOverlay(){
 // ════════════════════════════════════════════════════════
 //  WebSocket live updates
 // ════════════════════════════════════════════════════════
-let gWS=null;
+let gWS=null, _wsDelay=4000;
 function wsSend(msg){ if(gWS&&gWS.readyState===WebSocket.OPEN) gWS.send(JSON.stringify(msg)); }
 
 function connectWS(){
   const proto=location.protocol==='https:'?'wss':'ws';
   gWS=new WebSocket(`${proto}://${location.host}`);
-  gWS.onopen=()=>gWS.send(JSON.stringify({type:'auth',data:{token:state.token}}));
+  gWS.onopen=()=>{ _wsDelay=4000; gWS.send(JSON.stringify({type:'auth',data:{token:state.token}})); };
   gWS.onmessage=ev=>{
     try{
       const {type,data}=JSON.parse(ev.data);
@@ -3474,6 +3475,15 @@ function connectWS(){
         const cutoff=Date.now()-30000;
         Object.keys(windowerLivePos).forEach(n=>{ if(windowerLivePos[n].ts<cutoff) delete windowerLivePos[n]; });
         if(calState.active) _calUpdateUI();
+        // Auto-switch map to player's current zone
+        const fresh=Object.values(windowerLivePos).filter(p=>p.ts>Date.now()-5000);
+        if(fresh.length>0){
+          const sel=document.getElementById('zoneSelect');
+          const playerZone=String(fresh[0].zone);
+          if(sel&&sel.value!==playerZone&&_allZoneOptions.some(o=>String(o.id)===playerZone)){
+            sel.value=playerZone; loadZoneMap(false);
+          }
+        }
       }
       if(type==='log') appendLogLines(data.file, data.lines);
       if(type==='positions'){
@@ -3508,7 +3518,7 @@ function connectWS(){
       }
     }catch(_){}
   };
-  gWS.onclose=(e)=>{ gWS=null; if(e.code===1008){ clearToken(); showLogin(); return; } setTimeout(connectWS,4000); };
+  gWS.onclose=(e)=>{ gWS=null; if(e.code===1008){ clearToken(); showLogin(); return; } const el=document.getElementById('onlineCount'); if(el) el.textContent=`Reconnecting in ${Math.round(_wsDelay/1000)}s...`; setTimeout(connectWS,_wsDelay); _wsDelay=Math.min(_wsDelay*2,30000); };
 }
 
 // ════════════════════════════════════════════════════════
@@ -5736,13 +5746,17 @@ async function initTimers(){
   if(t){
     state.token=t;
     try{ await enterApp(); return; }
-    catch(_){
-      // api() clears state.token and calls showLogin() on 401 — nothing left to do.
-      // For any other error (network blip, server restart) keep the token so the
-      // next page load auto-retries instead of forcing a full re-login.
+    catch(err){
       if(!state.token) return;
+      console.error('[boot] enterApp failed (non-401):', err);
+      return;
     }
   }
+  // Auto-login if server has AUTOLOGIN=true
+  try{
+    const data=await fetch('/api/autologin').then(r=>r.ok?r.json():null);
+    if(data?.token){ saveToken(data.token); state.tier=data.tier; state.login=data.login; await enterApp(); return; }
+  }catch(_){}
   showLogin();
 })();
 </script>

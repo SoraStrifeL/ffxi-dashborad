@@ -112,7 +112,7 @@ export function createMapRouter(pool: Pool): Router {
 
   router.get('/api/calibrations', requireAuth, (_req, res) => res.json(calStore));
 
-  router.post('/api/calibrations/:zoneId', requireAdmin, (req, res) => {
+  router.post('/api/calibrations/:zoneId', requireAuth, requireAdmin, (req, res) => {
     const zoneId = parseInt(req.params.zoneId as string);
     if (!Number.isFinite(zoneId)) { res.status(400).json({ error: 'Invalid zone' }); return; }
     const { minX, maxX, minZ, maxZ } = (req.body as { minX?: number; maxX?: number; minZ?: number; maxZ?: number }) || {};
@@ -124,7 +124,7 @@ export function createMapRouter(pool: Pool): Router {
     res.json({ ok: true });
   });
 
-  router.delete('/api/calibrations/:zoneId', requireAdmin, (req, res) => {
+  router.delete('/api/calibrations/:zoneId', requireAuth, requireAdmin, (req, res) => {
     const zoneId = parseInt(req.params.zoneId as string);
     delete calStore[zoneId];
     saveCalStore();

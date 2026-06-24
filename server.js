@@ -2498,6 +2498,40 @@ app.get('/api/windower/zone_entities/:zoneId', auth.requireAuth, (req, res) => {
   res.json({ zoneId, ...record });
 });
 
+// Claude API proxy — Windower addon posts here to avoid TLS issues under Wine
+const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+app.post('/api/claude', async (req, res) => {
+  if (!WINDOWER_API_KEY || req.headers['x-windower-key'] !== WINDOWER_API_KEY)
+    return res.status(403).json({ error: 'forbidden' });
+  if (!ANTHROPIC_API_KEY)
+    return res.status(503).json({ error: 'ANTHROPIC_API_KEY not set on server' });
+
+  const { message, system, model, max_tokens } = req.body;
+  if (!message) return res.status(400).json({ error: 'message required' });
+
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'x-api-key': ANTHROPIC_API_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model || 'claude-sonnet-4-6',
+        max_tokens: max_tokens || 1024,
+        system: system || 'You are a helpful assistant embedded in Final Fantasy XI. Be concise.',
+        messages: [{ role: 'user', content: message }],
+      }),
+    });
+    const data = await r.json();
+    if (!r.ok) return res.status(r.status).json({ error: data.error?.message || 'Claude API error' });
+    res.json({ reply: data.content?.[0]?.text || '' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 // EXP needed per level (from exp_base; index = current level, value = XP to reach next level)
 let EXP_PER_LEVEL = [];

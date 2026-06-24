@@ -71,5 +71,38 @@ export function createWindowerRouter(): Router {
     res.json({ zoneId, ...record });
   });
 
+  const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+  router.post('/api/claude', async (req, res) => {
+    if (!WINDOWER_API_KEY || req.headers['x-windower-key'] !== WINDOWER_API_KEY)
+      return void res.status(403).json({ error: 'forbidden' });
+    if (!ANTHROPIC_API_KEY)
+      return void res.status(503).json({ error: 'ANTHROPIC_API_KEY not set on server' });
+
+    const { message, system, model, max_tokens } = (req.body as any) || {};
+    if (!message) return void res.status(400).json({ error: 'message required' });
+
+    try {
+      const r = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'x-api-key': ANTHROPIC_API_KEY,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          model:      model      || 'claude-sonnet-4-6',
+          max_tokens: max_tokens || 1024,
+          system:     system     || 'You are a helpful assistant embedded in Final Fantasy XI. Be concise.',
+          messages:   [{ role: 'user', content: message }],
+        }),
+      });
+      const data = await r.json() as any;
+      if (!r.ok) return void res.status(r.status).json({ error: data.error?.message || 'Claude API error' });
+      res.json({ reply: data.content?.[0]?.text || '' });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   return router;
 }

@@ -19,6 +19,25 @@ export function createAuthRouter(pool: Pool): Router {
     for (const [k, e] of loginAttempts) if (e.start < cutoff) loginAttempts.delete(k);
   }, 5 * 60 * 1000);
 
+  router.get('/api/autologin', async (req, res) => {
+    if (process.env.AUTOLOGIN !== 'true') { res.status(403).json({ error: 'disabled' }); return; }
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    try {
+      const [rows] = await pool.execute<import('mysql2/promise').RowDataPacket[]>(
+        `SELECT a.id, a.login FROM accounts a
+         JOIN chars c ON c.accid = a.id
+         WHERE a.status = 1 AND c.gmlevel >= ? ORDER BY c.gmlevel DESC LIMIT 1`,
+        [auth.ADMIN_GM_LEVEL]);
+      if (!rows.length) { res.status(403).json({ error: 'no admin account found' }); return; }
+      const { id, login } = rows[0];
+      const identity = { accid: id as number, tier: 'admin' as const, login: login as string };
+      audit(identity.login, 'auth.autologin', undefined, { ip });
+      res.json({ token: auth.issueToken(identity), tier: identity.tier, login: identity.login });
+    } catch (e) {
+      res.status(500).json({ error: 'Internal server error' });
+    }
+  });
+
   router.post('/api/login', async (req, res) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const { login, password } = (req.body as { login?: string; password?: string }) || {};
