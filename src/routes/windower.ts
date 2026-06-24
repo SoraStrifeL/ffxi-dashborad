@@ -81,6 +81,10 @@ export function createWindowerRouter(): Router {
     const { message, system, model, max_tokens } = (req.body as any) || {};
     if (!message) return void res.status(400).json({ error: 'message required' });
 
+    const ALLOWED_MODELS = new Set(['claude-haiku-4-5-20251001', 'claude-sonnet-4-6']);
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+    const safeMaxTokens = Math.min(Math.max(1, parseInt(max_tokens) || 1024), 2048);
+
     try {
       const r = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -90,8 +94,8 @@ export function createWindowerRouter(): Router {
           'content-type': 'application/json',
         },
         body: JSON.stringify({
-          model:      model      || 'claude-sonnet-4-6',
-          max_tokens: max_tokens || 1024,
+          model:      safeModel,
+          max_tokens: safeMaxTokens,
           system:     system     || 'You are a helpful assistant embedded in Final Fantasy XI. Be concise.',
           messages:   [{ role: 'user', content: message }],
         }),

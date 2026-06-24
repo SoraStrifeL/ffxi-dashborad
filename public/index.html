@@ -153,6 +153,21 @@
   .inv-item .del{background:transparent;border:0;color:var(--text3);font-size:14px;padding:2px 6px;border-radius:5px}
   .inv-item .del:hover{color:var(--danger);background:rgba(224,92,92,.1)}
 
+  /* ── Settings sidebar layout ────────────────────────── */
+  .settings-layout{display:grid;grid-template-columns:185px 1fr;height:100%}
+  .settings-nav{background:var(--bg1);border-right:1px solid var(--border);padding:6px 0;overflow-y:auto;flex-shrink:0}
+  .snav-group{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);padding:12px 16px 4px;margin-top:2px}
+  .snav-group:first-child{margin-top:0;padding-top:8px}
+  .snav-item{display:block;width:100%;text-align:left;background:transparent;border:none;border-left:3px solid transparent;color:var(--text2);padding:7px 12px 7px 17px;font-size:13px;cursor:pointer;transition:color .12s,background .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .snav-item:hover{color:var(--text);background:var(--bg2)}
+  .snav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(122,173,255,.08);font-weight:500}
+  .settings-content{overflow-y:auto}
+  .settings-section{display:none;padding:20px 24px;max-width:880px}
+  .settings-section.active{display:block}
+  .sxh{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .sxh h2{font-size:16px;font-weight:700;color:var(--text);margin:0;letter-spacing:-.2px}
+  .warn-tag{font-size:11px;color:var(--gold);background:rgba(240,160,80,.1);padding:4px 10px;border-radius:6px;white-space:nowrap}
+
   /* ── Admin edit panel ────────────────────────────────── */
   .edit-panel{background:var(--bg2);border:1px solid var(--gold);border-radius:10px;padding:16px;margin-bottom:20px}
   .edit-panel h3{color:var(--gold)}
@@ -219,6 +234,7 @@
       <button class="tab admin-only" data-page="consolePage" style="display:none">Console</button>
       <button class="tab admin-only" data-page="scriptsPage" style="display:none">Scripts</button>
       <button class="tab admin-only" data-page="settingsPage" style="display:none">Settings</button>
+      <button class="tab admin-only" data-page="filesPage" style="display:none">Files</button>
     </div>
     <div class="right">
       <span id="onlineCount">—</span>
@@ -664,54 +680,191 @@
 
     <!-- SETTINGS (admin only) -->
     <div class="page" id="settingsPage">
-      <div class="list-page" style="max-width:860px">
-        <div class="panel" style="margin-bottom:20px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <h3 style="margin:0">Game Rates</h3>
-            <span style="font-size:11px;color:var(--gold);background:rgba(240,160,80,.1);padding:4px 10px;border-radius:6px">⚠ LSB restart required for changes to take effect</span>
-          </div>
-          <div id="ratesContent"><div class="muted">Loading…</div></div>
-        </div>
-        <div class="panel" style="margin-bottom:20px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
-            <h3 style="margin:0">Feature Toggles</h3>
-            <span style="font-size:11px;color:var(--gold);background:rgba(240,160,80,.1);padding:4px 10px;border-radius:6px">⚠ LSB restart required for changes to take effect</span>
-          </div>
-          <div id="featuresContent"><div class="muted" style="font-size:12px">Loading…</div></div>
-        </div>
-        <div class="panel" style="margin-bottom:20px">
-          <h3>Server Announcement</h3>
-          <p class="muted" style="font-size:12px;margin:6px 0 12px">Sends a message to every online player via PrintToPlayer.</p>
-          <textarea id="announceMsg" class="lua-input" rows="3" placeholder="Enter announcement to send to all online players…"></textarea>
-          <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
-            <button class="btn-run" id="announceBtn">📢 Announce</button>
-            <span class="muted" id="announceStatus" style="font-size:12px"></span>
-          </div>
-          <div class="lua-out muted" id="announceOutput" style="margin-top:8px;min-height:0;display:none"></div>
-        </div>
-        <div class="panel" style="margin-bottom:20px">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-            <h3 style="margin:0">Settings File Scan</h3>
-            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-              <input id="scanFilter" placeholder="Filter keys…" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;font-family:monospace;width:180px">
-              <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap">
-                <input type="checkbox" id="scanHideCurated"> Hide curated
-              </label>
-              <button class="btn-sm" id="scanReloadBtn">Reload</button>
+      <div class="settings-layout">
+
+        <!-- ── Sidebar navigation ───────────────────────── -->
+        <nav class="settings-nav">
+          <div class="snav-group">Dashboard</div>
+          <button class="snav-item active" data-section="dashboardSection">General</button>
+          <button class="snav-item" data-section="dbSection">Database</button>
+
+          <div class="snav-group" style="border-top:1px solid var(--border);margin-top:6px">Infrastructure</div>
+          <button class="snav-item" data-section="dockerSection">Docker</button>
+          <button class="snav-item" data-section="lsbSection">LSB Updates</button>
+          <button class="snav-item" data-section="pathsSection">File Paths</button>
+
+          <div class="snav-group" style="border-top:1px solid var(--border);margin-top:6px">Game Server</div>
+          <button class="snav-item" data-section="ratesSection">Game Rates</button>
+          <button class="snav-item" data-section="featuresSection">Features</button>
+          <button class="snav-item" data-section="announceSection">Announcement</button>
+          <button class="snav-item" data-section="scanSection">Settings Scan</button>
+          <button class="snav-item" data-section="varsSection">Variables</button>
+        </nav>
+
+        <!-- ── Content area ─────────────────────────────── -->
+        <div class="settings-content" id="settingsContent">
+
+          <!-- Dashboard › General -->
+          <div class="settings-section active" id="dashboardSection">
+            <div class="sxh">
+              <h2>General</h2>
+            </div>
+            <div class="panel" id="dashboardSettingsPanel">
+              <div id="dashboardSettingsContent"><div class="muted" style="font-size:12px">Loading…</div></div>
             </div>
           </div>
-          <div id="scanContent"><div class="muted" style="font-size:12px">Click Reload to scan settings files.</div></div>
-        </div>
-        <div class="panel">
-          <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap">
-            <h3 style="margin:0">Server Variables</h3>
-            <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
-              <input id="newVarName" placeholder="varname" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;font-family:monospace;width:160px">
-              <input id="newVarVal" type="number" value="0" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-size:12px;width:80px">
-              <button class="btn-sm" id="newVarBtn">Add</button>
+
+          <!-- Dashboard › Database -->
+          <div class="settings-section" id="dbSection">
+            <div class="sxh">
+              <h2>Database Connection</h2>
+              <span class="warn-tag">⚠ Restart dashboard for changes to take effect</span>
+            </div>
+            <div class="panel" id="dbConfigPanel">
+              <div id="dbConfigContent"><div class="muted" style="font-size:12px">Loading…</div></div>
             </div>
           </div>
-          <div id="serverVarsContent"><div class="muted">Loading…</div></div>
+
+          <!-- Infrastructure › Docker -->
+          <div class="settings-section" id="dockerSection">
+            <div class="sxh">
+              <h2>Docker Containers</h2>
+              <button class="btn-sm" id="dockerRefreshBtn" style="margin-left:auto">↻ Refresh</button>
+            </div>
+            <div class="panel" id="dockerPanel">
+              <div id="dockerContent"><div class="muted" style="font-size:12px">Loading…</div></div>
+            </div>
+          </div>
+
+          <!-- Infrastructure › LSB Updates -->
+          <div class="settings-section" id="lsbSection">
+            <div class="sxh">
+              <h2>LSB Server Updates</h2>
+              <button class="btn-sm" id="lsbRefreshBtn" style="margin-left:auto">↻ Check Now</button>
+            </div>
+            <div class="panel" id="lsbUpdatePanel">
+              <div id="lsbUpdateContent"><div class="muted" style="font-size:12px">Loading…</div></div>
+            </div>
+          </div>
+
+          <!-- Infrastructure › File Paths -->
+          <div class="settings-section" id="pathsSection">
+            <div class="sxh">
+              <h2>File Paths</h2>
+              <span class="warn-tag">⚠ Restart dashboard for path changes to take effect</span>
+            </div>
+            <div class="panel" id="filePathsPanel">
+              <div id="filePathsContent"><div class="muted" style="font-size:12px">Loading…</div></div>
+            </div>
+          </div>
+
+          <!-- Game Server › Game Rates -->
+          <div class="settings-section" id="ratesSection">
+            <div class="sxh">
+              <h2>Game Rates</h2>
+              <span class="warn-tag">⚠ LSB restart required for changes to take effect</span>
+            </div>
+            <div class="panel">
+              <div id="ratesContent"><div class="muted">Loading…</div></div>
+            </div>
+          </div>
+
+          <!-- Game Server › Features -->
+          <div class="settings-section" id="featuresSection">
+            <div class="sxh">
+              <h2>Feature Toggles</h2>
+              <span class="warn-tag">⚠ LSB restart required for changes to take effect</span>
+            </div>
+            <div class="panel">
+              <div id="featuresContent"><div class="muted" style="font-size:12px">Loading…</div></div>
+            </div>
+          </div>
+
+          <!-- Game Server › Announcement -->
+          <div class="settings-section" id="announceSection">
+            <div class="sxh">
+              <h2>Server Announcement</h2>
+            </div>
+            <div class="panel">
+              <p class="muted" style="font-size:12px;margin:0 0 12px">Sends a message to every online player via PrintToPlayer.</p>
+              <textarea id="announceMsg" class="lua-input" rows="3" placeholder="Enter announcement to send to all online players…"></textarea>
+              <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
+                <button class="btn-run" id="announceBtn">📢 Announce</button>
+                <span class="muted" id="announceStatus" style="font-size:12px"></span>
+              </div>
+              <div class="lua-out muted" id="announceOutput" style="margin-top:8px;min-height:0;display:none"></div>
+            </div>
+          </div>
+
+          <!-- Game Server › Settings Scan -->
+          <div class="settings-section" id="scanSection">
+            <div class="sxh">
+              <h2>Settings File Scan</h2>
+              <div style="display:flex;gap:8px;align-items:center;margin-left:auto;flex-wrap:wrap">
+                <input id="scanFilter" placeholder="Filter keys…" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;font-family:monospace;width:180px">
+                <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;white-space:nowrap">
+                  <input type="checkbox" id="scanHideCurated"> Hide curated
+                </label>
+                <button class="btn-sm" id="scanReloadBtn">Reload</button>
+              </div>
+            </div>
+            <div class="panel">
+              <div id="scanContent"><div class="muted" style="font-size:12px">Click Reload to scan settings files.</div></div>
+            </div>
+          </div>
+
+          <!-- Game Server › Variables -->
+          <div class="settings-section" id="varsSection">
+            <div class="sxh">
+              <h2>Server Variables</h2>
+              <div style="margin-left:auto;display:flex;gap:6px;align-items:center">
+                <input id="newVarName" placeholder="varname" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;font-family:monospace;width:160px">
+                <input id="newVarVal" type="number" value="0" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-size:12px;width:80px">
+                <button class="btn-sm" id="newVarBtn">Add</button>
+              </div>
+            </div>
+            <div class="panel">
+              <div id="serverVarsContent"><div class="muted">Loading…</div></div>
+            </div>
+          </div>
+
+        </div><!-- /settings-content -->
+      </div><!-- /settings-layout -->
+    </div>
+
+    <!-- FILES (admin only) -->
+    <div class="page" id="filesPage">
+      <div style="display:grid;grid-template-columns:220px 1fr;gap:16px;height:calc(100vh - 90px)">
+        <!-- Directory tree -->
+        <div class="panel" style="display:flex;flex-direction:column;overflow:hidden;padding:12px">
+          <h3 style="margin:0 0 10px;font-size:13px">Directories</h3>
+          <div id="filesDirTree" style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:2px"></div>
+        </div>
+        <!-- File list + preview -->
+        <div style="display:flex;flex-direction:column;gap:12px;overflow:hidden;min-height:0">
+          <div class="panel" style="display:flex;flex-direction:column;overflow:hidden;flex:1;min-height:0">
+            <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">
+              <div style="flex:1;min-width:0">
+                <div id="filesPathLabel" style="font-size:13px;font-weight:600;color:var(--text)">Select a directory</div>
+                <div id="filesBreadcrumb" style="font-size:11px;color:var(--text3);margin-top:2px;word-break:break-all"></div>
+              </div>
+              <button class="btn-sm" id="filesUploadBtn" style="display:none">Upload File</button>
+              <input type="file" id="filesUploadInput" accept="image/*" style="display:none">
+              <button class="btn-sm" id="filesReloadBtn" style="display:none">Reload</button>
+            </div>
+            <div id="filesList" style="flex:1;overflow-y:auto;font-size:13px">
+              <div class="muted" style="font-size:12px">Select a directory from the left panel.</div>
+            </div>
+          </div>
+          <!-- Image preview (hidden until an image is selected) -->
+          <div id="filesPreviewPanel" class="panel" style="display:none;padding:10px">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+              <span id="filesPreviewName" style="font-size:12px;font-family:monospace;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span>
+              <button class="btn-sm" id="filesPreviewDownload">Download</button>
+              <button onclick="document.getElementById('filesPreviewPanel').style.display='none'" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1">✕</button>
+            </div>
+            <img id="filesPreviewImg" src="" alt="" style="max-width:100%;max-height:300px;object-fit:contain;border-radius:4px;display:block">
+          </div>
         </div>
       </div>
     </div>
@@ -818,6 +971,64 @@
   </div>
 </div>
 
+<!-- GitHub file/dir picker modal -->
+<div id="ghPickerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9001;align-items:center;justify-content:center">
+  <div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;width:580px;max-width:95vw;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <span style="font-size:16px">🐙</span>
+      <span style="font-weight:600;font-size:14px">Browse GitHub Repo</span>
+      <span id="ghPickerRepoLabel" class="muted" style="font-size:12px;margin-left:4px"></span>
+      <button id="ghPickerUpBtn" class="btn-sm" style="margin-left:auto;font-size:16px;padding:2px 10px" title="Go up">↑</button>
+      <button id="ghPickerCloseBtn" class="btn-sm" style="border-color:var(--text3);color:var(--text3)">✕</button>
+    </div>
+    <div id="ghPickerPathBar" style="padding:7px 18px;font-family:monospace;font-size:12px;color:var(--accent);background:var(--bg2);border-bottom:1px solid var(--border);word-break:break-all"></div>
+    <div id="ghPickerList" style="flex:1;overflow-y:auto;padding:6px 0;min-height:120px"></div>
+    <div id="ghPickerPreview" style="display:none;border-top:1px solid var(--border);padding:10px 18px;max-height:200px;overflow-y:auto">
+      <pre id="ghPickerPreviewCode" style="margin:0;font-size:11px;font-family:monospace;color:var(--text2);white-space:pre-wrap"></pre>
+    </div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">
+      <span class="muted" style="font-size:11px;flex:1" id="ghPickerHint">Navigate to a directory, then click Select.</span>
+      <button class="btn-sm" id="ghPickerViewBtn" style="display:none">View File</button>
+      <button class="btn-run" id="ghPickerSelectBtn">Select This Path</button>
+    </div>
+  </div>
+</div>
+
+<!-- Directory picker modal -->
+<div id="ctPickerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9002;align-items:center;justify-content:center">
+  <div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;width:540px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <span style="font-size:17px">🐳</span>
+      <span style="font-weight:600;font-size:14px">Browse Container</span>
+      <span id="ctPickerTitle" class="muted" style="font-size:12px"></span>
+      <button id="ctPickerUpBtn" class="btn-sm" style="margin-left:auto;font-size:16px;padding:2px 10px" title="Go up">↑</button>
+      <button id="ctPickerCloseBtn" class="btn-sm" style="border-color:var(--text3);color:var(--text3)">✕</button>
+    </div>
+    <div id="ctPickerPathBar" style="padding:8px 18px;font-family:monospace;font-size:12px;color:var(--accent);background:var(--bg2);border-bottom:1px solid var(--border);word-break:break-all">/</div>
+    <div id="ctPickerList" style="flex:1;overflow-y:auto;padding:8px 0;min-height:120px"></div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">
+      <span class="muted" style="font-size:11px;flex:1">Navigate to the directory you want, then click Select.</span>
+      <button class="btn-run" id="ctPickerSelectBtn">Select This Directory</button>
+    </div>
+  </div>
+</div>
+
+<div id="dirPickerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;width:540px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <span style="font-weight:600;font-size:14px">Browse Directory</span>
+      <button id="dpUpBtn" class="btn-sm" style="margin-left:auto;font-size:16px;padding:2px 10px" title="Go up">↑</button>
+      <button id="dpCloseBtn" class="btn-sm" style="border-color:var(--text3);color:var(--text3)">✕</button>
+    </div>
+    <div id="dpPathBar" style="padding:8px 18px;font-family:monospace;font-size:12px;color:var(--accent);background:var(--bg2);border-bottom:1px solid var(--border);word-break:break-all"></div>
+    <div id="dpList" style="flex:1;overflow-y:auto;padding:8px 0;min-height:120px"></div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center">
+      <span class="muted" style="font-size:11px;flex:1" id="dpSelectHint">Navigate to the directory you want, then click Select.</span>
+      <button class="btn-run" id="dpSelectBtn">Select This Directory</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ════════════════════════════════════════════════════════
 //  State & auth
@@ -863,10 +1074,31 @@ async function doLogin(){
 
 document.getElementById('logoutBtn').onclick = ()=>{ clearToken(); showLogin(); };
 
+let _dashSettings={serverName:'FFXI Dashboard',motd:'',autoSwitchZone:true,autologin:true};
+async function applyDashboardSettings(s){
+  _dashSettings=s;
+  const name=s.serverName||'FFXI Dashboard';
+  document.title=name;
+  const brand=document.querySelector('header .brand');
+  if(brand) brand.textContent='⚔ '+name;
+  if(s.motd){
+    let banner=document.getElementById('motdBanner');
+    if(!banner){
+      banner=document.createElement('div');
+      banner.id='motdBanner';
+      banner.style.cssText='background:rgba(122,173,255,.08);border-bottom:1px solid var(--border);padding:8px 20px;font-size:12px;color:var(--text2);display:flex;align-items:center;gap:10px';
+      const appView=document.getElementById('appView');
+      appView.insertBefore(banner, appView.firstChild);
+    }
+    banner.innerHTML=`<span style="flex:1">${esc(s.motd)}</span><button onclick="this.parentElement.style.display='none'" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:16px;line-height:1">✕</button>`;
+    banner.style.display='flex';
+  }
+}
 async function enterApp(){
   showApp();
-  const me = await api('/api/me');
+  const [me, dashSettings] = await Promise.all([api('/api/me'), api('/api/dashboard/settings').catch(()=>null)]);
   state.tier=me.tier; state.login=me.login; state.accid=me.accid; state.chars=me.characters||[];
+  if(dashSettings) applyDashboardSettings(dashSettings);
   const badge=document.getElementById('tierBadge');
   badge.textContent = state.tier; badge.className = 'badge '+state.tier;
   document.getElementById('whoami').textContent = state.login;
@@ -891,6 +1123,7 @@ document.querySelectorAll('.tab').forEach(t=>{
     if(t.dataset.page==='accountsPage') loadAccountsTab();
     if(t.dataset.page==='consolePage')  initConsole();
     if(t.dataset.page==='settingsPage') loadSettingsTab();
+    if(t.dataset.page==='filesPage')    initFilesTab();
     if(t.dataset.page==='dbPage')       initDbTab();
     if(t.dataset.page==='scriptsPage')  initScripts();
     if(t.dataset.page==='timersPage')   initTimers();
@@ -3434,7 +3667,7 @@ function _redrawOverlay(){
 // ════════════════════════════════════════════════════════
 //  WebSocket live updates
 // ════════════════════════════════════════════════════════
-let gWS=null, _wsDelay=4000;
+let gWS=null, _wsDelay=4000, _lastWindowerZone=null;
 function wsSend(msg){ if(gWS&&gWS.readyState===WebSocket.OPEN) gWS.send(JSON.stringify(msg)); }
 
 function connectWS(){
@@ -3475,15 +3708,18 @@ function connectWS(){
         const cutoff=Date.now()-30000;
         Object.keys(windowerLivePos).forEach(n=>{ if(windowerLivePos[n].ts<cutoff) delete windowerLivePos[n]; });
         if(calState.active) _calUpdateUI();
-        // Auto-switch map to player's current zone
+        // Auto-switch map when the player moves to a new zone (not on every tick)
         const fresh=Object.values(windowerLivePos).filter(p=>p.ts>Date.now()-5000);
-        if(fresh.length>0){
-          const sel=document.getElementById('zoneSelect');
-          const playerZone=String(fresh[0].zone);
-          if(sel&&sel.value!==playerZone&&_allZoneOptions.some(o=>String(o.id)===playerZone)){
-            sel.value=playerZone; loadZoneMap(false);
+        const playerZone=fresh.length>0?String(fresh[0].zone):null;
+        if(playerZone&&playerZone!==_lastWindowerZone){
+          _lastWindowerZone=playerZone;
+          if(_dashSettings.autoSwitchZone){
+            const sel=document.getElementById('zoneSelect');
+            if(sel&&sel.value!==playerZone&&_allZoneOptions.some(o=>String(o.id)===playerZone)){
+              sel.value=playerZone; loadZoneMap(false);
+            }
           }
-        }
+        } else if(!playerZone){ _lastWindowerZone=null; }
       }
       if(type==='log') appendLogLines(data.file, data.lines);
       if(type==='positions'){
@@ -3599,9 +3835,218 @@ async function runLua(){
 // ════════════════════════════════════════════════════════
 let settingsInited=false;
 
+// ── Directory picker ─────────────────────────────────────────────────────────
+(function(){
+  let _dpCallback=null;
+  let _dpCurrent='/';
+  const overlay=()=>document.getElementById('dirPickerOverlay');
+  const list=()=>document.getElementById('dpList');
+  const pathBar=()=>document.getElementById('dpPathBar');
+
+  async function dpNavigate(dirPath){
+    _dpCurrent=dirPath;
+    pathBar().textContent=dirPath;
+    list().innerHTML='<div class="muted" style="padding:12px 18px;font-size:12px">Loading…</div>';
+    try {
+      const d=await api('/api/fs/browse?path='+encodeURIComponent(dirPath));
+      if(!d.dirs.length){
+        list().innerHTML='<div class="muted" style="padding:12px 18px;font-size:12px">(empty directory)</div>';
+        return;
+      }
+      list().innerHTML=d.dirs.map(e=>`
+        <div class="dp-row" data-path="${esc(e.path)}"
+          style="padding:7px 18px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;border-bottom:1px solid var(--border)"
+          onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+          <span style="color:var(--gold);font-size:14px">📁</span>
+          <span style="font-family:monospace">${esc(e.name)}</span>
+        </div>`).join('');
+      list().querySelectorAll('.dp-row').forEach(row=>{
+        row.onclick=()=>dpNavigate(row.dataset.path);
+      });
+      document.getElementById('dpUpBtn').disabled=!d.parent;
+      document.getElementById('dpUpBtn').onclick=()=>{ if(d.parent) dpNavigate(d.parent); };
+    } catch(e){
+      list().innerHTML=`<div style="color:var(--offline);padding:12px 18px;font-size:12px">Error: ${esc(e.message)}</div>`;
+    }
+  }
+
+  window.openDirPicker=function(startPath, callback){
+    _dpCallback=callback;
+    overlay().style.display='flex';
+    dpNavigate(startPath||'/');
+  };
+
+  document.getElementById('dpCloseBtn').onclick=()=>{ overlay().style.display='none'; };
+  document.getElementById('dirPickerOverlay').onclick=(e)=>{ if(e.target===overlay()) overlay().style.display='none'; };
+  document.getElementById('dpSelectBtn').onclick=()=>{
+    if(_dpCallback) _dpCallback(_dpCurrent);
+    overlay().style.display='none';
+  };
+})();
+
+// ── GitHub repo browser ───────────────────────────────────────────────────────
+(function(){
+  let _ghCallback=null;
+  let _ghCurrent='';
+  let _ghBranch='base';
+  const overlay=()=>document.getElementById('ghPickerOverlay');
+  const list=()=>document.getElementById('ghPickerList');
+  const pathBar=()=>document.getElementById('ghPickerPathBar');
+  const preview=()=>document.getElementById('ghPickerPreview');
+  const previewCode=()=>document.getElementById('ghPickerPreviewCode');
+  const viewBtn=()=>document.getElementById('ghPickerViewBtn');
+
+  async function ghNav(dirPath){
+    _ghCurrent=dirPath;
+    pathBar().textContent=dirPath||'(root)';
+    preview().style.display='none';
+    viewBtn().style.display='none';
+    list().innerHTML='<div class="muted" style="padding:12px 18px;font-size:12px">Loading…</div>';
+    try {
+      const params='?path='+encodeURIComponent(dirPath)+'&branch='+encodeURIComponent(_ghBranch);
+      const d=await api('/api/github/browse'+params);
+      if(d.file){
+        // Navigated to a file directly — shouldn't normally happen
+        list().innerHTML='<div class="muted" style="padding:12px 18px;font-size:12px">This is a file, not a directory.</div>';
+        return;
+      }
+      if(!d.items?.length){
+        list().innerHTML='<div class="muted" style="padding:12px 18px;font-size:12px">(empty)</div>';
+        return;
+      }
+      list().innerHTML=d.items.map(item=>`
+        <div class="gh-row" data-path="${esc(item.path)}" data-type="${esc(item.type)}"
+          data-url="${esc(item.htmlUrl||'')}" data-dl="${esc(item.downloadUrl||'')}"
+          style="padding:7px 18px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;border-bottom:1px solid var(--border)"
+          onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+          <span style="font-size:14px;width:18px;text-align:center">${item.type==='dir'?'📁':'📄'}</span>
+          <span style="font-family:monospace;flex:1">${esc(item.name)}</span>
+          ${item.type==='file'?'<span class="muted" style="font-size:11px">'+formatBytes(item.size)+'</span>':''}
+          ${item.type==='file'?'<a href="'+esc(item.htmlUrl||'')+'" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent)" onclick="event.stopPropagation()">↗</a>':''}
+        </div>`).join('');
+      document.getElementById('ghPickerUpBtn').disabled=!d.parent&&d.path!=='';
+      document.getElementById('ghPickerUpBtn').onclick=()=>{ if(d.parent!==null) ghNav(d.parent||''); };
+      list().querySelectorAll('.gh-row').forEach(row=>{
+        row.onclick=()=>{
+          if(row.dataset.type==='dir'){ ghNav(row.dataset.path); }
+          else { _ghCurrent=row.dataset.path; pathBar().textContent=row.dataset.path; viewBtn().style.display=''; }
+        };
+      });
+    } catch(e){
+      list().innerHTML='<div style="color:var(--offline);padding:12px 18px;font-size:12px">Error: '+esc(e.message)+'</div>';
+    }
+  }
+
+  window.openGithubPicker=function(startPath, branch, callback){
+    _ghCallback=callback;
+    _ghBranch=branch||'base';
+    document.getElementById('ghPickerRepoLabel').textContent='';
+    api('/api/github/config').then(cfg=>{
+      document.getElementById('ghPickerRepoLabel').textContent=cfg.repo?'('+cfg.repo+')':'';
+    }).catch(()=>{});
+    overlay().style.display='flex';
+    ghNav(startPath||'');
+  };
+
+  viewBtn().onclick=async()=>{
+    preview().style.display='';
+    previewCode().textContent='Loading…';
+    try {
+      const r=await api('/api/github/content?path='+encodeURIComponent(_ghCurrent)+'&branch='+encodeURIComponent(_ghBranch));
+      previewCode().textContent=r.content?.slice(0,4000)||(r.error||'(empty)');
+    } catch(e){ previewCode().textContent='Error: '+e.message; }
+  };
+  document.getElementById('ghPickerCloseBtn').onclick=()=>{ overlay().style.display='none'; };
+  overlay().addEventListener('click',e=>{ if(e.target===overlay()) overlay().style.display='none'; });
+  document.getElementById('ghPickerSelectBtn').onclick=()=>{
+    if(_ghCallback) _ghCallback(_ghCurrent);
+    overlay().style.display='none';
+  };
+})();
+
+// ── Docker container filesystem browser ───────────────────────────────────────
+(function(){
+  let _ctCallback=null;
+  let _ctContainerId='';
+  let _ctCurrent='/';
+  const overlay=()=>document.getElementById('ctPickerOverlay');
+  const list=()=>document.getElementById('ctPickerList');
+  const pathBar=()=>document.getElementById('ctPickerPathBar');
+  const title=()=>document.getElementById('ctPickerTitle');
+
+  async function ctNav(dirPath){
+    _ctCurrent=dirPath;
+    pathBar().textContent=dirPath||'/';
+    list().innerHTML='<div class="muted" style="padding:12px 18px;font-size:12px">Loading…</div>';
+    try{
+      const d=await api('/api/docker/containers/'+encodeURIComponent(_ctContainerId)+'/fs/browse?path='+encodeURIComponent(dirPath));
+      if(!d.items?.length){
+        list().innerHTML='<div class="muted" style="padding:12px 18px;font-size:12px">(empty)</div>';
+      } else {
+        list().innerHTML=d.items.map(item=>`
+          <div class="ct-row" data-path="${esc(item.path)}" data-type="${esc(item.type)}"
+            style="padding:7px 18px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;border-bottom:1px solid var(--border)"
+            onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background=''">
+            <span style="font-size:14px;width:18px;text-align:center">${item.type==='dir'?'📁':'📄'}</span>
+            <span style="font-family:monospace;flex:1">${esc(item.name)}</span>
+          </div>`).join('');
+        document.getElementById('ctPickerUpBtn').disabled=!d.parent;
+        document.getElementById('ctPickerUpBtn').onclick=()=>{ if(d.parent) ctNav(d.parent); };
+        list().querySelectorAll('.ct-row').forEach(row=>{
+          row.onclick=()=>{
+            if(row.dataset.type==='dir') ctNav(row.dataset.path);
+            else { _ctCurrent=row.dataset.path; pathBar().textContent=row.dataset.path; }
+          };
+        });
+      }
+    }catch(e){
+      list().innerHTML='<div style="color:var(--offline);padding:12px 18px;font-size:12px">Error: '+esc(e.message)+'</div>';
+    }
+  }
+
+  window.openContainerPicker=function(containerId, startPath, callback){
+    _ctCallback=callback;
+    _ctContainerId=containerId;
+    title().textContent='Container: '+containerId.slice(0,12);
+    overlay().style.display='flex';
+    ctNav(startPath||'/');
+  };
+
+  document.getElementById('ctPickerCloseBtn').onclick=()=>{ overlay().style.display='none'; };
+  overlay().addEventListener('click',e=>{ if(e.target===overlay()) overlay().style.display='none'; });
+  document.getElementById('ctPickerSelectBtn').onclick=()=>{
+    if(_ctCallback) _ctCallback(_ctCurrent);
+    overlay().style.display='none';
+  };
+})();
+
+const _settingsLoaded=new Set();
+
+function showSettingsSection(sectionId){
+  document.querySelectorAll('.settings-section').forEach(s=>s.classList.toggle('active',s.id===sectionId));
+  document.querySelectorAll('.snav-item[data-section]').forEach(i=>i.classList.toggle('active',i.dataset.section===sectionId));
+  const content=document.getElementById('settingsContent');
+  if(content) content.scrollTop=0;
+  if(!_settingsLoaded.has(sectionId)){
+    _settingsLoaded.add(sectionId);
+    switch(sectionId){
+      case 'dashboardSection': loadDashboardSettingsPanel(); break;
+      case 'dbSection':        loadDbConfigPanel(); break;
+      case 'dockerSection':    loadDockerPanel(); break;
+      case 'lsbSection':       loadLsbUpdatePanel(); break;
+      case 'pathsSection':     loadFilePathsPanel(); break;
+      case 'ratesSection':     loadRates(); break;
+      case 'featuresSection':  loadFeatures(); break;
+      case 'varsSection':      loadServerVars(); break;
+    }
+  }
+}
+
 async function loadSettingsTab(){
   if(!settingsInited){
     settingsInited=true;
+    document.getElementById('dockerRefreshBtn').onclick=()=>{ _settingsLoaded.delete('dockerSection'); loadDockerPanel(); };
+    document.getElementById('lsbRefreshBtn').onclick=()=>loadLsbUpdatePanel(true);
     document.getElementById('announceBtn').onclick=sendAnnouncement;
     document.getElementById('scanReloadBtn').onclick=loadScan;
     document.getElementById('scanFilter').oninput=renderScan;
@@ -3617,8 +4062,539 @@ async function loadSettingsTab(){
         await loadServerVars();
       }catch(e){ alert('Error: '+e.message); }
     };
+    document.querySelectorAll('.snav-item[data-section]').forEach(item=>{
+      item.onclick=()=>showSettingsSection(item.dataset.section);
+    });
+    showSettingsSection('dashboardSection');
   }
-  await Promise.all([loadRates(), loadFeatures(), loadServerVars()]);
+}
+
+async function loadDashboardSettingsPanel(){
+  const el=document.getElementById('dashboardSettingsContent');
+  try{
+    const s=await api('/api/dashboard/settings');
+    applyDashboardSettings(s);
+    const isAdmin=state.tier==='admin';
+    el.innerHTML=`
+      <div style="display:grid;gap:14px">
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+          <div>
+            <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Server Name</label>
+            <input id="dsServerName" value="${esc(s.serverName||'')}" maxlength="100" ${isAdmin?'':'disabled'}
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;box-sizing:border-box">
+          </div>
+          ${isAdmin?`<button class="btn-sm" id="dsNameSave">Save</button>`:''}
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">MOTD <span style="color:var(--text3)">(shown as banner after login)</span></label>
+          <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end">
+            <textarea id="dsMotd" rows="2" maxlength="500" ${isAdmin?'':'disabled'}
+              style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 10px;border-radius:6px;font-size:13px;resize:vertical;box-sizing:border-box">${esc(s.motd||'')}</textarea>
+            ${isAdmin?`<button class="btn-sm" id="dsMotdSave">Save</button>`:''}
+          </div>
+        </div>
+        <div style="display:flex;gap:24px;flex-wrap:wrap">
+          <label style="display:flex;align-items:center;gap:8px;cursor:${isAdmin?'pointer':'default'}">
+            <input type="checkbox" id="dsAutoSwitch" ${s.autoSwitchZone?'checked':''} ${isAdmin?'':'disabled'}
+              style="width:15px;height:15px;accent-color:var(--accent)">
+            <span style="font-size:13px">Auto-switch zone when Windower moves</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:${isAdmin?'pointer':'default'}">
+            <input type="checkbox" id="dsAutologin" ${s.autologin?'checked':''} ${isAdmin?'':'disabled'}
+              style="width:15px;height:15px;accent-color:var(--accent)">
+            <span style="font-size:13px">Autologin <span class="muted" style="font-size:11px">(auto-login as top GM on page load)</span></span>
+          </label>
+        </div>
+      </div>`;
+    if(isAdmin){
+      const save=async(patch)=>{
+        try{
+          const r=await api('/api/dashboard/settings',{method:'POST',body:JSON.stringify(patch)});
+          applyDashboardSettings(r.settings||{..._dashSettings,...patch});
+        }catch(e){ alert('Error: '+e.message); }
+      };
+      document.getElementById('dsNameSave').onclick=()=>save({serverName:document.getElementById('dsServerName').value.trim()||'FFXI Dashboard'});
+      document.getElementById('dsMotdSave').onclick=()=>save({motd:document.getElementById('dsMotd').value});
+      document.getElementById('dsAutoSwitch').onchange=e=>save({autoSwitchZone:e.target.checked});
+      document.getElementById('dsAutologin').onchange=e=>save({autologin:e.target.checked});
+    }
+  }catch(e){ el.innerHTML=`<div class="muted" style="font-size:12px">Error: ${esc(e.message)}</div>`; }
+}
+
+async function loadDbConfigPanel(){
+  const el=document.getElementById('dbConfigContent');
+  if(state.tier!=='admin'){ el.innerHTML='<div class="muted" style="font-size:12px">Admin only.</div>'; return; }
+  try{
+    const d=await api('/api/dashboard/db');
+    const {effective,saved}=d;
+    const fields=[
+      {key:'DB_HOST', label:'Host',     type:'text',   placeholder:'localhost', col:1},
+      {key:'DB_PORT', label:'Port',     type:'number',  placeholder:'3306',     col:1},
+      {key:'DB_NAME', label:'Database', type:'text',   placeholder:'xidb',      col:1},
+      {key:'DB_USER', label:'User',     type:'text',   placeholder:'xiadmin',   col:2},
+      {key:'DB_PASS', label:'Password', type:'password',placeholder:'(unchanged)',col:2},
+    ];
+    let html=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px 20px">`;
+    fields.forEach(({key,label,type,placeholder,col})=>{
+      const val=effective[key]||'';
+      const isSaved=saved&&saved[key]!=null;
+      html+=`<div style="grid-column:${col}">
+        <label style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px;margin-bottom:4px">
+          ${esc(label)}
+          ${isSaved?`<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:rgba(122,173,255,.15);color:var(--accent)">custom</span>`:
+                    `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg3);color:var(--text3)">default</span>`}
+        </label>
+        <input id="dbc-${key}" type="${type}" value="${type==='password'?'':esc(val)}"
+          placeholder="${esc(type==='password'?(d.hasPassword?'(unchanged)':'(empty)'):placeholder)}"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;font-family:monospace;box-sizing:border-box">
+      </div>`;
+    });
+    html+=`</div>
+      <div style="display:flex;gap:8px;margin-top:14px;align-items:center;flex-wrap:wrap">
+        <button class="btn-sm" id="dbcSaveBtn" style="border-color:var(--ok);color:var(--ok)">Save</button>
+        <button class="btn-sm" id="dbcTestBtn">Test Connection</button>
+        <span id="dbcStatus" style="font-size:12px;color:var(--text3)"></span>
+      </div>`;
+    el.innerHTML=html;
+
+    const getVals=()=>({
+      DB_HOST: document.getElementById('dbc-DB_HOST').value.trim(),
+      DB_PORT: document.getElementById('dbc-DB_PORT').value.trim(),
+      DB_USER: document.getElementById('dbc-DB_USER').value.trim(),
+      DB_PASS: document.getElementById('dbc-DB_PASS').value,
+      DB_NAME: document.getElementById('dbc-DB_NAME').value.trim(),
+    });
+    const setStatus=(msg,ok)=>{
+      const s=document.getElementById('dbcStatus');
+      s.textContent=msg; s.style.color=ok===true?'var(--ok)':ok===false?'var(--danger)':'var(--text3)';
+    };
+    document.getElementById('dbcSaveBtn').onclick=async()=>{
+      try{
+        await api('/api/dashboard/db',{method:'POST',body:JSON.stringify(getVals())});
+        setStatus('Saved — restart required',null);
+        await loadDbConfigPanel();
+      }catch(e){ setStatus('Error: '+e.message,false); }
+    };
+    document.getElementById('dbcTestBtn').onclick=async()=>{
+      setStatus('Testing…',null);
+      try{
+        const r=await api('/api/dashboard/db/test',{method:'POST',body:JSON.stringify(getVals())});
+        setStatus(`Connected — MariaDB ${r.version} / ${r.database}`,true);
+      }catch(e){ setStatus('Failed: '+e.message,false); }
+    };
+  }catch(e){ el.innerHTML=`<div class="muted" style="font-size:12px">Error: ${esc(e.message)}</div>`; }
+}
+
+async function loadDockerPanel(){
+  const el=document.getElementById('dockerContent');
+  if(state.tier!=='admin'){ el.innerHTML='<div class="muted" style="font-size:12px">Admin only.</div>'; return; }
+  try {
+    const d=await api('/api/docker/status');
+    if(!d.available){
+      el.innerHTML=`
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:22px">🐳</span>
+          <div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:6px">Docker socket not available</div>
+            <div class="muted" style="font-size:12px;margin-bottom:10px">To enable Docker management, add the socket mount to <code>docker-compose.yml</code>:</div>
+            <pre style="background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 14px;font-size:11px;margin:0;overflow-x:auto">    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock</pre>
+            <div class="muted" style="font-size:11px;margin-top:8px">Then run <code>docker compose up -d --force-recreate</code> to apply.</div>
+          </div>
+        </div>`;
+      return;
+    }
+    const stateColor=s=>s==='running'?'var(--online)':s==='exited'?'var(--offline)':'var(--gold)';
+    const stateIcon=s=>s==='running'?'●':'○';
+    const fmtAge=ts=>{ const s=Math.floor(Date.now()/1000-ts); if(s<120) return s+'s'; if(s<7200) return Math.floor(s/60)+'m'; if(s<172800) return Math.floor(s/3600)+'h'; return Math.floor(s/86400)+'d'; };
+    let rows=d.containers.map(c=>`
+      <tr class="docker-row" data-id="${esc(c.id)}" style="border-top:1px solid var(--border)">
+        <td style="padding:8px 12px">
+          <span style="color:${stateColor(c.state)};font-size:13px">${stateIcon(c.state)}</span>
+        </td>
+        <td style="padding:8px 12px;font-weight:600;font-size:13px">${esc(c.names[0]||c.id)}</td>
+        <td style="padding:8px 12px;font-size:12px;color:var(--text2);font-family:monospace">${esc(c.image)}</td>
+        <td style="padding:8px 12px;font-size:12px;color:${stateColor(c.state)}">${esc(c.status)}</td>
+        <td style="padding:8px 12px;font-size:11px;color:var(--muted)">${fmtAge(c.created)}</td>
+        <td style="padding:8px 12px;font-size:11px;color:var(--muted)">${c.ports.join(', ')||'—'}</td>
+        <td style="padding:8px 12px;text-align:right">
+          <button class="btn-sm docker-logs-btn" data-id="${esc(c.id)}" data-name="${esc(c.names[0]||c.id)}" style="margin-right:4px;font-size:11px">Logs</button>
+          <button class="btn-sm docker-restart-btn" data-id="${esc(c.id)}" data-name="${esc(c.names[0]||c.id)}" style="font-size:11px">Restart</button>
+        </td>
+      </tr>
+      <tr class="docker-log-row" id="logs-${esc(c.id)}" style="display:none">
+        <td colspan="7" style="padding:0 12px 10px">
+          <div class="docker-log-box" style="background:var(--bg2);border-radius:6px;padding:10px;font-family:monospace;font-size:11px;max-height:220px;overflow-y:auto;white-space:pre-wrap;color:var(--text2)">Loading…</div>
+        </td>
+      </tr>`).join('');
+    el.innerHTML=`
+      <div style="font-size:11px;color:var(--muted);margin-bottom:10px">Docker ${esc(d.serverVersion||'')} — ${d.containers.length} container${d.containers.length!==1?'s':''}</div>
+      <table style="width:100%;border-collapse:collapse;font-size:12px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:6px 12px;text-align:left;color:var(--muted);font-weight:600;width:24px"></th>
+          <th style="padding:6px 12px;text-align:left;color:var(--muted);font-weight:600">Name</th>
+          <th style="padding:6px 12px;text-align:left;color:var(--muted);font-weight:600">Image</th>
+          <th style="padding:6px 12px;text-align:left;color:var(--muted);font-weight:600">Status</th>
+          <th style="padding:6px 12px;text-align:left;color:var(--muted);font-weight:600">Age</th>
+          <th style="padding:6px 12px;text-align:left;color:var(--muted);font-weight:600">Ports</th>
+          <th style="padding:6px 12px;text-align:right;color:var(--muted);font-weight:600">Actions</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>`;
+
+    el.querySelectorAll('.docker-restart-btn').forEach(btn=>{
+      btn.onclick=async()=>{
+        if(!confirm(`Restart container "${btn.dataset.name}"?`)) return;
+        btn.disabled=true; btn.textContent='…';
+        try {
+          await api(`/api/docker/containers/${btn.dataset.id}/restart`,{method:'POST'});
+          btn.textContent='✓'; setTimeout(loadDockerPanel, 3000);
+        } catch(e){ btn.textContent='Restart'; btn.disabled=false; alert('Error: '+e.message); }
+      };
+    });
+
+    el.querySelectorAll('.docker-logs-btn').forEach(btn=>{
+      btn.onclick=async()=>{
+        const logRow=document.getElementById('logs-'+btn.dataset.id);
+        const box=logRow.querySelector('.docker-log-box');
+        if(logRow.style.display==='none'){
+          logRow.style.display='';
+          try {
+            const r=await api(`/api/docker/containers/${btn.dataset.id}/logs?tail=80`);
+            box.textContent=r.lines.join('\n')||'(no output)';
+            box.scrollTop=box.scrollHeight;
+          } catch(e){ box.textContent='Error: '+e.message; }
+        } else {
+          logRow.style.display='none';
+        }
+      };
+    });
+
+  } catch(e){
+    el.innerHTML='<div style="color:var(--offline);font-size:12px">Error: '+String(e)+'</div>';
+  }
+}
+
+async function loadLsbUpdatePanel(forceRefresh=false){
+  const el=document.getElementById('lsbUpdateContent');
+  if(state.tier!=='admin'){ el.innerHTML='<div class="muted" style="font-size:12px">Admin only.</div>'; return; }
+  try {
+    const [cfg, status] = await Promise.all([
+      api('/api/lsb/config'),
+      api('/api/lsb/status'+(forceRefresh?'?refresh=1':'')).catch(e=>({error:e.message})),
+    ]);
+
+    const fmtDate=iso=>{ if(!iso) return '—'; const d=new Date(iso); return d.toLocaleDateString()+' '+d.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}); };
+    const commitBadge=(cmp,label)=>{
+      if(!cmp) return '';
+      const b=cmp.behindBy||0;
+      if(cmp.status==='identical'||b===0) return '<span style="color:var(--online);font-size:12px;font-weight:600">Up to date</span>';
+      if(cmp.status==='diverged')         return '<span style="color:var(--offline);font-size:12px;font-weight:600">Diverged</span>';
+      return '<span style="color:var(--gold);font-size:12px;font-weight:600">'+b+' commit'+(b!==1?'s':'')+' behind '+(label||'')+'</span>';
+    };
+    const repoCard=(title,info,repo)=>!info?'':`
+      <div style="background:var(--bg2);border-radius:8px;padding:12px 16px">
+        <div class="muted" style="font-size:10px;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">`+esc(title)+`</div>
+        `+(info.error?`<div style="color:var(--offline);font-size:12px">`+esc(info.error)+`</div>`:`
+        <div style="font-family:monospace;font-size:13px;margin-bottom:3px">
+          `+(repo?`<a href="https://github.com/`+esc(repo)+`/commit/`+esc(info.sha||'')+`" target="_blank" rel="noopener" style="color:var(--accent)">`+esc(info.shortSha||info.sha?.slice(0,7)||'?')+`</a>`:esc(info.shortSha||info.sha?.slice(0,7)||'?'))+`
+          `+(info.branch?`<span class="muted" style="font-size:11px">(`+esc(info.branch)+`)</span>`:'')+`
+        </div>
+        `+(info.message?`<div style="font-size:12px;margin-bottom:3px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">`+esc(info.message)+`</div>`:'')+`
+        <div class="muted" style="font-size:11px">`+fmtDate(info.date)+(info.author?' — '+esc(info.author):'')+`</div>`)+`
+      </div>`;
+    const commitsTable=(rows,heading)=>!rows?.length?'':(`
+      <div class="muted" style="font-size:11px;margin:14px 0 6px">`+heading+`</div>
+      <div style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--bg2)">
+            <th style="padding:5px 10px;text-align:left;color:var(--muted);font-weight:600;width:58px">SHA</th>
+            <th style="padding:5px 10px;text-align:left;color:var(--muted);font-weight:600">Message</th>
+            <th style="padding:5px 10px;text-align:left;color:var(--muted);font-weight:600;width:110px">Author</th>
+            <th style="padding:5px 10px;text-align:left;color:var(--muted);font-weight:600;width:100px">Date</th>
+          </tr></thead>
+          <tbody>`+rows.map((c,i)=>`
+            <tr style="border-top:1px solid var(--border);`+(i%2?'background:var(--bg2)':'')+`">
+              <td style="padding:5px 10px;font-family:monospace"><a href="`+esc(c.url||'')+`" target="_blank" rel="noopener" style="color:var(--accent)">`+esc(c.sha)+`</a></td>
+              <td style="padding:5px 10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:320px" title="`+esc(c.message)+`">`+esc(c.message)+`</td>
+              <td style="padding:5px 10px;color:var(--muted)">`+esc(c.author)+`</td>
+              <td style="padding:5px 10px;color:var(--muted)">`+fmtDate(c.date)+`</td>
+            </tr>`).join('')+`
+          </tbody>
+        </table>
+      </div>`);
+
+    // Config form
+    let configHtml=`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+        <div>
+          <label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Your Fork (GitHub repo)</label>
+          <input id="lsbForkRepo" class="lua-input" style="width:100%;box-sizing:border-box" value="`+esc(cfg.forkRepo||'')+`" placeholder="YourUsername/server">
+        </div>
+        <div>
+          <label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Upstream GitHub Repo</label>
+          <input id="lsbUpstreamRepo" class="lua-input" style="width:100%;box-sizing:border-box" value="`+esc(cfg.upstreamRepo||'LandSandBoat/server')+`" placeholder="LandSandBoat/server">
+        </div>
+        <div>
+          <label class="muted" style="font-size:11px;display:block;margin-bottom:4px">Branch</label>
+          <input id="lsbUpstreamBranch" class="lua-input" style="width:100%;box-sizing:border-box" value="`+esc(cfg.upstreamBranch||'base')+`" placeholder="base">
+        </div>
+        <div>
+          <label class="muted" style="font-size:11px;display:block;margin-bottom:4px">GitHub Token <span class="muted">(optional — higher rate limit)</span></label>
+          <input id="lsbGithubToken" class="lua-input" type="password" style="width:100%;box-sizing:border-box" value="`+esc(cfg.githubToken||'')+`" placeholder="ghp_…">
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-bottom:14px;padding:8px 12px;border-radius:6px;background:var(--bg3)">
+        ℹ️ The LSB server runs in Docker — its <code style="font-size:10px">.git</code> directory is stripped at image build time, so local version detection is not available. Use your GitHub fork above for update tracking.
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:20px">
+        <button class="btn-run" id="lsbSaveBtn">Save Config</button>
+        <span id="lsbSaveMsg" style="font-size:12px;line-height:30px;color:var(--online)"></span>
+      </div>`;
+
+    // Status section
+    let statusHtml='';
+    if(!status.configured){
+      statusHtml='<div class="muted" style="font-size:12px">Enter your fork repo (e.g. <code>YourUsername/server</code>) above and click Save Config, then Check Now.</div>';
+    } else if(status.error){
+      statusHtml='<div style="color:var(--offline);font-size:12px;padding:10px 14px;border-radius:6px;background:rgba(220,80,80,.1)">'+esc(status.error)+'</div>';
+    } else {
+      const cols=1+(status.fork?1:0)+(status.local?1:0);
+      statusHtml='<div style="display:grid;grid-template-columns:repeat('+cols+',1fr);gap:10px;margin-bottom:12px">';
+      if(status.local)     statusHtml+=repoCard('Your Local Build',   status.local,   status.forkRepo||status.upstreamRepo);
+      if(status.fork)      statusHtml+=repoCard('Your Fork',          status.fork,    status.forkRepo);
+      statusHtml+=                     repoCard('Upstream ('+esc(status.upstream?.branch||'')+')', status.upstream, status.upstreamRepo);
+      statusHtml+='</div>';
+
+      // Comparison badges
+      statusHtml+='<div style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-bottom:6px">';
+      if(status.forkVsUpstream)  statusHtml+=commitBadge(status.forkVsUpstream,'upstream');
+      if(status.localVsRef)      statusHtml+='<span class="muted" style="font-size:11px">|</span>'+commitBadge(status.localVsRef,'fork');
+      statusHtml+='<span class="muted" style="font-size:11px;margin-left:auto">'+fmtDate(status.checkedAt)+(status.cached?' (cached)':'')+`</span>`;
+      if(status.forkRepo&&status.upstream)
+        statusHtml+='<a href="https://github.com/'+esc(status.upstreamRepo||'')+'/compare/'+esc(status.forkRepo?.split('/')[1]||'HEAD')+':'+esc(status.upstream?.branch||'')+'...'+esc(status.upstream?.branch||'')+'" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent)">View diff ↗</a>';
+      statusHtml+='</div>';
+
+      // Missing commits tables
+      if(status.forkMissingCommits?.length)
+        statusHtml+=commitsTable(status.forkMissingCommits,'Commits your fork is missing from upstream (newest first):');
+      if(status.localMissingCommits?.length)
+        statusHtml+=commitsTable(status.localMissingCommits,'Commits your local build is missing (newest first):');
+    }
+
+    el.innerHTML=configHtml+statusHtml;
+
+    document.getElementById('lsbSaveBtn').onclick=async()=>{
+      const msg=document.getElementById('lsbSaveMsg');
+      try{
+        await api('/api/lsb/config',{method:'POST',body:JSON.stringify({
+          forkRepo:      document.getElementById('lsbForkRepo').value,
+          upstreamRepo:  document.getElementById('lsbUpstreamRepo').value,
+          upstreamBranch:document.getElementById('lsbUpstreamBranch').value,
+          githubToken:   document.getElementById('lsbGithubToken').value,
+        })});
+        msg.textContent='Saved.';
+        setTimeout(()=>{ msg.textContent=''; loadLsbUpdatePanel(true); },1200);
+      } catch(e){ msg.style.color='var(--offline)'; msg.textContent='Error: '+e.message; }
+    };
+
+  } catch(e){
+    el.innerHTML='<div style="color:var(--offline);font-size:12px">Error: '+String(e)+'</div>';
+  }
+}
+
+async function loadFilePathsPanel(){
+  const el=document.getElementById('filePathsContent');
+  if(state.tier!=='admin'){ el.innerHTML='<div class="muted" style="font-size:12px">Admin only.</div>'; return; }
+  try{
+    const [d, ghCfgRaw, dockerRaw] = await Promise.all([
+      api('/api/dashboard/paths'),
+      api('/api/github/config').catch(()=>null),
+      api('/api/docker/status').catch(()=>null),
+    ]);
+    const ghCfg=ghCfgRaw||{repo:'',branch:'base',token:'',paths:{}};
+    const dockerContainers=(dockerRaw?.available&&dockerRaw.containers)||[];
+    const lsbContainers=dockerContainers.filter(c=>c.image&&c.image.includes('landsandboat'));
+    const allContainers=lsbContainers.length?lsbContainers:dockerContainers;
+    const {effective,saved,defaults}=d;
+    const configurable=[
+      {key:'LSB_SCRIPTS_DIR',  label:'Scripts Directory',  desc:'Lua enum/catalog files (quests, effects, merits, etc.)'},
+      {key:'LSB_SETTINGS_DIR', label:'Settings Directory', desc:'main.lua, map.lua, login.lua — read/written by Game Rates'},
+      {key:'LSB_LOG_DIR',      label:'Log Directory',      desc:'Server logs and dashboard_positions.json (live positions)'},
+    ];
+    const readonly=[
+      {key:'MAPS_DIR',     label:'Map Images'},
+      {key:'UPLOADS_DIR',  label:'Uploaded Images'},
+      {key:'DATA_DIR',     label:'Dashboard Data'},
+    ];
+    const hasGh=!!ghCfg.repo;
+    const hasDocker=dockerContainers.length>0;
+
+    // Docker container source section
+    let html='';
+    if(hasDocker){
+      const opts=allContainers.map(c=>{
+        const name=(c.names||[c.id.slice(0,12)])[0].replace(/^\//,'');
+        return '<option value="'+esc(c.id)+'">'+esc(name)+' ('+esc(c.image)+')</option>';
+      }).join('');
+      html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:6px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <span style="font-size:15px">🐳</span>
+          <span style="font-size:13px;font-weight:600">Browse in Container</span>
+          <span class="muted" style="font-size:11px">Use container filesystem to discover paths</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center">
+          <select id="fpDockerContainer" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;width:100%">
+            ${opts}
+          </select>
+          <span class="muted" style="font-size:11px">← select container, then use Browse below</span>
+        </div>
+      </div>`;
+    }
+
+    // GitHub Source section
+    html+=`<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <span style="font-size:15px">🐙</span>
+        <span style="font-size:13px;font-weight:600">GitHub Source</span>
+        ${hasGh?`<span style="font-size:10px;padding:1px 7px;border-radius:10px;background:rgba(122,173,255,.15);color:var(--accent)">${esc(ghCfg.repo)}</span>`:'<span class="muted" style="font-size:11px">Not configured — enter your fork repo below</span>'}
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 120px 1fr;gap:10px;margin-bottom:10px">
+        <div>
+          <label class="muted" style="font-size:11px;display:block;margin-bottom:3px">GitHub Repo (your fork)</label>
+          <input id="ghCfgRepo" class="lua-input" style="width:100%;box-sizing:border-box" value="${esc(ghCfg.repo||'')}" placeholder="YourUsername/server">
+        </div>
+        <div>
+          <label class="muted" style="font-size:11px;display:block;margin-bottom:3px">Branch</label>
+          <input id="ghCfgBranch" class="lua-input" style="width:100%;box-sizing:border-box" value="${esc(ghCfg.branch||'base')}" placeholder="base">
+        </div>
+        <div>
+          <label class="muted" style="font-size:11px;display:block;margin-bottom:3px">Token <span class="muted">(optional)</span></label>
+          <input id="ghCfgToken" class="lua-input" type="password" style="width:100%;box-sizing:border-box" value="${esc(ghCfg.token||'')}" placeholder="ghp_…">
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="btn-run" id="ghCfgSaveBtn" style="font-size:12px">Save GitHub Config</button>
+        <span id="ghCfgMsg" style="font-size:12px;color:var(--online)"></span>
+        ${hasGh?`<a href="https://github.com/${esc(ghCfg.repo)}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent);margin-left:auto">View on GitHub ↗</a>`:''}
+      </div>
+    </div>`;
+
+    html+='<div style="display:grid;gap:14px">';
+
+    // Configurable paths — each has local + optional GitHub path row
+    configurable.forEach(({key,label,desc})=>{
+      const cur=effective[key]||'';
+      const dflt=defaults[key]||'';
+      const isSaved=!!saved[key];
+      const ghPath=ghCfg.paths?.[key]??'';
+      html+=`<div>
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+          <label style="font-size:12px;font-weight:600;color:var(--text)">${esc(label)}</label>
+          <span class="muted" style="font-size:11px">${esc(desc)}</span>
+          ${isSaved?`<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:rgba(122,173,255,.15);color:var(--accent);margin-left:auto">custom</span>`:
+                    `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--bg3);color:var(--text3);margin-left:auto">default</span>`}
+        </div>
+        <div style="display:grid;grid-template-columns:1fr auto auto auto auto;gap:6px;align-items:center;margin-bottom:${hasGh?'5px':'0'}">
+          <input id="fp-${key}" value="${esc(cur)}" placeholder="${esc(dflt)}"
+            style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:6px;font-size:12px;font-family:monospace;width:100%;box-sizing:border-box">
+          <button class="btn-sm fp-browse-btn" data-key="${key}" style="white-space:nowrap" title="Browse dashboard container filesystem">Browse</button>
+          ${hasDocker?`<button class="btn-sm fp-docker-browse-btn" data-key="${key}" style="white-space:nowrap;font-size:11px" title="Browse a running container filesystem">🐳</button>`:''}
+          <button class="btn-sm fp-save-btn" data-key="${key}" style="white-space:nowrap">Save</button>
+          ${isSaved?`<button class="btn-sm fp-reset-btn" data-key="${key}" style="border-color:var(--text3);color:var(--text3);white-space:nowrap">Reset</button>`:'<span style="width:52px"></span>'}
+        </div>
+        ${hasGh?`<div style="display:grid;grid-template-columns:auto 1fr auto auto;gap:6px;align-items:center">
+          <span class="muted" style="font-size:11px;white-space:nowrap">🐙 Repo path:</span>
+          <input id="ghfp-${key}" value="${esc(ghPath)}"
+            style="background:var(--bg2);border:1px solid var(--border);color:var(--text);padding:5px 9px;border-radius:6px;font-size:11px;font-family:monospace;width:100%;box-sizing:border-box"
+            placeholder="e.g. scripts/globals">
+          <button class="btn-sm fp-gh-browse-btn" data-key="${key}" style="white-space:nowrap;font-size:11px">Browse</button>
+          <button class="btn-sm fp-gh-path-save" data-key="${key}" style="white-space:nowrap;font-size:11px">Save</button>
+        </div>`:''}
+      </div>`;
+    });
+
+    // Read-only paths
+    html+=`<div style="border-top:1px solid var(--border);padding-top:14px">
+      <div style="font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">Internal Paths (not configurable)</div>
+      <div style="display:grid;gap:6px">`;
+    readonly.forEach(({key,label})=>{
+      html+=`<div style="display:grid;grid-template-columns:140px 1fr;gap:8px;align-items:center">
+        <span style="font-size:12px;color:var(--text3)">${esc(label)}</span>
+        <span style="font-family:monospace;font-size:12px;color:var(--text2)">${esc(effective[key]||'—')}</span>
+      </div>`;
+    });
+    html+='</div></div></div>';
+    el.innerHTML=html;
+
+    const saveOne=async(key,val)=>{
+      try{
+        const patch={[key]:val};
+        await api('/api/dashboard/paths',{method:'POST',body:JSON.stringify(patch)});
+        await loadFilePathsPanel();
+      }catch(e){ alert('Error: '+e.message); }
+    };
+    el.querySelectorAll('.fp-browse-btn').forEach(btn=>{
+      btn.onclick=()=>{
+        const key=btn.dataset.key;
+        const input=document.getElementById('fp-'+key);
+        openDirPicker(input.value||'/', path=>{ input.value=path; });
+      };
+    });
+    el.querySelectorAll('.fp-docker-browse-btn').forEach(btn=>{
+      btn.onclick=()=>{
+        const key=btn.dataset.key;
+        const input=document.getElementById('fp-'+key);
+        const sel=document.getElementById('fpDockerContainer');
+        const containerId=sel?sel.value:'';
+        if(!containerId){ alert('Select a container first'); return; }
+        openContainerPicker(containerId, input.value||'/server', path=>{ input.value=path; });
+      };
+    });
+    el.querySelectorAll('.fp-gh-browse-btn').forEach(btn=>{
+      btn.onclick=()=>{
+        const key=btn.dataset.key;
+        const ghPathInput=document.getElementById('ghfp-'+key);
+        const currentGhPath=ghPathInput?ghPathInput.value:ghCfg.paths[key]||'';
+        openGithubPicker(currentGhPath, ghCfg.branch||'base', p=>{
+          if(ghPathInput) ghPathInput.value=p;
+        });
+      };
+    });
+    el.querySelectorAll('.fp-save-btn').forEach(btn=>{
+      btn.onclick=()=>{
+        const key=btn.dataset.key;
+        const val=document.getElementById('fp-'+key).value.trim();
+        saveOne(key,val);
+      };
+    });
+    el.querySelectorAll('.fp-reset-btn').forEach(btn=>{
+      btn.onclick=()=>saveOne(btn.dataset.key,'');
+    });
+    el.querySelectorAll('.fp-gh-path-save').forEach(btn=>{
+      btn.onclick=async()=>{
+        const key=btn.dataset.key;
+        const val=document.getElementById('ghfp-'+key)?.value.trim()||'';
+        try{
+          await api('/api/github/config',{method:'POST',body:JSON.stringify({paths:{[key]:val}})});
+          btn.textContent='✓'; setTimeout(()=>{ btn.textContent='Save'; },1500);
+        }catch(e){ alert('Error saving GitHub path: '+e.message); }
+      };
+    });
+    // GitHub config form save
+    const ghSaveBtn=document.getElementById('ghCfgSaveBtn');
+    if(ghSaveBtn) ghSaveBtn.onclick=async()=>{
+      const msg=document.getElementById('ghCfgMsg');
+      try{
+        await api('/api/github/config',{method:'POST',body:JSON.stringify({
+          repo:   document.getElementById('ghCfgRepo').value.trim(),
+          branch: document.getElementById('ghCfgBranch').value.trim(),
+          token:  document.getElementById('ghCfgToken').value,
+        })});
+        msg.textContent='Saved.'; setTimeout(()=>{ msg.textContent=''; loadFilePathsPanel(); },1200);
+      }catch(e){ msg.style.color='var(--offline)'; msg.textContent='Error: '+e.message; }
+    };
+  }catch(e){ el.innerHTML='<div class="muted" style="font-size:12px">Error: '+esc(e.message)+'</div>'; }
 }
 
 async function loadRates(){
@@ -3727,7 +4703,7 @@ async function loadFeatures(){
     if(!toggles.length){ el.innerHTML='<div class="muted" style="font-size:12px">No ENABLE_* keys found in main.lua.</div>'; return; }
     let html='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px">';
     toggles.forEach(r=>{
-      const on=r.value===true;
+      const on=r.value===true||r.value===1;
       const label=r.key.replace(/^ENABLE_/,'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
       html+=`<div style="background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:6px">
         <span style="font-size:12px;color:var(--text2);font-family:monospace">${esc(r.key)}</span>
@@ -5747,8 +6723,9 @@ async function initTimers(){
     state.token=t;
     try{ await enterApp(); return; }
     catch(err){
-      if(!state.token) return;
+      if(!state.token) return; // 401 — api() already called showLogin()
       console.error('[boot] enterApp failed (non-401):', err);
+      showLogin();
       return;
     }
   }
@@ -5759,6 +6736,188 @@ async function initTimers(){
   }catch(_){}
   showLogin();
 })();
+
+// ════════════════════════════════════════════════════════
+//  Files tab
+// ════════════════════════════════════════════════════════
+const FILE_DIRS=[
+  {key:'maps',           label:'Map Images',       icon:'🗺',  canWrite:true},
+  {key:'uploads/items',  label:'Uploads / Items',  icon:'🗡',  canWrite:true},
+  {key:'uploads/npcs',   label:'Uploads / NPCs',   icon:'👤', canWrite:true},
+  {key:'uploads/mobs',   label:'Uploads / Mobs',   icon:'👹', canWrite:true},
+  {key:'scripts',        label:'Server Scripts',   icon:'📜', canWrite:false},
+  {key:'settings',       label:'Server Settings',  icon:'⚙',  canWrite:false},
+  {key:'log',            label:'Server Logs',      icon:'📋', canWrite:false},
+];
+
+let _filesInited=false, _filesDir=null, _filesSub='', _filesStaticBase=null, _filesCanWrite=false;
+
+function initFilesTab(){
+  if(_filesInited) return;
+  _filesInited=true;
+  const tree=document.getElementById('filesDirTree');
+  tree.innerHTML='';
+  FILE_DIRS.forEach(d=>{
+    const btn=document.createElement('button');
+    btn.dataset.fdir=d.key;
+    btn.style.cssText='width:100%;text-align:left;background:none;border:none;padding:6px 8px;border-radius:6px;cursor:pointer;color:var(--text2);font-size:12px;display:flex;align-items:center;gap:6px';
+    btn.innerHTML=`<span>${d.icon}</span><span>${d.label}</span>${d.canWrite?'':'<span style="margin-left:auto;font-size:10px;color:var(--text3)">read-only</span>'}`;
+    btn.onmouseenter=()=>{ if(btn.dataset.fdir!==_filesDir) btn.style.background='var(--bg3)'; };
+    btn.onmouseleave=()=>{ if(btn.dataset.fdir!==_filesDir) btn.style.background='none'; };
+    btn.onclick=()=>{ _filesSub=''; loadFilesDir(d.key); };
+    tree.appendChild(btn);
+  });
+  document.getElementById('filesReloadBtn').onclick=()=>loadFilesDir(_filesDir,_filesSub);
+  document.getElementById('filesUploadBtn').onclick=()=>document.getElementById('filesUploadInput').click();
+  document.getElementById('filesUploadInput').onchange=async(e)=>{
+    const f=e.target.files[0]; if(!f) return;
+    const fd=new FormData(); fd.append('file',f);
+    const params=new URLSearchParams({dir:_filesDir,...(_filesSub?{sub:_filesSub}:{})});
+    try{
+      const h={'Authorization':'Bearer '+state.token};
+      const r=await fetch('/api/files/upload?'+params,{method:'POST',headers:h,body:fd});
+      const d=await r.json();
+      if(!r.ok) throw new Error(d.error||'upload failed');
+      e.target.value='';
+      loadFilesDir(_filesDir,_filesSub);
+    }catch(err){ alert('Upload error: '+err.message); }
+  };
+}
+
+async function loadFilesDir(dirKey, sub=''){
+  _filesDir=dirKey; _filesSub=sub;
+  // highlight active tree item
+  document.querySelectorAll('#filesDirTree button').forEach(b=>{
+    const active=b.dataset.fdir===dirKey;
+    b.style.background=active?'var(--accent)':'none';
+    b.style.color=active?'#fff':'var(--text2)';
+  });
+  const dirInfo=FILE_DIRS.find(d=>d.key===dirKey)||{};
+  document.getElementById('filesPathLabel').textContent=dirInfo.label||dirKey;
+  document.getElementById('filesBreadcrumb').textContent=sub?sub:'';
+  document.getElementById('filesReloadBtn').style.display='';
+  document.getElementById('filesList').innerHTML='<div class="muted" style="font-size:12px">Loading…</div>';
+  document.getElementById('filesPreviewPanel').style.display='none';
+  try{
+    const params=new URLSearchParams({dir:dirKey,...(sub?{sub}:{})});
+    const data=await api('/api/files/list?'+params);
+    _filesStaticBase=data.staticBase||null;
+    _filesCanWrite=data.canWrite||false;
+    document.getElementById('filesUploadBtn').style.display=_filesCanWrite?'':'none';
+    document.getElementById('filesUploadInput').accept=dirKey==='maps'?'.png':'image/*';
+    renderFilesList(data.files||[], sub, data.missing);
+  }catch(e){
+    document.getElementById('filesList').innerHTML=`<div class="muted" style="font-size:12px">Error: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderFilesList(files, sub, missing){
+  const el=document.getElementById('filesList');
+  if(missing){ el.innerHTML='<div class="muted" style="font-size:12px">Directory not mounted or not found.</div>'; return; }
+  if(!files.length){ el.innerHTML='<div class="muted" style="font-size:12px">Empty directory.</div>'; return; }
+
+  let html='<table style="width:100%;border-collapse:collapse">';
+  html+='<thead><tr>';
+  html+='<th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text3);font-weight:400;width:36px"></th>';
+  html+='<th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text3);font-weight:400">Name</th>';
+  html+='<th style="text-align:right;padding:4px 8px;font-size:11px;color:var(--text3);font-weight:400;width:80px">Size</th>';
+  html+='<th style="text-align:left;padding:4px 8px;font-size:11px;color:var(--text3);font-weight:400;width:130px">Modified</th>';
+  html+='<th style="width:110px;padding:4px 8px"></th>';
+  html+='</tr></thead><tbody>';
+
+  if(sub){
+    const parentSub=sub.includes('/')?sub.substring(0,sub.lastIndexOf('/')):'';
+    html+=`<tr data-go-up="1" style="cursor:pointer">
+      <td style="padding:3px 8px;text-align:center;font-size:15px">📁</td>
+      <td style="padding:3px 8px;color:var(--accent)">..</td>
+      <td></td><td></td><td></td></tr>`;
+  }
+
+  files.forEach(f=>{
+    const ext=f.name.split('.').pop()||'';
+    const icon=f.isDir?'📁':f.isImage?'🖼':'📄';
+    const sizeStr=f.size==null?'—':f.size<1024?f.size+'B':f.size<1048576?(f.size/1024).toFixed(1)+'KB':(f.size/1048576).toFixed(1)+'MB';
+    const dateStr=f.mtime?new Date(f.mtime).toLocaleDateString():'—';
+    const nameSafe=esc(f.name);
+    html+=`<tr data-fname="${nameSafe}" data-fisdir="${f.isDir?1:0}" data-fisimg="${f.isImage?1:0}"
+      style="border-top:1px solid var(--border);cursor:${f.isDir?'pointer':'default'}">
+      <td style="padding:5px 8px;text-align:center;font-size:15px">${icon}</td>
+      <td style="padding:5px 8px;font-family:monospace;font-size:12px;word-break:break-all">
+        ${f.isDir?`<span style="color:var(--accent)">${nameSafe}/</span>`:nameSafe}
+      </td>
+      <td style="padding:5px 8px;text-align:right;font-size:11px;color:var(--text3)">${sizeStr}</td>
+      <td style="padding:5px 8px;font-size:11px;color:var(--text3)">${dateStr}</td>
+      <td style="padding:5px 8px;text-align:right">
+        ${!f.isDir?`<div style="display:flex;gap:4px;justify-content:flex-end">
+          <button class="btn-sm files-dl-btn" data-name="${nameSafe}" style="font-size:11px;padding:2px 7px">↓</button>
+          ${_filesCanWrite?`<button class="btn-sm files-del-btn" data-name="${nameSafe}" style="font-size:11px;padding:2px 7px;border-color:var(--danger);color:var(--danger)">✕</button>`:''}
+        </div>`:''}
+      </td></tr>`;
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+
+  // Navigate up
+  const upRow=el.querySelector('[data-go-up]');
+  if(upRow) upRow.onclick=()=>{
+    const parentSub=sub.includes('/')?sub.substring(0,sub.lastIndexOf('/')):'';
+    loadFilesDir(_filesDir,parentSub);
+  };
+
+  // Directory rows
+  el.querySelectorAll('tr[data-fisdir="1"]').forEach(row=>{
+    const name=row.dataset.fname;
+    row.onclick=()=>loadFilesDir(_filesDir, sub?sub+'/'+name:name);
+  });
+
+  // Image preview on row click (non-dir image)
+  el.querySelectorAll('tr[data-fisimg="1"]').forEach(row=>{
+    row.style.cursor='pointer';
+    row.onclick=(e)=>{
+      if(e.target.closest('button')) return;
+      const name=row.dataset.fname;
+      showFilesPreview(name);
+    };
+  });
+
+  // Download buttons
+  el.querySelectorAll('.files-dl-btn').forEach(btn=>{
+    btn.onclick=()=>{
+      const name=btn.dataset.name;
+      const params=new URLSearchParams({dir:_filesDir,...(_filesSub?{sub:_filesSub}:{}),name});
+      window.open('/api/files/download?'+params+'&_token='+encodeURIComponent(state.token),'_blank');
+    };
+  });
+
+  // Delete buttons
+  el.querySelectorAll('.files-del-btn').forEach(btn=>{
+    btn.onclick=async()=>{
+      const name=btn.dataset.name;
+      if(!confirm('Delete '+name+'?')) return;
+      try{
+        const params=new URLSearchParams({dir:_filesDir,...(_filesSub?{sub:_filesSub}:{}),name});
+        await api('/api/files?'+params,{method:'DELETE'});
+        loadFilesDir(_filesDir,_filesSub);
+      }catch(e){ alert('Delete error: '+e.message); }
+    };
+  });
+}
+
+function showFilesPreview(name){
+  const panel=document.getElementById('filesPreviewPanel');
+  const img=document.getElementById('filesPreviewImg');
+  const nameEl=document.getElementById('filesPreviewName');
+  const dlBtn=document.getElementById('filesPreviewDownload');
+  nameEl.textContent=name;
+  const params=new URLSearchParams({dir:_filesDir,...(_filesSub?{sub:_filesSub}:{}),name});
+  if(_filesStaticBase){
+    img.src=_filesStaticBase+(_filesSub?'/'+_filesSub:'')+'/'+name;
+  } else {
+    img.src='/api/files/download?'+params+'&_token='+encodeURIComponent(state.token);
+  }
+  dlBtn.onclick=()=>window.open('/api/files/download?'+params+'&_token='+encodeURIComponent(state.token),'_blank');
+  panel.style.display='';
+}
 </script>
 </body>
 </html>

@@ -23,6 +23,10 @@ import { createScriptsRouter }   from './routes/scripts';
 import { createUploadRouter }    from './routes/upload';
 import { createWindowerRouter }  from './routes/windower';
 import { createAdminRouter }     from './routes/admin';
+import { createFilesRouter }     from './routes/files';
+import { createLsbUpdateRouter } from './routes/lsb-update';
+import { createDockerRouter }      from './routes/docker';
+import { createGithubFilesRouter } from './routes/github-files';
 import { createHealthRouter }    from './routes/health';
 import { loadPlugins }           from './plugin';
 
@@ -68,6 +72,10 @@ app.use(createAccountsRouter(pool));
 app.use(createScriptsRouter());
 app.use(createUploadRouter(pool));
 app.use(createWindowerRouter());
+app.use(createFilesRouter());
+app.use(createLsbUpdateRouter());
+app.use(createDockerRouter());
+app.use(createGithubFilesRouter());
 app.use(createAdminRouter());
 loadPlugins({ pool, app });
 

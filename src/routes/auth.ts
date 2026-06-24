@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { Pool } from 'mysql2/promise';
 import * as auth from '../auth';
 import { audit } from '../audit';
+import { loadDashboardSettings } from '../settings';
 
 export function createAuthRouter(pool: Pool): Router {
   const router = Router();
@@ -20,7 +21,8 @@ export function createAuthRouter(pool: Pool): Router {
   }, 5 * 60 * 1000);
 
   router.get('/api/autologin', async (req, res) => {
-    if (process.env.AUTOLOGIN !== 'true') { res.status(403).json({ error: 'disabled' }); return; }
+    const ds = loadDashboardSettings();
+    if (!ds.autologin) { res.status(403).json({ error: 'disabled' }); return; }
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     try {
       const [rows] = await pool.execute<import('mysql2/promise').RowDataPacket[]>(

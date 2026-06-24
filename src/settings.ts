@@ -95,7 +95,7 @@ export function readRate(content: string, key: string, type?: string): number | 
     const m = content.match(new RegExp(`\\b${key}\\s*=\\s*(true|false)`));
     return m ? m[1] === 'true' : null;
   }
-  const m = content.match(new RegExp(`\\b${key}\\s*=\\s*([\\d.]+)`));
+  const m = content.match(new RegExp(`\\b${key}\\s*=\\s*(-?[\\d.]+)`));
   return m ? parseFloat(m[1]) : null;
 }
 
@@ -103,10 +103,39 @@ export function writeRate(content: string, key: string, value: unknown, type?: s
   if (type === 'bool') {
     return content.replace(new RegExp(`(\\b${key}\\s*=\\s*)(?:true|false)`), `$1${value}`);
   }
-  return content.replace(new RegExp(`(\\b${key}\\s*=\\s*)[\\d.]+`), `$1${value}`);
+  return content.replace(new RegExp(`(\\b${key}\\s*=\\s*)-?[\\d.]+`), `$1${value}`);
 }
 
 export const SCAN_FILES = ['main.lua', 'map.lua', 'login.lua'];
+
+// ── Dashboard settings ────────────────────────────────────────────────────────
+const DASHBOARD_SETTINGS_PATH = path.join(__dirname, '..', 'data', 'dashboard.json');
+
+export interface DashboardSettings {
+  serverName: string;
+  motd: string;
+  autoSwitchZone: boolean;
+  autologin: boolean;
+}
+
+const DASHBOARD_DEFAULTS: DashboardSettings = {
+  serverName: 'FFXI Dashboard',
+  motd: '',
+  autoSwitchZone: true,
+  autologin: process.env.AUTOLOGIN === 'true',
+};
+
+export function loadDashboardSettings(): DashboardSettings {
+  try {
+    return { ...DASHBOARD_DEFAULTS, ...JSON.parse(fs.readFileSync(DASHBOARD_SETTINGS_PATH, 'utf8')) };
+  } catch (_) {
+    return { ...DASHBOARD_DEFAULTS };
+  }
+}
+
+export function saveDashboardSettings(s: DashboardSettings): void {
+  fs.writeFileSync(DASHBOARD_SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf8');
+}
 export const CURATED_KEYS = new Set(RATE_CATALOG.map(e => e.key));
 
 export function scanSettingsFile(file: string): { entries: Array<{ key: string; value: unknown; curated: boolean }>; missing: boolean } {
@@ -125,10 +154,11 @@ export function scanSettingsFile(file: string): { entries: Array<{ key: string; 
     if (seen.has(key)) continue;
     seen.add(key);
     const raw = m[2].replace(/--[^\n]*$/, '').replace(/,\s*$/, '').trim();
-    let value: unknown = raw;
+    let value: unknown;
     if (raw === 'true') value = true;
     else if (raw === 'false') value = false;
     else if (raw !== '' && !isNaN(Number(raw))) value = parseFloat(raw);
+    else continue; // skip strings, tables, and anything non-scalar
     entries.push({ key, value, curated: CURATED_KEYS.has(key) });
   }
   return { entries, missing: false };

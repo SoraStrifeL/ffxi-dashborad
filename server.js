@@ -9,6 +9,17 @@ const WebSocket = require('ws');
 const multer    = require('multer');
 const auth      = require('./auth');
 
+// ── Dashboard settings (needed early for autologin gate) ─────────────────────
+const DASHBOARD_SETTINGS_PATH = path.join(__dirname, 'data', 'dashboard.json');
+const DASHBOARD_DEFAULTS = { serverName: 'FFXI Dashboard', motd: '', autoSwitchZone: true, autologin: process.env.AUTOLOGIN === 'true' };
+function loadDashboardSettings() {
+  try { return { ...DASHBOARD_DEFAULTS, ...JSON.parse(fs.readFileSync(DASHBOARD_SETTINGS_PATH, 'utf8')) }; }
+  catch (_) { return { ...DASHBOARD_DEFAULTS }; }
+}
+function saveDashboardSettings(s) {
+  fs.writeFileSync(DASHBOARD_SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf8');
+}
+
 const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json());
@@ -21,13 +32,39 @@ app.use(express.static(path.join(__dirname, 'public'), {
 const server = http.createServer(app);
 const wss    = new WebSocket.Server({ server });
 
+// ── Database configuration ────────────────────────────────────────────────────
+const DB_CONFIG_FILE = path.join(__dirname, 'data', 'db-config.json');
+const DB_DEFAULTS = { DB_HOST:'localhost', DB_PORT:3306, DB_USER:'xiadmin', DB_PASS:'changeme', DB_NAME:'xidb' };
+function loadDbConfig() {
+  let saved = {};
+  try { saved = JSON.parse(fs.readFileSync(DB_CONFIG_FILE, 'utf8')); } catch(_) {}
+  return {
+    DB_HOST: saved.DB_HOST || process.env.DB_HOST || DB_DEFAULTS.DB_HOST,
+    DB_PORT: saved.DB_PORT ? Number(saved.DB_PORT) : parseInt(process.env.DB_PORT || '') || DB_DEFAULTS.DB_PORT,
+    DB_USER: saved.DB_USER || process.env.DB_USER || DB_DEFAULTS.DB_USER,
+    DB_PASS: saved.DB_PASS || process.env.DB_PASS || DB_DEFAULTS.DB_PASS,
+    DB_NAME: saved.DB_NAME || process.env.DB_NAME || DB_DEFAULTS.DB_NAME,
+  };
+}
+function saveDbConfig(patch) {
+  let current = {};
+  try { current = JSON.parse(fs.readFileSync(DB_CONFIG_FILE, 'utf8')); } catch(_) {}
+  const updated = { ...current, ...patch };
+  for (const k of Object.keys(updated)) {
+    if (String(updated[k]) === (process.env[k] || String(DB_DEFAULTS[k]))) delete updated[k];
+  }
+  fs.mkdirSync(path.dirname(DB_CONFIG_FILE), { recursive: true });
+  fs.writeFileSync(DB_CONFIG_FILE, JSON.stringify(updated, null, 2), 'utf8');
+}
+const _dbCfg = loadDbConfig();
+
 // ── Connection pool (shared by REST + WS poller) ─────────────────────────────
 const pool = mysql.createPool({
-  host:             process.env.DB_HOST || 'localhost',
-  port:             parseInt(process.env.DB_PORT)  || 3306,
-  user:             process.env.DB_USER || 'xiadmin',
-  password:         process.env.DB_PASS || 'changeme',
-  database:         process.env.DB_NAME || 'xidb',
+  host:             _dbCfg.DB_HOST,
+  port:             _dbCfg.DB_PORT,
+  user:             _dbCfg.DB_USER,
+  password:         _dbCfg.DB_PASS,
+  database:         _dbCfg.DB_NAME,
   waitForConnections: true,
   connectionLimit:    10,
   queueLimit:          0,
@@ -416,7 +453,7 @@ app.get('/api/bounds', auth.requireAuth, async (_req, res) => {
 
 app.get('/api/calibrations', auth.requireAuth, (_req, res) => res.json(calStore));
 
-app.post('/api/calibrations/:zoneId', auth.requireAdmin, (req, res) => {
+app.post('/api/calibrations/:zoneId', auth.requireAuth, auth.requireAdmin, (req, res) => {
   const zoneId = parseInt(req.params.zoneId);
   if (!Number.isFinite(zoneId)) return res.status(400).json({ error: 'Invalid zone' });
   const { minX, maxX, minZ, maxZ } = req.body || {};
@@ -427,7 +464,7 @@ app.post('/api/calibrations/:zoneId', auth.requireAdmin, (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/calibrations/:zoneId', auth.requireAdmin, (req, res) => {
+app.delete('/api/calibrations/:zoneId', auth.requireAuth, auth.requireAdmin, (req, res) => {
   const zoneId = parseInt(req.params.zoneId);
   delete calStore[zoneId];
   saveCalStore();
@@ -551,6 +588,22 @@ app.post('/api/login', async (req, res) => {
   } catch (e) {
     console.error('Login error:', e);
     res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.get('/api/autologin', async (_req, res) => {
+  if (!loadDashboardSettings().autologin)
+    return res.status(403).json({ error: 'disabled' });
+  try {
+    const [rows] = await pool.execute(
+      'SELECT a.id, a.login FROM accounts a JOIN chars c ON c.accid = a.id WHERE a.status = 1 AND c.gmlevel >= ? ORDER BY c.gmlevel DESC LIMIT 1',
+      [auth.ADMIN_GM_LEVEL]);
+    if (!rows.length) return res.status(403).json({ error: 'no admin account found' });
+    const { id, login } = rows[0];
+    const identity = { accid: id, tier: 'admin', login };
+    res.json({ token: auth.issueToken(identity), tier: identity.tier, login: identity.login });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
   }
 });
 
@@ -1828,7 +1881,399 @@ app.get('/api/character/:charid/bags', auth.requireAuth, async (req, res) => {
 });
 
 // ── Game rates (settings/*.lua files) ────────────────────────────────────────
-const SETTINGS_DIR = '/ffxi-settings';
+const PATH_CONFIG_FILE = path.join(__dirname, 'data', 'path-config.json');
+function _readPathCfg() {
+  try { return JSON.parse(fs.readFileSync(PATH_CONFIG_FILE, 'utf8')); } catch(_) { return {}; }
+}
+const _pathCfg = _readPathCfg();
+const LSB_SCRIPTS_DIR  = _pathCfg.LSB_SCRIPTS_DIR  || process.env.LSB_SCRIPTS_DIR  || '/ffxi-scripts';
+const LSB_SETTINGS_DIR = _pathCfg.LSB_SETTINGS_DIR || process.env.LSB_SETTINGS_DIR || '/ffxi-settings';
+const LSB_LOG_DIR      = _pathCfg.LSB_LOG_DIR      || process.env.LSB_LOG_DIR      || '/ffxi-log';
+const SETTINGS_DIR = LSB_SETTINGS_DIR;
+const MAPS_DIR_ROOT = path.join(__dirname, 'public', 'maps');
+const UPLOADS_DIR_ROOT = path.join(__dirname, 'public', 'uploads');
+
+app.get('/api/dashboard/paths', auth.requireAuth, auth.requireAdmin, (_req, res) => {
+  let saved = {};
+  try { saved = JSON.parse(fs.readFileSync(PATH_CONFIG_FILE, 'utf8')); } catch(_) {}
+  res.json({
+    effective: { LSB_SCRIPTS_DIR, LSB_SETTINGS_DIR, LSB_LOG_DIR,
+                 MAPS_DIR: MAPS_DIR_ROOT, UPLOADS_DIR: UPLOADS_DIR_ROOT, DATA_DIR: path.join(__dirname, 'data') },
+    saved,
+    defaults: { LSB_SCRIPTS_DIR: '/ffxi-scripts', LSB_SETTINGS_DIR: '/ffxi-settings', LSB_LOG_DIR: '/ffxi-log' },
+  });
+});
+
+app.post('/api/dashboard/paths', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  let current = {};
+  try { current = JSON.parse(fs.readFileSync(PATH_CONFIG_FILE, 'utf8')); } catch(_) {}
+  const body = req.body || {};
+  for (const key of ['LSB_SCRIPTS_DIR', 'LSB_SETTINGS_DIR', 'LSB_LOG_DIR']) {
+    if (typeof body[key] === 'string') {
+      const trimmed = body[key].trim();
+      if (trimmed) current[key] = trimmed;
+      else delete current[key];
+    }
+  }
+  fs.writeFileSync(PATH_CONFIG_FILE, JSON.stringify(current, null, 2), 'utf8');
+  res.json({ ok: true, saved: current, restartRequired: true });
+});
+
+// ── Database config routes ────────────────────────────────────────────────────
+app.get('/api/dashboard/db', auth.requireAuth, auth.requireAdmin, (_req, res) => {
+  const effective = loadDbConfig();
+  let saved = {};
+  try { saved = JSON.parse(fs.readFileSync(DB_CONFIG_FILE, 'utf8')); } catch(_) {}
+  res.json({
+    effective: { ...effective, DB_PASS: effective.DB_PASS ? '••••••••' : '' },
+    saved: { ...saved, DB_PASS: saved.DB_PASS ? '••••••••' : undefined },
+    hasPassword: !!effective.DB_PASS,
+  });
+});
+
+app.post('/api/dashboard/db', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  const body = req.body || {};
+  const patch = {};
+  if (typeof body.DB_HOST === 'string') patch.DB_HOST = body.DB_HOST.trim();
+  if (body.DB_PORT) patch.DB_PORT = Math.max(1, Math.min(65535, parseInt(String(body.DB_PORT)) || 3306));
+  if (typeof body.DB_USER === 'string') patch.DB_USER = body.DB_USER.trim();
+  if (typeof body.DB_NAME === 'string') patch.DB_NAME = body.DB_NAME.trim();
+  if (typeof body.DB_PASS === 'string' && !body.DB_PASS.includes('•')) patch.DB_PASS = body.DB_PASS;
+  saveDbConfig(patch);
+  res.json({ ok: true, restartRequired: true });
+});
+
+app.post('/api/dashboard/db/test', auth.requireAuth, auth.requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  const current = loadDbConfig();
+  const cfg = {
+    host:     (body.DB_HOST?.trim()) || current.DB_HOST,
+    port:     body.DB_PORT ? parseInt(String(body.DB_PORT)) || 3306 : current.DB_PORT,
+    user:     (body.DB_USER?.trim()) || current.DB_USER,
+    password: (body.DB_PASS && !body.DB_PASS.includes('•')) ? body.DB_PASS : current.DB_PASS,
+    database: (body.DB_NAME?.trim()) || current.DB_NAME,
+    connectTimeout: 5000,
+  };
+  let conn;
+  try {
+    conn = await mysql.createConnection(cfg);
+    const [rows] = await conn.query('SELECT VERSION() AS v, DATABASE() AS db');
+    res.json({ ok: true, version: rows[0]?.v, database: rows[0]?.db });
+  } catch(e) {
+    res.status(400).json({ ok: false, error: e.message });
+  } finally {
+    if (conn) await conn.end().catch(()=>{});
+  }
+});
+
+// ── LSB update checker ───────────────────────────────────────────────────────
+const LSB_CONFIG_FILE = path.join(DATA_DIR, 'lsb-config.json');
+const LSB_CFG_DEFAULTS = { serverPath:'', forkRepo:'', upstreamRepo:'LandSandBoat/server', upstreamBranch:'base', githubToken:'' };
+
+function loadLsbConfig(){
+  try { return { ...LSB_CFG_DEFAULTS, ...JSON.parse(fs.readFileSync(LSB_CONFIG_FILE,'utf8')) }; }
+  catch(_){ return { ...LSB_CFG_DEFAULTS }; }
+}
+function saveLsbConfig(patch){
+  let cur={}; try{ cur=JSON.parse(fs.readFileSync(LSB_CONFIG_FILE,'utf8')); }catch(_){}
+  fs.mkdirSync(path.dirname(LSB_CONFIG_FILE),{recursive:true});
+  fs.writeFileSync(LSB_CONFIG_FILE, JSON.stringify({...cur,...patch},null,2),'utf8');
+}
+function readLocalGitInfo(repoPath){
+  try {
+    const head=fs.readFileSync(path.join(repoPath,'.git','HEAD'),'utf8').trim();
+    let sha,branch;
+    if(head.startsWith('ref: ')){
+      const ref=head.slice(5);
+      branch=ref.replace(/^refs\/heads\//,'');
+      const refFile=path.join(repoPath,'.git',ref);
+      if(fs.existsSync(refFile)){ sha=fs.readFileSync(refFile,'utf8').trim(); }
+      else {
+        const pp=path.join(repoPath,'.git','packed-refs');
+        const packed=fs.existsSync(pp)?fs.readFileSync(pp,'utf8'):'';
+        const m=packed.match(new RegExp(`^([a-f0-9]{40})\\s+${ref.replace(/\//g,'\\/')}$`,'m'));
+        sha=m?m[1]:'';
+      }
+    } else { sha=head; branch='(detached HEAD)'; }
+    return { sha, shortSha:sha.slice(0,7), branch };
+  } catch(_){ return null; }
+}
+const _lsbStatusCache=new Map();
+const LSB_CACHE_TTL=5*60*1000;
+async function ghFetch(url,token){
+  const headers={'User-Agent':'FFXI-Dashboard/1.0','Accept':'application/vnd.github.v3+json'};
+  if(token) headers['Authorization']=`Bearer ${token}`;
+  const resp=await fetch(url,{headers,signal:AbortSignal.timeout(8000)});
+  if(!resp.ok){ const msg=await resp.text().catch(()=>resp.statusText); throw new Error(`GitHub ${resp.status}: ${msg.slice(0,200)}`); }
+  return resp.json();
+}
+
+app.get('/api/fs/browse', auth.requireAuth, auth.requireAdmin, (req,res)=>{
+  const dirPath=path.resolve(req.query.path||'/');
+  try {
+    const entries=fs.readdirSync(dirPath,{withFileTypes:true});
+    const dirs=entries.filter(e=>e.isDirectory())
+      .map(e=>({name:e.name,path:path.join(dirPath,e.name)}))
+      .sort((a,b)=>a.name.localeCompare(b.name));
+    const parent=dirPath==='/'?null:path.dirname(dirPath);
+    res.json({path:dirPath,parent,dirs});
+  } catch(e){ res.status(400).json({error:e.message}); }
+});
+
+app.get('/api/lsb/config', auth.requireAuth, auth.requireAdmin, (req,res)=>{
+  const cfg=loadLsbConfig();
+  res.json({...cfg, githubToken:cfg.githubToken?'••••••••':''});
+});
+app.post('/api/lsb/config', auth.requireAuth, auth.requireAdmin, (req,res)=>{
+  const body=req.body||{};
+  const patch={};
+  if(typeof body.serverPath==='string')     patch.serverPath=body.serverPath.trim();
+  if(typeof body.forkRepo==='string')       patch.forkRepo=body.forkRepo.trim();
+  if(typeof body.upstreamRepo==='string')   patch.upstreamRepo=body.upstreamRepo.trim();
+  if(typeof body.upstreamBranch==='string') patch.upstreamBranch=body.upstreamBranch.trim();
+  if(typeof body.githubToken==='string'&&!body.githubToken.includes('•')) patch.githubToken=body.githubToken.trim();
+  saveLsbConfig(patch);
+  _lsbStatusCache.clear();
+  res.json({ok:true});
+});
+
+async function ghBranchHead(repo,branch,token){
+  const d=await ghFetch(`https://api.github.com/repos/${repo}/branches/${branch}`,token);
+  return {sha:d.commit.sha,shortSha:d.commit.sha.slice(0,7),date:d.commit.commit.committer.date,
+    message:d.commit.commit.message.split('\n')[0],author:d.commit.commit.author.name};
+}
+async function ghCompare(repo,base,head,token){
+  try {
+    const cmp=await ghFetch(`https://api.github.com/repos/${repo}/compare/${base}...${head}`,token);
+    return {status:cmp.status??'unknown',behindBy:cmp.behind_by??0,aheadBy:cmp.ahead_by??0,
+      commits:(cmp.commits??[]).slice(-20).reverse().map(c=>({
+        sha:c.sha.slice(0,7),message:c.commit.message.split('\n')[0],
+        author:c.commit.author.name,date:c.commit.committer.date,url:c.html_url
+      }))};
+  } catch(_){ return null; }
+}
+
+app.get('/api/lsb/status', auth.requireAuth, auth.requireAdmin, async(req,res)=>{
+  const cfg=loadLsbConfig();
+  const hasFork=!!cfg.forkRepo, hasLocal=!!cfg.serverPath;
+  if(!hasFork&&!hasLocal) return res.json({configured:false});
+  const forceRefresh=req.query.refresh==='1';
+  const cacheKey=`${cfg.serverPath}|${cfg.forkRepo}|${cfg.upstreamRepo}|${cfg.upstreamBranch}`;
+  if(!forceRefresh){
+    const hit=_lsbStatusCache.get(cacheKey);
+    if(hit&&Date.now()-hit.ts<LSB_CACHE_TTL) return res.json({...hit.data,cached:true});
+  }
+  const token=cfg.githubToken||undefined;
+  let upstream;
+  try { upstream=await ghBranchHead(cfg.upstreamRepo,cfg.upstreamBranch,token); upstream.repo=cfg.upstreamRepo; upstream.branch=cfg.upstreamBranch; }
+  catch(e){ return res.json({configured:true,error:e.message}); }
+
+  let fork=null,forkVsUpstream=null,forkMissingCommits=[];
+  if(hasFork){
+    try {
+      fork=await ghBranchHead(cfg.forkRepo,cfg.upstreamBranch,token);
+      fork.repo=cfg.forkRepo; fork.branch=cfg.upstreamBranch;
+      const cmp=await ghCompare(cfg.upstreamRepo,fork.sha,upstream.sha,token);
+      if(cmp){ forkVsUpstream={status:cmp.status,behindBy:cmp.behindBy,aheadBy:cmp.aheadBy}; forkMissingCommits=cmp.commits; }
+    } catch(e){ fork={error:e.message}; }
+  }
+
+  let local=null,localVsRef=null,localMissingCommits=[];
+  if(hasLocal){
+    const gitInfo=readLocalGitInfo(cfg.serverPath);
+    if(!gitInfo){ local={error:`Cannot read .git/HEAD at: ${cfg.serverPath}`}; }
+    else {
+      local={...gitInfo};
+      const refRepo=cfg.forkRepo||cfg.upstreamRepo;
+      const refHead=fork?.sha||upstream.sha;
+      if(local.sha&&local.sha.length===40){
+        try { const lc=await ghFetch(`https://api.github.com/repos/${refRepo}/commits/${local.sha}`,token);
+          local.date=lc.commit?.committer?.date??null; local.message=(lc.commit?.message??'').split('\n')[0]||null; } catch(_){}
+        const cmp=await ghCompare(refRepo,local.sha,refHead,token);
+        if(cmp){ localVsRef={status:cmp.status,behindBy:cmp.behindBy,aheadBy:cmp.aheadBy,comparedTo:refRepo}; localMissingCommits=cmp.commits; }
+      }
+    }
+  }
+  const data={configured:true,upstream,fork,local,forkVsUpstream,forkMissingCommits,localVsRef,localMissingCommits,
+    upstreamRepo:cfg.upstreamRepo,forkRepo:cfg.forkRepo,checkedAt:new Date().toISOString()};
+  _lsbStatusCache.set(cacheKey,{ts:Date.now(),data});
+  res.json(data);
+});
+
+// ── Docker management ─────────────────────────────────────────────────────────
+// ── GitHub file browser ───────────────────────────────────────────────────────
+const GH_CONFIG_FILE=path.join(DATA_DIR,'github-config.json');
+const GH_DEFAULTS={repo:'',branch:'base',token:'',paths:{LSB_SCRIPTS_DIR:'scripts',LSB_SETTINGS_DIR:'scripts'}};
+function loadGithubFilesConfig(){
+  try{ const s=JSON.parse(fs.readFileSync(GH_CONFIG_FILE,'utf8')); return{...GH_DEFAULTS,...s,paths:{...GH_DEFAULTS.paths,...(s.paths||{})}}; }
+  catch(_){ return{...GH_DEFAULTS,paths:{...GH_DEFAULTS.paths}}; }
+}
+function saveGithubFilesConfig(patch){
+  let cur={}; try{ cur=JSON.parse(fs.readFileSync(GH_CONFIG_FILE,'utf8')); }catch(_){}
+  const merged={...GH_DEFAULTS,...cur,...patch,paths:{...GH_DEFAULTS.paths,...(cur.paths||{}),...(patch.paths||{})}};
+  fs.mkdirSync(path.dirname(GH_CONFIG_FILE),{recursive:true});
+  fs.writeFileSync(GH_CONFIG_FILE,JSON.stringify(merged,null,2),'utf8');
+}
+async function ghApiGet(url,token){
+  const headers={'User-Agent':'FFXI-Dashboard/1.0','Accept':'application/vnd.github.v3+json'};
+  if(token) headers['Authorization']=`Bearer ${token}`;
+  const resp=await fetch(url,{headers,signal:AbortSignal.timeout(10000)});
+  if(!resp.ok){ const msg=await resp.text().catch(()=>resp.statusText); throw new Error(`GitHub ${resp.status}: ${msg.slice(0,200)}`); }
+  return resp.json();
+}
+app.get('/api/github/config', auth.requireAuth, auth.requireAdmin, (req,res)=>{
+  const cfg=loadGithubFilesConfig(); res.json({...cfg,token:cfg.token?'••••••••':''});
+});
+app.post('/api/github/config', auth.requireAuth, auth.requireAdmin, (req,res)=>{
+  const body=req.body||{}; const patch={};
+  if(typeof body.repo==='string')   patch.repo=body.repo.trim();
+  if(typeof body.branch==='string') patch.branch=body.branch.trim();
+  if(typeof body.token==='string'&&!body.token.includes('•')) patch.token=body.token.trim();
+  if(body.paths&&typeof body.paths==='object'){
+    patch.paths={};
+    for(const[k,v] of Object.entries(body.paths)) if(typeof v==='string') patch.paths[k]=v.trim();
+  }
+  saveGithubFilesConfig(patch); res.json({ok:true});
+});
+app.get('/api/github/browse', auth.requireAuth, auth.requireAdmin, async(req,res)=>{
+  const cfg=loadGithubFilesConfig();
+  if(!cfg.repo) return res.status(400).json({error:'GitHub repo not configured'});
+  const dirPath=((req.query.path||'').replace(/^\/+/,''));
+  const branch=req.query.branch||cfg.branch||'base';
+  const token=cfg.token||undefined;
+  try {
+    const url=`https://api.github.com/repos/${cfg.repo}/contents/${dirPath}?ref=${encodeURIComponent(branch)}`;
+    const data=await ghApiGet(url,token);
+    if(Array.isArray(data)){
+      const items=data.map(item=>({name:item.name,path:item.path,type:item.type,size:item.size,
+        sha:item.sha,htmlUrl:item.html_url,downloadUrl:item.download_url}))
+        .sort((a,b)=>a.type!==b.type?(a.type==='dir'?-1:1):a.name.localeCompare(b.name));
+      const parent=dirPath.includes('/')?dirPath.slice(0,dirPath.lastIndexOf('/')):null;
+      res.json({path:dirPath,branch,repo:cfg.repo,parent,items});
+    } else { res.json({path:dirPath,branch,repo:cfg.repo,file:data}); }
+  } catch(e){ res.status(500).json({error:e.message}); }
+});
+app.get('/api/github/content', auth.requireAuth, auth.requireAdmin, async(req,res)=>{
+  const cfg=loadGithubFilesConfig();
+  if(!cfg.repo) return res.status(400).json({error:'GitHub repo not configured'});
+  const filePath=req.query.path||'';
+  const branch=req.query.branch||cfg.branch||'base';
+  const token=cfg.token||undefined;
+  try {
+    const url=`https://api.github.com/repos/${cfg.repo}/contents/${filePath}?ref=${encodeURIComponent(branch)}`;
+    const data=await ghApiGet(url,token);
+    if(data.encoding==='base64'){
+      const content=Buffer.from(data.content.replace(/\n/g,''),'base64').toString('utf8');
+      res.json({content,name:data.name,path:data.path,size:data.size,htmlUrl:data.html_url});
+    } else { res.status(400).json({error:'Unexpected encoding: '+data.encoding}); }
+  } catch(e){ res.status(500).json({error:e.message}); }
+});
+
+const DOCKER_SOCKET='/var/run/docker.sock';
+function isDockerAvailable(){ try{ fs.accessSync(DOCKER_SOCKET); return true; }catch(_){ return false; } }
+function dockerReq(method,apiPath,body){
+  return new Promise((resolve,reject)=>{
+    const opts={socketPath:DOCKER_SOCKET,method,path:apiPath,headers:body?{'Content-Type':'application/json'}:{}};
+    const req=require('http').request(opts,res=>{
+      const chunks=[];
+      res.on('data',c=>chunks.push(c));
+      res.on('end',()=>{
+        const raw=Buffer.concat(chunks);
+        let parsed; try{ parsed=JSON.parse(raw.toString()); }catch(_){ parsed=raw.toString(); }
+        resolve({status:res.statusCode,body:parsed});
+      });
+    });
+    req.on('error',reject);
+    if(body) req.write(JSON.stringify(body));
+    req.end();
+  });
+}
+function parseDockerLogs(buf){
+  const lines=[]; let offset=0;
+  while(offset+8<=buf.length){
+    const size=buf.readUInt32BE(offset+4); offset+=8;
+    if(size===0) continue;
+    if(offset+size>buf.length) break;
+    const chunk=buf.slice(offset,offset+size).toString('utf8'); offset+=size;
+    for(const l of chunk.split('\n')){ const t=l.trimEnd(); if(t) lines.push(t); }
+  }
+  if(!lines.length) return buf.toString('utf8').split('\n').map(l=>l.trimEnd()).filter(Boolean);
+  return lines;
+}
+
+app.get('/api/docker/status', auth.requireAuth, auth.requireAdmin, async(req,res)=>{
+  if(!isDockerAvailable()) return res.json({available:false,hint:'Add "- /var/run/docker.sock:/var/run/docker.sock" to the dashboard volumes in docker-compose.yml, then recreate the container.'});
+  try {
+    const [infoR,containersR]=await Promise.all([dockerReq('GET','/info'),dockerReq('GET','/containers/json?all=1')]);
+    const containers=(Array.isArray(containersR.body)?containersR.body:[]).map(c=>({
+      id:c.Id.slice(0,12), names:c.Names.map(n=>n.replace(/^\//,'')),
+      image:c.Image, status:c.Status, state:c.State, created:c.Created,
+      ports:c.Ports.map(p=>p.PublicPort?`${p.PublicPort}→${p.PrivatePort}`:null).filter(Boolean),
+    }));
+    res.json({available:true,serverVersion:infoR.body?.ServerVersion,containers});
+  } catch(e){ res.status(500).json({available:false,error:e.message}); }
+});
+app.post('/api/docker/containers/:id/restart', auth.requireAuth, auth.requireAdmin, async(req,res)=>{
+  if(!isDockerAvailable()) return res.status(503).json({error:'Docker not available'});
+  try {
+    const r=await dockerReq('POST',`/containers/${req.params.id}/restart?t=10`);
+    if(r.status===204||r.status===200) res.json({ok:true});
+    else res.status(r.status||500).json({error:r.body?.message||'Docker API error'});
+  } catch(e){ res.status(500).json({error:e.message}); }
+});
+app.get('/api/docker/containers/:id/logs', auth.requireAuth, auth.requireAdmin, (req,res)=>{
+  if(!isDockerAvailable()) return res.status(503).json({error:'Docker not available'});
+  const tail=Math.min(200,Math.max(10,parseInt(req.query.tail)||50));
+  const opts={socketPath:DOCKER_SOCKET,method:'GET',path:`/containers/${req.params.id}/logs?stdout=1&stderr=1&tail=${tail}&timestamps=0`};
+  const dreq=require('http').request(opts,dres=>{
+    const chunks=[]; dres.on('data',c=>chunks.push(c));
+    dres.on('end',()=>res.json({lines:parseDockerLogs(Buffer.concat(chunks))}));
+  });
+  dreq.on('error',e=>res.status(500).json({error:e.message}));
+  dreq.end();
+});
+
+// ── Browse filesystem inside a container via Docker exec ────────────────────
+app.get('/api/docker/containers/:id/fs/browse', auth.requireAuth, auth.requireAdmin, async (req,res)=>{
+  if(!isDockerAvailable()) return res.status(503).json({error:'Docker not available'});
+  const dirPath=(req.query.path||'/').toString();
+  const id=req.params.id;
+  try{
+    // Create exec
+    const execR=await dockerReq('POST',`/containers/${id}/exec`,{
+      AttachStdout:true, AttachStderr:false,
+      Cmd:['sh','-c',`ls -1ap "${dirPath}" 2>&1`],
+    });
+    if(execR.status!==201) return res.status(400).json({error:execR.body?.message||'Exec create failed'});
+    const execId=execR.body.Id;
+    // Start exec and collect output
+    const output=await new Promise((resolve,reject)=>{
+      const opts={socketPath:DOCKER_SOCKET,method:'POST',path:`/exec/${execId}/start`,
+        headers:{'Content-Type':'application/json'}};
+      const dr=require('http').request(opts,dres=>{
+        const chunks=[]; dres.on('data',c=>chunks.push(c));
+        dres.on('end',()=>resolve(parseDockerLogs(Buffer.concat(chunks)).join('\n')));
+      });
+      dr.on('error',reject);
+      dr.write(JSON.stringify({Detach:false,Tty:false}));
+      dr.end();
+    });
+    const lines=output.split('\n').map(l=>l.trim()).filter(l=>l&&l!=='.'&&l!=='..');
+    const items=lines.map(name=>{
+      const isDir=name.endsWith('/');
+      const clean=isDir?name.slice(0,-1):name;
+      const joined=dirPath.replace(/\/$/,'')+'/'+clean;
+      return {name:clean,path:joined,type:isDir?'dir':'file'};
+    }).sort((a,b)=>{
+      if(a.type!==b.type) return a.type==='dir'?-1:1;
+      return a.name.localeCompare(b.name);
+    });
+    const parent=dirPath==='/'?null:dirPath.replace(/\/$/,'').replace(/\/[^/]+$/,'')||'/';
+    res.json({path:dirPath,parent,items,containerId:id});
+  }catch(e){
+    res.status(500).json({error:e.message});
+  }
+});
 
 const RATE_CATALOG = [
   // Experience
@@ -1911,7 +2356,7 @@ function readRate(content, key, type) {
     const m = content.match(new RegExp(`\\b${key}\\s*=\\s*(true|false)`));
     return m ? m[1] === 'true' : null;
   }
-  const m = content.match(new RegExp(`\\b${key}\\s*=\\s*([\\d.]+)`));
+  const m = content.match(new RegExp(`\\b${key}\\s*=\\s*(-?[\\d.]+)`));
   return m ? parseFloat(m[1]) : null;
 }
 
@@ -1919,7 +2364,7 @@ function writeRate(content, key, value, type) {
   if (type === 'bool') {
     return content.replace(new RegExp(`(\\b${key}\\s*=\\s*)(?:true|false)`), `$1${value}`);
   }
-  return content.replace(new RegExp(`(\\b${key}\\s*=\\s*)[\\d.]+`), `$1${value}`);
+  return content.replace(new RegExp(`(\\b${key}\\s*=\\s*)-?[\\d.]+`), `$1${value}`);
 }
 
 app.get('/api/settings/rates', auth.requireAuth, auth.requireAdmin, async (_req, res) => {
@@ -1956,6 +2401,21 @@ app.post('/api/settings/rates', auth.requireAuth, auth.requireAdmin, async (req,
 const SCAN_FILES = ['main.lua', 'map.lua', 'login.lua'];
 const CURATED_KEYS = new Set(RATE_CATALOG.map(e => e.key));
 
+app.get('/api/dashboard/settings', auth.requireAuth, (_req, res) => res.json(loadDashboardSettings()));
+
+app.post('/api/dashboard/settings', auth.requireAuth, auth.requireAdmin, (req, res) => {
+  const current = loadDashboardSettings();
+  const { serverName, motd, autoSwitchZone, autologin } = req.body || {};
+  const updated = {
+    serverName:     typeof serverName     === 'string'  ? serverName.slice(0, 100)  : current.serverName,
+    motd:           typeof motd           === 'string'  ? motd.slice(0, 500)        : current.motd,
+    autoSwitchZone: typeof autoSwitchZone === 'boolean' ? autoSwitchZone             : current.autoSwitchZone,
+    autologin:      typeof autologin      === 'boolean' ? autologin                  : current.autologin,
+  };
+  saveDashboardSettings(updated);
+  res.json({ ok: true, settings: updated });
+});
+
 function scanSettingsFile(file) {
   const entries = [];
   const tryPaths = [path.join(SETTINGS_DIR, file), path.join(SETTINGS_DIR, 'default', file)];
@@ -1972,10 +2432,11 @@ function scanSettingsFile(file) {
     if (seen.has(key)) continue;
     seen.add(key);
     const raw = m[2].replace(/--[^\n]*$/, '').replace(/,\s*$/, '').trim();
-    let value = raw;
+    let value;
     if (raw === 'true') value = true;
     else if (raw === 'false') value = false;
     else if (raw !== '' && !isNaN(raw)) value = parseFloat(raw);
+    else continue; // skip strings, tables, and anything non-scalar
     entries.push({ key, value, curated: CURATED_KEYS.has(key) });
   }
   return { entries, missing: false };
@@ -1997,8 +2458,13 @@ app.post('/api/settings/scan', auth.requireAuth, auth.requireAdmin, (req, res) =
     const filePath = path.join(SETTINGS_DIR, file);
     const content = fs.readFileSync(filePath, 'utf8');
     const isBool = value === 'true' || value === 'false' || value === true || value === false;
-    const writeVal = isBool ? (value === true || value === 'true' ? 'true' : 'false') : parseFloat(value);
-    const updated = writeRate(content, key, writeVal, isBool ? 'bool' : undefined);
+    const boolIsTrue = value === true || value === 'true';
+    let writeVal = isBool ? (boolIsTrue ? 'true' : 'false') : parseFloat(value);
+    let updated = writeRate(content, key, writeVal, isBool ? 'bool' : undefined);
+    if (updated === content && isBool) {
+      writeVal = boolIsTrue ? 1 : 0;
+      updated = writeRate(content, key, writeVal);
+    }
     if (updated === content) return res.status(400).json({ error: 'key not found in file' });
     fs.writeFileSync(filePath, updated, 'utf8');
     res.json({ ok: true });
@@ -2509,6 +2975,10 @@ app.post('/api/claude', async (req, res) => {
   const { message, system, model, max_tokens } = req.body;
   if (!message) return res.status(400).json({ error: 'message required' });
 
+  const ALLOWED_MODELS = new Set(['claude-haiku-4-5-20251001', 'claude-sonnet-4-6']);
+  const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+  const safeMaxTokens = Math.min(Math.max(1, parseInt(max_tokens) || 1024), 2048);
+
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -2518,8 +2988,8 @@ app.post('/api/claude', async (req, res) => {
         'content-type': 'application/json',
       },
       body: JSON.stringify({
-        model: model || 'claude-sonnet-4-6',
-        max_tokens: max_tokens || 1024,
+        model: safeModel,
+        max_tokens: safeMaxTokens,
         system: system || 'You are a helpful assistant embedded in Final Fantasy XI. Be concise.',
         messages: [{ role: 'user', content: message }],
       }),

@@ -42,6 +42,7 @@ services:
       - /opt/stacks/ffxi/scripts/globals/missions.lua:/ffxi-scripts/missions.lua:ro
       - /opt/stacks/ffxi/scripts/quests:/ffxi-scripts/quests:ro
       - /opt/stacks/ffxi/scripts:/ffxi-server-scripts
+      - /var/run/docker.sock:/var/run/docker.sock
     networks:
       - ffxi_default
 

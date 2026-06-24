@@ -7,12 +7,22 @@ import { WindowerPosition, ZoneEntity } from './types';
 // ── Paths ─────────────────────────────────────────────────────────────────────
 export const MAPS_DIR    = path.join(__dirname, '..', 'public', 'maps');
 export const UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
+export const DATA_DIR    = path.join(__dirname, '..', 'data');
+export const PATH_CONFIG_FILE = path.join(DATA_DIR, 'path-config.json');
 
-// Configurable LSB directory roots — set these in .env for bare-metal or Windows installs.
-// Docker: the compose file mounts these at the defaults below via volumes.
-export const LSB_SCRIPTS_DIR  = process.env.LSB_SCRIPTS_DIR  || '/ffxi-scripts';
-export const LSB_SETTINGS_DIR = process.env.LSB_SETTINGS_DIR || '/ffxi-settings';
-export const LSB_LOG_DIR      = process.env.LSB_LOG_DIR      || '/ffxi-log';
+// Configurable LSB directory roots — set via Settings UI (data/path-config.json),
+// env vars, or fall back to Docker volume-mount defaults.
+function _readPathCfg(): Record<string, string> {
+  try { return JSON.parse(fs.readFileSync(PATH_CONFIG_FILE, 'utf8')); } catch (_) { return {}; }
+}
+const _pathCfg = _readPathCfg();
+function _resolvePath(key: string, envKey: string, def: string): string {
+  return _pathCfg[key] || process.env[envKey] || def;
+}
+
+export const LSB_SCRIPTS_DIR  = _resolvePath('LSB_SCRIPTS_DIR',  'LSB_SCRIPTS_DIR',  '/ffxi-scripts');
+export const LSB_SETTINGS_DIR = _resolvePath('LSB_SETTINGS_DIR', 'LSB_SETTINGS_DIR', '/ffxi-settings');
+export const LSB_LOG_DIR      = _resolvePath('LSB_LOG_DIR',      'LSB_LOG_DIR',      '/ffxi-log');
 ['items', 'npcs', 'mobs'].forEach(d => fs.mkdirSync(path.join(UPLOADS_DIR, d), { recursive: true }));
 
 // ── Calibration store ─────────────────────────────────────────────────────────
