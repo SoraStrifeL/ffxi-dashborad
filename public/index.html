@@ -242,6 +242,7 @@
           <select id="floorSelect" style="display:none;margin-top:-10px"></select>
           <h3 style="margin-top:4px">Layers</h3>
           <div class="layer-toggle active" id="togglePlayers" data-layer="players"><span class="layer-dot" style="background:var(--player)"></span>Players</div>
+          <div class="layer-toggle" id="toggleOfflinePlayers" data-layer="offlineplayers" style="padding-left:26px;font-size:11px;color:var(--text3)"><span class="layer-dot" style="background:#555"></span>Show offline</div>
           <div class="layer-toggle active" id="toggleNpcs" data-layer="npcs"><span class="layer-dot" style="background:var(--npc)"></span>NPCs</div>
           <div class="layer-toggle active" id="toggleMobs" data-layer="mobs"><span class="layer-dot" style="background:var(--mob)"></span>Monsters</div>
           <div class="layer-toggle active" id="toggleAggroOnly" data-layer="aggroonly" style="padding-left:26px;font-size:11px;color:var(--text3)">Aggro only</div>
@@ -2445,7 +2446,7 @@ const ZONE_BOUNDS = {1:{minX:-15.17,maxX:14.58,minZ:-13.48,maxZ:17.78},2:{minX:-
 })();
 const MOB_ECO_COLORS={Vermin:0x96cc3a,Beast:0xd4823a,Lizard:0x3acc7a,Aquan:0x3a8adc,Plantoid:0x5ab83a,Undead:0x9868d8,Demon:0xd8386a,Dragon:0x3ac8a8,Amorph:0xd838d0,Arcana:0x7898b8,Beastmen:0xd8a838,Humanoid:0xc8906a,Bird:0x70b8e0,Elemental:0xe0e040};
 let coordTransform=null, currentZoneData={chars:[],npcs:[],mobs:[]}, mapFloors={};
-const layers={players:true,npcs:true,mobs:true,bounds:false,aggroonly:false,labels:false};
+const layers={players:true,npcs:true,mobs:true,bounds:false,aggroonly:false,labels:false,offlineplayers:false};
 let _allZoneOptions=[], _mapHighlight=null, _mapHighlightTick=0;
 let _followCharId=null;
 const mapAdj={ox:0,oy:0,sx:1,sy:1,pad:50};
@@ -2752,18 +2753,20 @@ function _mobGfx(name, aggro, mJob, ecosystem){
 }
 
 function _playerGfx(c){
+  const online=!!c.online;
+  const color=online?0x7c6af7:0x555566;
   const ctr=new PIXI.Container();
   const glow=new PIXI.Graphics();
-  glow.beginFill(0x7c6af7,0.15); glow.drawCircle(0,0,13); glow.endFill();
+  glow.beginFill(color,online?0.15:0.08); glow.drawCircle(0,0,13); glow.endFill();
   const dot=new PIXI.Graphics();
-  dot.beginFill(0x7c6af7); dot.drawCircle(0,0,6); dot.endFill();
-  const lbl=new PIXI.Text(c.charname,{fontFamily:'sans-serif',fontSize:12,fontWeight:'bold',fill:0xe8e8f0,dropShadow:true,dropShadowDistance:1,dropShadowAlpha:0.7});
+  dot.beginFill(color); dot.drawCircle(0,0,online?6:4); dot.endFill();
+  const lbl=new PIXI.Text(c.charname,{fontFamily:'sans-serif',fontSize:12,fontWeight:'bold',fill:online?0xe8e8f0:0x777788,dropShadow:true,dropShadowDistance:1,dropShadowAlpha:0.7});
   lbl.anchor.set(0.5,1); lbl.y=-16;
   ctr.addChild(glow,dot,lbl);
   ctr.interactive=true; ctr.buttonMode=true;
   ctr.hitArea=new PIXI.Circle(0,0,14);
   const ref={c};
-  ctr.on('pointerdown',(e)=>{ e.stopPropagation(); _showTip(ref.c.charname,'Player',e.data.global.x,e.data.global.y,ref.c); });
+  ctr.on('pointerdown',(e)=>{ e.stopPropagation(); _showTip(ref.c.charname,online?'Player':'Offline',e.data.global.x,e.data.global.y,ref.c); });
   return {ctr,lbl,ref};
 }
 
@@ -2776,7 +2779,7 @@ function _showTip(name,type,canvasX,canvasY,charData,mJob){
   const lx=(canvasX*sx)+(cRect.left-wRect.left);
   const ly=(canvasY*sy)+(cRect.top-wRect.top);
   const tt=document.getElementById('mapTooltip');
-  const typeCol=type==='NPC'?'#4fc3a1':type==='Player'?'#7c6af7':type==='Aggressive mob'?'#e05c5c':'#e0a040';
+  const typeCol=type==='NPC'?'#4fc3a1':type==='Player'?'#7c6af7':type==='Offline'?'#666688':type==='Aggressive mob'?'#e05c5c':'#e0a040';
   let html=`<b>${esc(name)}</b><span style="color:${typeCol};margin-left:6px;font-size:10px">${esc(type)}</span>`;
   if(charData){
     const hpPct=charData.hp!=null&&charData.maxhp?Math.round(charData.hp/charData.maxhp*100):null;
@@ -3346,7 +3349,7 @@ function updateEntities(){
 
   // Players
   const activePlrs=new Set();
-  currentZoneData.chars.filter(c=>!(c.pos_x===0&&c.pos_z===0)).forEach(c=>{
+  currentZoneData.chars.filter(c=>(c.online||(layers.offlineplayers&&layers.players))&&!(c.pos_x===0&&c.pos_z===0)).forEach(c=>{
     activePlrs.add(c.charid);
     const{px,py}=T(c.pos_x,c.pos_z);
     if(!playerSprites.has(c.charid)){
