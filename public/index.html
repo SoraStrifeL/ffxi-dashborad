@@ -168,6 +168,8 @@
   .muted{color:var(--text3);font-size:12px}
   .online-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--online);vertical-align:middle;margin-right:3px}
   .offline-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--text3);vertical-align:middle;margin-right:3px}
+  .input{background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-size:13px;box-sizing:border-box}
+  .input:focus{outline:none;border-color:var(--accent)}
   .cal-inp{width:100%;display:block;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:6px;font-size:12px;margin-bottom:6px}
   .console-log{background:var(--bg1);border:1px solid var(--border);border-radius:7px;padding:10px 12px;height:300px;overflow-y:auto;font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-all;line-height:1.5}
   .console-log .ll-e{color:#f87171} .console-log .ll-w{color:#fbbf24} .console-log .ll-i{color:#93c5fd}
@@ -822,9 +824,9 @@
 const state = { token:null, tier:null, login:null, accid:null, chars:[], zones:[] };
 const livePositions = {}; // charid → {pos_x,pos_y,pos_z,pos_zone} from positions feed
 
-function saveToken(t){ state.token = t; try{ sessionStorage.setItem('dash_token', t); }catch(_){} }
-function loadToken(){ try{ return sessionStorage.getItem('dash_token'); }catch(_){ return null; } }
-function clearToken(){ state.token=null; try{ sessionStorage.removeItem('dash_token'); }catch(_){} }
+function saveToken(t){ state.token = t; try{ localStorage.setItem('dash_token', t); }catch(_){} }
+function loadToken(){ try{ return localStorage.getItem('dash_token'); }catch(_){ return null; } }
+function clearToken(){ state.token=null; try{ localStorage.removeItem('dash_token'); }catch(_){} }
 
 async function api(path, opts={}){
   const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
@@ -5722,7 +5724,16 @@ async function initTimers(){
 // ════════════════════════════════════════════════════════
 (async function boot(){
   const t=loadToken();
-  if(t){ state.token=t; try{ await enterApp(); return; }catch(_){ clearToken(); } }
+  if(t){
+    state.token=t;
+    try{ await enterApp(); return; }
+    catch(_){
+      // api() clears state.token and calls showLogin() on 401 — nothing left to do.
+      // For any other error (network blip, server restart) keep the token so the
+      // next page load auto-retries instead of forcing a full re-login.
+      if(!state.token) return;
+    }
+  }
   showLogin();
 })();
 </script>

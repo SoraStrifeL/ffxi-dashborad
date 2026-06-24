@@ -1,5 +1,5 @@
 // ════════════════════════════════════════════════════════════════════
-//  auth.js — dashboard authentication using the GAME's account system
+//  auth.ts — dashboard authentication using the GAME's account system
 //  ────────────────────────────────────────────────────────────────────
 //  Login = game login. Verifies the submitted password against the
 //  bcrypt hash stored in `accounts.password`, the SAME way the LSB login
@@ -8,21 +8,15 @@
 //  Tiers:
 //    admin  — account owns at least one character with gmlevel >= ADMIN_GM_LEVEL
 //    player — any other valid account; scoped to their own characters only
-//
-//  Security stance:
-//    - password verified against bcrypt hash; never stored or logged
-//    - banned accounts (status != 1) rejected, matching the game
-//    - session = signed JWT with { accid, tier }, expiring
-//    - JWT secret from env (DASHBOARD_JWT_SECRET); refuse to run without it
-//    - legacy non-bcrypt accounts: rejected with a clear message telling
-//      them to log into the GAME once (which auto-upgrades them to bcrypt),
-//      rather than us re-implementing MariaDB PASSWORD() in Node
 // ════════════════════════════════════════════════════════════════════
-const bcrypt = require('bcrypt');
-const jwt    = require('jsonwebtoken');
+import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
+import { RequestHandler } from 'express';
+import { Pool, RowDataPacket } from 'mysql2/promise';
+import { AuthUser } from './types';
 
-const ADMIN_GM_LEVEL = 1;                 // gmlevel >= this on any char => admin tier
-const TOKEN_TTL      = '24h';             // session lifetime
+export const ADMIN_GM_LEVEL = 1;
+const TOKEN_TTL = '24h';
 
 const JWT_SECRET = process.env.DASHBOARD_JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 16) {
@@ -30,15 +24,17 @@ if (!JWT_SECRET || JWT_SECRET.length < 16) {
   console.error('Set it before starting, e.g. in dev.docker-compose.yml or the shell.');
   process.exit(1);
 }
+// After the guard above JWT_SECRET is guaranteed to be a string
+const SECRET = JWT_SECRET as string;
 
 // Detects the LSB bcrypt hash format ($2a/$2b/$2y/$2x$...), mirroring
 // isBcryptHash() in src/login/auth_session.cpp.
-function isBcryptHash(h) {
+function isBcryptHash(h: unknown): boolean {
   return typeof h === 'string'
-      && h.length >= 60
-      && h[0] === '$' && h[1] === '2'
-      && (h[2] === 'a' || h[2] === 'b' || h[2] === 'y' || h[2] === 'x')
-      && h[3] === '$';
+    && h.length >= 60
+    && h[0] === '$' && h[1] === '2'
+    && (h[2] === 'a' || h[2] === 'b' || h[2] === 'y' || h[2] === 'x')
+    && h[3] === '$';
 }
 
 // Dummy hash used when the account doesn't exist, to keep response time
@@ -46,86 +42,78 @@ function isBcryptHash(h) {
 const DUMMY_HASH = '$2b$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
 // Returns { accid, tier, login } on success, or null on any failure.
-// `pool` is the shared mysql2/promise pool from server.js.
-async function authenticate(pool, login, password) {
+export async function authenticate(
+  pool: Pool,
+  login: string,
+  password: string,
+): Promise<{ accid: number; tier: 'admin' | 'player'; login: string } | { error: string } | null> {
   if (!login || !password) return null;
-  if (login.length > 16 || password.length > 32) return null;   // match game's input limits
+  if (login.length > 16 || password.length > 32) return null;
 
-  const [rows] = await pool.execute(
+  const [rows] = await pool.execute<RowDataPacket[]>(
     'SELECT id, status, password FROM accounts WHERE login = ? LIMIT 1', [login]);
 
   if (rows.length === 0) {
-    // Run a dummy compare so the response time is indistinguishable from a
-    // real failed login — prevents username enumeration via timing.
     await bcrypt.compare(password, DUMMY_HASH);
     return null;
   }
 
   const acc = rows[0];
 
-  // status: 1 = normal/active in LSB. Anything else (banned/inactive) is rejected.
   if (Number(acc.status) !== 1) return null;
 
-  // Only bcrypt accounts are verifiable here. Legacy hashes can't be checked
-  // without re-implementing MariaDB PASSWORD(); we refuse rather than weaken.
   if (!isBcryptHash(acc.password)) {
     return { error: 'legacy_password' };
   }
 
-  const ok = await bcrypt.compare(password, acc.password);
+  const ok = await bcrypt.compare(password, acc.password as string);
   if (!ok) return null;
 
-  // Determine tier: admin if any owned character is a GM.
-  const [gmRows] = await pool.execute(
+  const [gmRows] = await pool.execute<RowDataPacket[]>(
     'SELECT MAX(gmlevel) AS maxgm FROM chars WHERE accid = ?', [acc.id]);
   const maxGm = gmRows.length ? Number(gmRows[0].maxgm || 0) : 0;
-  const tier  = maxGm >= ADMIN_GM_LEVEL ? 'admin' : 'player';
+  const tier: 'admin' | 'player' = maxGm >= ADMIN_GM_LEVEL ? 'admin' : 'player';
 
-  return { accid: acc.id, tier, login };
+  return { accid: acc.id as number, tier, login };
 }
 
-function issueToken(identity) {
+export function issueToken(identity: { accid: number; tier: string; login: string }): string {
   return jwt.sign(
     { accid: identity.accid, tier: identity.tier, login: identity.login },
-    JWT_SECRET,
+    SECRET,
     { expiresIn: TOKEN_TTL });
 }
 
 // Express middleware: verifies the Bearer token, attaches req.user.
-function requireAuth(req, res, next) {
+export const requireAuth: RequestHandler = (req, res, next) => {
   const hdr = req.headers.authorization || '';
   const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : null;
-  if (!token) return res.status(401).json({ error: 'no token' });
+  if (!token) { res.status(401).json({ error: 'no token' }); return; }
   try {
-    req.user = jwt.verify(token, JWT_SECRET);   // { accid, tier, login, iat, exp }
+    req.user = jwt.verify(token, SECRET) as AuthUser;
     next();
-  } catch (e) {
-    return res.status(401).json({ error: 'invalid or expired token' });
+  } catch (_e) {
+    res.status(401).json({ error: 'invalid or expired token' });
   }
-}
+};
 
 // Express middleware: requires admin tier.
-function requireAdmin(req, res, next) {
+export const requireAdmin: RequestHandler = (req, res, next) => {
   if (!req.user || req.user.tier !== 'admin') {
-    return res.status(403).json({ error: 'admin only' });
+    res.status(403).json({ error: 'admin only' });
+    return;
   }
   next();
-}
+};
 
 // Helper: does this request's user own the given charid?
-// Used to scope player-tier access to their own characters.
-async function userOwnsChar(pool, accid, charid) {
-  const [rows] = await pool.execute(
+export async function userOwnsChar(pool: Pool, accid: number, charid: number): Promise<boolean> {
+  const [rows] = await pool.execute<RowDataPacket[]>(
     'SELECT 1 FROM chars WHERE charid = ? AND accid = ? LIMIT 1', [charid, accid]);
   return rows.length > 0;
 }
 
 // Verifies a raw JWT string; throws on invalid/expired.
-function verifyToken(token) {
-  return jwt.verify(token, JWT_SECRET);
+export function verifyToken(token: string): AuthUser {
+  return jwt.verify(token, SECRET) as AuthUser;
 }
-
-module.exports = {
-  authenticate, issueToken, requireAuth, requireAdmin, userOwnsChar, verifyToken,
-  ADMIN_GM_LEVEL,
-};

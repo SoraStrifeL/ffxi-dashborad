@@ -164,6 +164,7 @@ function ensureLogTail(fileKey) {
     const msg = JSON.stringify({ type: 'log', data: { file: fileKey, lines } });
     entry.subs.forEach(ws => { if (ws.readyState === WebSocket.OPEN) ws.send(msg); });
   });
+  proc.stdout.on('error', e => console.error(`[log:${fileKey}] stdout error:`, e.message));
   proc.on('error', e => console.error(`[log:${fileKey}]`, e.message));
 }
 
@@ -520,31 +521,37 @@ app.get('/api/characters/:zone', auth.requireAuth, async (req, res) => {
 });
 
 
-// ── Login rate limiter: max 10 attempts per 15 min per IP ────────────────────
+// ── Login rate limiter: max 10 attempts per 15 min, tracked by IP and by
+//    account name so distributed IPs can't brute-force a single account. ───────
 const loginAttempts = new Map();
-function checkLoginRateLimit(ip) {
+function checkLoginRateLimit(key) {
   const now = Date.now(), window = 15 * 60 * 1000, max = 10;
-  let e = loginAttempts.get(ip);
-  if (!e || now - e.start > window) { e = { start: now, count: 0 }; loginAttempts.set(ip, e); }
+  let e = loginAttempts.get(key);
+  if (!e || now - e.start > window) { e = { start: now, count: 0 }; loginAttempts.set(key, e); }
   return ++e.count > max;
 }
 setInterval(() => {
   const cutoff = Date.now() - 15 * 60 * 1000;
-  for (const [ip, e] of loginAttempts) if (e.start < cutoff) loginAttempts.delete(ip);
+  for (const [k, e] of loginAttempts) if (e.start < cutoff) loginAttempts.delete(k);
 }, 5 * 60 * 1000);
 
 app.post('/api/login', async (req, res) => {
-  if (checkLoginRateLimit(req.ip || req.socket.remoteAddress))
+  const ip = req.ip || req.socket.remoteAddress;
+  const { login, password } = req.body || {};
+  // Check both IP and account name so neither can be abused independently.
+  if (checkLoginRateLimit(`ip:${ip}`) || (login && checkLoginRateLimit(`acct:${String(login).toLowerCase()}`)))
     return res.status(429).json({ error: 'Too many login attempts. Try again later.' });
   try {
-    const { login, password } = req.body || {};
     const identity = await auth.authenticate(pool, login, password);
     if (!identity) return res.status(401).json({ error: 'invalid credentials' });
     if (identity.error === 'legacy_password') {
       return res.status(409).json({ error: 'Log into the game once to upgrade your account security, then try again.' });
     }
     res.json({ token: auth.issueToken(identity), tier: identity.tier, login: identity.login });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) {
+    console.error('Login error:', e);
+    res.status(500).json({ error: 'Internal server error' });
+  }
 });
 
 app.get('/api/me', auth.requireAuth, async (req, res) => {
@@ -984,6 +991,8 @@ const QUEST_REWARDS = buildQuestRewards();
 app.get('/api/character/:charid/quests', auth.requireAuth, async (req, res) => {
   try {
     const charid = parseInt(req.params.charid);
+    if (req.user.tier !== 'admin' && !(await auth.userOwnsChar(pool, req.user.accid, charid)))
+      return res.status(403).json({ error: 'not your character' });
     const [[row]] = await pool.execute('SELECT quests FROM chars WHERE charid = ?', [charid]);
     if (!row || !row.quests) return res.json([]);
     const blob = Buffer.isBuffer(row.quests) ? row.quests : Buffer.from(row.quests);
@@ -1356,6 +1365,8 @@ app.get('/api/quest-settings', auth.requireAuth, (_req, res) => {
 app.get('/api/character/:charid/vars', auth.requireAuth, async (req, res) => {
   try {
     const charid = parseInt(req.params.charid);
+    if (req.user.tier !== 'admin' && !(await auth.userOwnsChar(pool, req.user.accid, charid)))
+      return res.status(403).json({ error: 'not your character' });
     const [rows] = await pool.execute(
       `SELECT varname, value FROM char_vars WHERE charid=? ORDER BY varname`, [charid]);
     const vars = {};
@@ -1728,6 +1739,8 @@ const DEBUFF_IDS = new Set([
 app.get('/api/character/:charid/effects', auth.requireAuth, async (req, res) => {
   try {
     const charid = parseInt(req.params.charid);
+    if (req.user.tier !== 'admin' && !(await auth.userOwnsChar(pool, req.user.accid, charid)))
+      return res.status(403).json({ error: 'not your character' });
     const [rows] = await pool.execute(
       'SELECT effectid, power, tick, duration, timestamp FROM char_effects WHERE charid = ? ORDER BY effectid',
       [charid]

@@ -1,9 +1,19 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: ffxi-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --save ""
+    networks:
+      - ffxi_default
+
   dashboard:
     build: .
     image: ffxi-dashboard
     container_name: ffxi-dashboard
     restart: unless-stopped
+    depends_on:
+      - redis
     environment:
       DB_HOST: ffxi-database-1
       DB_USER: xiadmin
@@ -13,6 +23,7 @@ services:
       DASHBOARD_JWT_SECRET: "${DASHBOARD_JWT_SECRET}"
       CORS_ORIGIN: "${CORS_ORIGIN:-}"
       WINDOWER_API_KEY: "${WINDOWER_API_KEY}"
+      REDIS_URL: "${REDIS_URL:-redis://ffxi-redis:6379}"
     ports:
       - "3001:3000"
     volumes:
@@ -31,9 +42,11 @@ services:
       - /opt/stacks/ffxi/scripts:/ffxi-server-scripts
     networks:
       - ffxi_default
+
 networks:
   ffxi_default:
     external: true
+
 volumes:
   ffxi_ffxi-logs:
     external: true
