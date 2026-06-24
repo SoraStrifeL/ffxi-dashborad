@@ -1,7 +1,8 @@
 import fs from 'fs';
 import path from 'path';
+import { LSB_SETTINGS_DIR } from './catalog';
 
-export const SETTINGS_DIR = '/ffxi-settings';
+export const SETTINGS_DIR = LSB_SETTINGS_DIR;
 
 export interface RateCatalogEntry {
   group: string;

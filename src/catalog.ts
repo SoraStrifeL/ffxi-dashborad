@@ -7,6 +7,12 @@ import { WindowerPosition, ZoneEntity } from './types';
 // ── Paths ─────────────────────────────────────────────────────────────────────
 export const MAPS_DIR    = path.join(__dirname, '..', 'public', 'maps');
 export const UPLOADS_DIR = path.join(__dirname, '..', 'public', 'uploads');
+
+// Configurable LSB directory roots — set these in .env for bare-metal or Windows installs.
+// Docker: the compose file mounts these at the defaults below via volumes.
+export const LSB_SCRIPTS_DIR  = process.env.LSB_SCRIPTS_DIR  || '/ffxi-scripts';
+export const LSB_SETTINGS_DIR = process.env.LSB_SETTINGS_DIR || '/ffxi-settings';
+export const LSB_LOG_DIR      = process.env.LSB_LOG_DIR      || '/ffxi-log';
 ['items', 'npcs', 'mobs'].forEach(d => fs.mkdirSync(path.join(UPLOADS_DIR, d), { recursive: true }));
 
 // ── Calibration store ─────────────────────────────────────────────────────────
@@ -223,7 +229,7 @@ export function prettyEffectName(key: string): string {
 export function buildEffectNames(): Record<number, string> {
   const names: Record<number, string> = {};
   try {
-    const text = fs.readFileSync('/ffxi-scripts/effect.lua', 'utf8');
+    const text = fs.readFileSync(`${LSB_SCRIPTS_DIR}/effect.lua`, 'utf8');
     const re = /^\s+(\w+)\s*=\s*(\d+)/gm;
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
@@ -239,7 +245,7 @@ export const EFFECT_NAMES = buildEffectNames();
 export function buildMeritNames(): Record<number, string> {
   const names: Record<number, string> = {};
   try {
-    const text = fs.readFileSync('/ffxi-scripts/merit.lua', 'utf8');
+    const text = fs.readFileSync(`${LSB_SCRIPTS_DIR}/merit.lua`, 'utf8');
     const cats: Record<string, number> = {};
     const catMatch = text.match(/local meritCategory\s*=\s*\{([\s\S]*?)\}/);
     if (catMatch) {
@@ -279,8 +285,8 @@ export function buildLuaEnum(filepath: string): Record<number, string> {
   return names;
 }
 
-export const KEY_ITEM_NAMES = buildLuaEnum('/ffxi-scripts/key_item.lua');
-export const TITLE_NAMES    = buildLuaEnum('/ffxi-scripts/title.lua');
+export const KEY_ITEM_NAMES = buildLuaEnum(`${LSB_SCRIPTS_DIR}/key_item.lua`);
+export const TITLE_NAMES    = buildLuaEnum(`${LSB_SCRIPTS_DIR}/title.lua`);
 console.log(`[enum] ${Object.keys(KEY_ITEM_NAMES).length} key items, ${Object.keys(TITLE_NAMES).length} titles`);
 
 // ── RoE Records ────────────────────────────────────────────────────────────────
@@ -288,7 +294,7 @@ export function buildRoeRecords(): { names: Record<number, string>; records: Rec
   const names: Record<number, string> = {};
   const records: Record<number, { id: number; name: string; flags: string[]; goal: number | null }> = {};
   try {
-    const text = fs.readFileSync('/ffxi-scripts/roe_records.lua', 'utf8');
+    const text = fs.readFileSync(`${LSB_SCRIPTS_DIR}/roe_records.lua`, 'utf8');
     const blockRe = /\[(\d+)\]\s*=\s*\{([^[]*?)(?=\[\d+\]\s*=\s*\{|\s*\}$)/gs;
     let m: RegExpExecArray | null;
     while ((m = blockRe.exec(text)) !== null) {
@@ -328,7 +334,7 @@ const _MISSION_KEY_TO_LOG: Record<string, number> = {
 export function buildMissionNames(): Record<number, Record<number, string>> {
   const result: Record<number, Record<number, string>> = {};
   try {
-    const text = fs.readFileSync('/ffxi-scripts/missions.lua', 'utf8');
+    const text = fs.readFileSync(`${LSB_SCRIPTS_DIR}/missions.lua`, 'utf8');
     const sectionRe = /\[xi\.mission\.area\[xi\.mission\.log_id\.(\w+)\]\]\s*=\s*\{([^}]+)\}/gs;
     let sec: RegExpExecArray | null;
     while ((sec = sectionRe.exec(text)) !== null) {
@@ -453,7 +459,7 @@ export function buildQuestCatalog(): QuestCatalogWithMeta {
   const catalog = Array.from({ length: 11 }, () => ({} as Record<number, string>)) as QuestCatalogWithMeta;
   const constToId: Record<string, number> = {};
   try {
-    const text = fs.readFileSync('/ffxi-scripts/quests.lua', 'utf8');
+    const text = fs.readFileSync(`${LSB_SCRIPTS_DIR}/quests.lua`, 'utf8');
     const sectionRe = /\[xi\.quest\.area\[xi\.questLog\.([A-Z_]+)\]\]\s*=\s*\{([^}]+)\}/gs;
     let m: RegExpExecArray | null;
     while ((m = sectionRe.exec(text)) !== null) {
@@ -576,7 +582,10 @@ export function _loadQuestSettings(): Record<string, unknown> {
     'OLDSCHOOL_G1', 'OLDSCHOOL_G2', 'ENABLE_MAGIAN_TRIALS',
   ];
   const result: Record<string, unknown> = {};
-  const paths = ['/ffxi-settings/main.lua', '/ffxi-settings/default/main.lua'];
+  const paths = [
+    path.join(LSB_SETTINGS_DIR, 'main.lua'),
+    path.join(LSB_SETTINGS_DIR, 'default', 'main.lua'),
+  ];
   for (const p of paths) {
     let txt = '';
     try { txt = fs.readFileSync(p, 'utf8'); } catch (e) { void e; continue; }
@@ -601,7 +610,7 @@ export function buildQuestRewards(): Record<number, Record<number, Record<string
   const rewards: Record<number, Record<number, Record<string, unknown>>> = {};
   QUEST_LOG_DIRS.forEach((dir, logId) => {
     rewards[logId] = {};
-    const dirPath = `/ffxi-scripts/quests/${dir}`;
+    const dirPath = path.join(LSB_SCRIPTS_DIR, 'quests', dir);
     let files: string[];
     try { files = fs.readdirSync(dirPath).filter(f => f.endsWith('.lua')); }
     catch (e) { void e; return; }
@@ -691,4 +700,4 @@ export const PLAYER_ALLOWED_ACTIONS = new Set<string>([]);
 export const DB_PAGE = 50;
 
 // ── Scripts root ───────────────────────────────────────────────────────────────
-export const SERVER_SCRIPTS_ROOT = '/ffxi-server-scripts';
+export const SERVER_SCRIPTS_ROOT = process.env.LSB_SERVER_SCRIPTS_DIR || '/ffxi-server-scripts';

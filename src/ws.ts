@@ -3,7 +3,7 @@ import { spawn, ChildProcess } from 'child_process';
 import WebSocket from 'ws';
 import { Pool, RowDataPacket } from 'mysql2/promise';
 import { WsClientState } from './types';
-import { queryStats, queryPlayers } from './catalog';
+import { queryStats, queryPlayers, LSB_LOG_DIR } from './catalog';
 import { verifyToken } from './auth';
 import { hasPermission } from './rbac';
 import { setBroadcastAuditEvent } from './audit';
@@ -140,7 +140,7 @@ export async function pollAndBroadcast(pool: Pool): Promise<void> {
 }
 
 // ── Server log streaming ───────────────────────────────────────────────────────
-const LOG_DIR = '/ffxi-log';
+const LOG_DIR = LSB_LOG_DIR;
 export const LOG_FILES: Record<string, string> = {
   map:     'map-server.log',
   world:   'world-server.log',
@@ -186,7 +186,8 @@ export function unsubscribeLog(ws: WebSocket): void {
 }
 
 // ── Live position feed ─────────────────────────────────────────────────────────
-export const POS_FILE = '/ffxi-log/dashboard_positions.json';
+import path from 'path';
+export const POS_FILE = path.join(LSB_LOG_DIR, 'dashboard_positions.json');
 
 export function startPosWatcher(): void {
   if (!fs.existsSync(POS_FILE)) { setTimeout(startPosWatcher, 10_000); return; }

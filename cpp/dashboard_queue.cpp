@@ -11,11 +11,14 @@
  *   - modules/retail_plus/cpp/retail_plus_db.cpp  (CPPModule, db::preparedStmt,
  *     FOR_DB_SINGLE_RESULT, REGISTER_CPP_MODULE, OFFSET-loop for multi-row)
  *   - modules/tools/packetcap/packetcap.cpp       (include list, OnTimeServerTick)
- *   - src/map/utils/moduleutils.h:57              (virtual OnTimeServerTick)
- *   - src/map/utils/zoneutils.h:76                (GetChar(charId) -> CCharEntity*)
- *   - src/map/utils/charutils.h:129              (AddItem(PChar, loc, itemID, qty))
- *   - src/map/utils/charutils.h:131              (UpdateItem(PChar, loc, slot, qty))
- *   - src/map/item_container.h:36                (LOC_INVENTORY = 0)
+ *   - src/map/utils/moduleutils.h                 (virtual OnTimeServerTick)
+ *   - src/map/utils/zoneutils.h                   (GetChar(charId) -> CCharEntity*)
+ *   - src/map/utils/charutils.h                   (AddItem(PChar, loc, itemID, qty))
+ *   - src/map/utils/charutils.h                   (UpdateItem(PChar, loc, slot, qty))
+ *   - src/map/item_container.h                    (LOC_INVENTORY = 0)
+ *   - src/map/entities/char_entity.h              (renamed from charentity.h)
+ *   - src/map/entities/mob_entity.h               (renamed from mobentity.h)
+ *   - src/map/entities/npc_entity.h               (renamed from npcentity.h)
  *
  * v2 SCOPE: additem / delitem / setgil / addgil.
  *   Gil lives at LOC_INVENTORY slot 0, itemId 65535.
@@ -35,9 +38,9 @@
  ************************************************************************/
 
 #include "common/database.h"
-#include "map/entities/charentity.h"
-#include "map/entities/mobentity.h"
-#include "map/entities/npcentity.h"
+#include "map/entities/char_entity.h"
+#include "map/entities/mob_entity.h"
+#include "map/entities/npc_entity.h"
 #include "map/items/item.h"
 #include "map/lua/luautils.h"
 #include "map/packets/s2c/0x062_clistatus2.h"
