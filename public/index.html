@@ -142,12 +142,25 @@
   .vars-table div{display:flex;padding:2px 0;border-bottom:1px solid var(--border)}
   .vars-table .vk{color:var(--text3);width:200px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .vars-table .vv{color:var(--text)}
-  .db-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text3);padding:8px 16px;font-size:13px;font-weight:500;cursor:pointer;margin-bottom:-2px;transition:color .15s,border-color .15s}
-  .db-tab:hover{color:var(--text)}
-  .db-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-  .db-type-chip,.db-sort-chip,.db-sub-chip,.db-log-chip,.db-script-chip,.db-qsort-chip,.db-region-chip,.db-geo-sort-chip,.db-eco-chip,.db-ztype-chip,.db-zcontent-chip,.db-zsort-chip,.db-flag-chip{background:var(--bg3);border:1px solid var(--border);color:var(--text3);padding:3px 9px;border-radius:12px;font-size:11px;cursor:pointer;transition:all .12s}
-  .db-type-chip:hover,.db-sort-chip:hover,.db-sub-chip:hover,.db-log-chip:hover,.db-script-chip:hover,.db-qsort-chip:hover,.db-region-chip:hover,.db-geo-sort-chip:hover,.db-eco-chip:hover,.db-ztype-chip:hover,.db-zcontent-chip:hover,.db-zsort-chip:hover,.db-flag-chip:hover{border-color:var(--accent);color:var(--text)}
-  .db-type-chip.active,.db-sort-chip.active,.db-log-chip.active,.db-qsort-chip.active,.db-region-chip.active,.db-geo-sort-chip.active,.db-eco-chip.active,.db-ztype-chip.active,.db-zcontent-chip.active,.db-zsort-chip.active,.db-flag-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* ── Database sidebar layout ─────────────────────────── */
+  .db-layout{display:grid;grid-template-columns:158px 1fr;height:100%}
+  .db-nav{background:var(--bg2);border-right:1px solid var(--border);padding:8px 0;overflow-y:auto;flex-shrink:0}
+  .db-nav-group{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);padding:12px 14px 4px;margin-top:2px}
+  .db-nav-group:first-child{padding-top:8px;margin-top:0}
+  .db-nav-item{display:block;width:100%;text-align:left;background:transparent;border:none;border-left:3px solid transparent;color:var(--text2);padding:7px 12px 7px 15px;font-size:13px;cursor:pointer;transition:color .12s,background .12s;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .db-nav-item:hover{color:var(--text);background:var(--bg3)}
+  .db-nav-item.active{color:var(--accent);border-left-color:var(--accent);background:rgba(124,106,247,.08);font-weight:500}
+  .db-content{overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;min-height:0}
+  .db-search-wrap{position:relative;flex-shrink:0;margin-bottom:12px}
+  .db-search-wrap svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;opacity:.45}
+  .db-search-wrap input{width:100%;max-width:380px;padding:8px 12px 8px 34px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:inherit;transition:border-color .15s}
+  .db-search-wrap input:focus{outline:none;border-color:var(--accent)}
+  .db-filter-bar{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
+  .db-filter-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .db-filter-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);white-space:nowrap;min-width:42px}
+  .db-chip,.db-type-chip,.db-sort-chip,.db-sub-chip,.db-log-chip,.db-script-chip,.db-qsort-chip,.db-region-chip,.db-geo-sort-chip,.db-eco-chip,.db-ztype-chip,.db-zcontent-chip,.db-zsort-chip,.db-flag-chip,.db-ajob-chip{background:var(--bg2);border:1px solid var(--border);color:var(--text3);padding:3px 9px;border-radius:10px;font-size:11px;cursor:pointer;transition:all .12s;white-space:nowrap}
+  .db-chip:hover,.db-type-chip:hover,.db-sort-chip:hover,.db-sub-chip:hover,.db-log-chip:hover,.db-script-chip:hover,.db-qsort-chip:hover,.db-region-chip:hover,.db-geo-sort-chip:hover,.db-eco-chip:hover,.db-ztype-chip:hover,.db-zcontent-chip:hover,.db-zsort-chip:hover,.db-flag-chip:hover,.db-ajob-chip:hover{border-color:var(--accent);color:var(--text)}
+  .db-chip.active,.db-type-chip.active,.db-sort-chip.active,.db-log-chip.active,.db-qsort-chip.active,.db-region-chip.active,.db-geo-sort-chip.active,.db-eco-chip.active,.db-ztype-chip.active,.db-zcontent-chip.active,.db-zsort-chip.active,.db-flag-chip.active,.db-ajob-chip.active{background:var(--accent);border-color:var(--accent);color:#fff}
   .db-sub-chip.active{background:var(--ok);border-color:var(--ok);color:#fff}
   .db-script-chip.active[data-scripted="1"]{background:var(--ok);border-color:var(--ok);color:#fff}
   .db-script-chip.active[data-scripted="0"]{background:#5a3a1a;border-color:#8a5a2a;color:#ffb74d}
@@ -457,63 +470,75 @@
     <!-- ZONES -->
     <!-- DATABASE -->
     <div class="page" id="dbPage">
-      <div class="list-page">
-        <!-- Category tabs -->
-        <div style="display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:14px">
-          <button class="db-tab active" data-cat="items">Items</button>
-          <button class="db-tab" data-cat="npcs">NPCs</button>
-          <button class="db-tab" data-cat="mobs">Mobs</button>
-          <button class="db-tab" data-cat="quests">Quests</button>
-          <button class="db-tab" data-cat="zones">Zones</button>
+      <div class="db-layout">
+        <!-- Left category nav -->
+        <div class="db-nav">
+          <div class="db-nav-group">World</div>
+          <button class="db-nav-item active" data-cat="items">Items</button>
+          <button class="db-nav-item" data-cat="npcs">NPCs</button>
+          <button class="db-nav-item" data-cat="mobs">Mobs</button>
+          <button class="db-nav-item" data-cat="zones">Zones</button>
+          <div class="db-nav-group">Progress</div>
+          <button class="db-nav-item" data-cat="jobs">Jobs</button>
+          <button class="db-nav-item" data-cat="skills">Skills</button>
+          <button class="db-nav-item" data-cat="abilities">Abilities</button>
+          <div class="db-nav-group">Lore</div>
+          <button class="db-nav-item" data-cat="quests">Quests</button>
+          <button class="db-nav-item" data-cat="keyitems">Key Items</button>
+          <button class="db-nav-item" data-cat="trusts">Trusts</button>
+          <button class="db-nav-item" data-cat="mounts">Mounts</button>
         </div>
+        <!-- Right content -->
+        <div class="db-content">
         <!-- Search row -->
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
-          <input id="dbSearch" placeholder="Search items…" style="flex:1;min-width:160px;max-width:280px;padding:6px 10px;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:inherit">
-          <input id="dbZone" placeholder="Filter by zone…" style="width:170px;padding:6px 10px;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:6px;color:inherit;display:none">
-          <!-- Item-specific controls -->
-          <div id="dbItemControls" style="display:flex;flex-direction:column;gap:6px">
-            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              <span style="font-size:11px;color:var(--text3);white-space:nowrap">Type:</span>
-              <div id="dbTypeChips" style="display:flex;gap:4px;flex-wrap:wrap">
-                <button class="db-type-chip active" data-bit="">All</button>
-                <button class="db-type-chip" data-bit="7">Weapon</button>
-                <button class="db-type-chip" data-bit="6">Armor</button>
-                <button class="db-type-chip" data-bit="5">Crystal</button>
-                <button class="db-type-chip" data-bit="1">General</button>
-                <button class="db-type-chip" data-bit="4">Puppet</button>
-                <button class="db-type-chip" data-bit="3">Furnishing</button>
-                <button class="db-type-chip" data-bit="2">Linkshell</button>
-                <button class="db-type-chip" data-bit="8">Currency</button>
-              </div>
-            </div>
-            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-              <span style="font-size:11px;color:var(--text3);white-space:nowrap">Flags:</span>
-              <div id="dbFlagChips" style="display:flex;gap:4px;flex-wrap:wrap">
-                <button class="db-flag-chip active" data-flagmask="" data-flagval="">All</button>
-                <button class="db-flag-chip" data-flagmask="32768" data-flagval="32768">RARE</button>
-                <button class="db-flag-chip" data-flagmask="14336" data-flagval="14336">EX</button>
-                <button class="db-flag-chip" data-flagmask="1024" data-flagval="1024">No Drop</button>
-                <button class="db-flag-chip" data-flagmask="64" data-flagval="64">No Sell</button>
-                <button class="db-flag-chip" data-flagmask="2048" data-flagval="0">Auctionable</button>
-              </div>
-              <div style="width:1px;height:16px;background:var(--border);margin:0 2px"></div>
-              <span style="font-size:11px;color:var(--text3);white-space:nowrap">Sort:</span>
-              <div id="dbSortChips" style="display:flex;gap:4px;flex-wrap:wrap">
-                <button class="db-sort-chip active" data-sort="">ID</button>
-                <button class="db-sort-chip" data-sort="name">Name</button>
-                <button class="db-sort-chip" data-sort="level">Lv</button>
-                <button class="db-sort-chip" data-sort="ilevel">iLv</button>
-                <button class="db-sort-chip" data-sort="dmg">DMG</button>
-                <button class="db-sort-chip" data-sort="sell">Sell</button>
-              </div>
+        <div class="db-search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input id="dbSearch" placeholder="Search items…">
+          <input id="dbZone" placeholder="Filter by zone…" style="display:none;margin-left:8px;width:170px;padding:8px 12px;font-size:13px;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:inherit">
+        </div>
+        <input type="checkbox" id="dbRareOnly" style="display:none">
+        <!-- Item filters -->
+        <div id="dbItemControls" class="db-filter-bar" style="display:flex">
+          <div class="db-filter-row">
+            <span class="db-filter-label">Type</span>
+            <div id="dbTypeChips" style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="db-type-chip active" data-bit="">All</button>
+              <button class="db-type-chip" data-bit="7">Weapon</button>
+              <button class="db-type-chip" data-bit="6">Armor</button>
+              <button class="db-type-chip" data-bit="5">Crystal</button>
+              <button class="db-type-chip" data-bit="1">General</button>
+              <button class="db-type-chip" data-bit="4">Puppet</button>
+              <button class="db-type-chip" data-bit="3">Furnishing</button>
+              <button class="db-type-chip" data-bit="2">Linkshell</button>
+              <button class="db-type-chip" data-bit="8">Currency</button>
             </div>
           </div>
-          <input type="checkbox" id="dbRareOnly" style="display:none">
+          <div class="db-filter-row">
+            <span class="db-filter-label">Flags</span>
+            <div id="dbFlagChips" style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="db-flag-chip active" data-flagmask="" data-flagval="">All</button>
+              <button class="db-flag-chip" data-flagmask="32768" data-flagval="32768">RARE</button>
+              <button class="db-flag-chip" data-flagmask="14336" data-flagval="14336">EX</button>
+              <button class="db-flag-chip" data-flagmask="1024" data-flagval="1024">No Drop</button>
+              <button class="db-flag-chip" data-flagmask="64" data-flagval="64">No Sell</button>
+              <button class="db-flag-chip" data-flagmask="2048" data-flagval="0">Auctionable</button>
+            </div>
+            <div style="width:1px;height:16px;background:var(--border);margin:0 4px;flex-shrink:0"></div>
+            <span class="db-filter-label">Sort</span>
+            <div id="dbSortChips" style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="db-sort-chip active" data-sort="">ID</button>
+              <button class="db-sort-chip" data-sort="name">Name</button>
+              <button class="db-sort-chip" data-sort="level">Lv</button>
+              <button class="db-sort-chip" data-sort="ilevel">iLv</button>
+              <button class="db-sort-chip" data-sort="dmg">DMG</button>
+              <button class="db-sort-chip" data-sort="sell">Sell</button>
+            </div>
+          </div>
         </div>
-        <!-- Quest controls: area + script filter -->
-        <div id="dbQuestControls" style="display:none;flex-direction:column;gap:6px;margin-bottom:4px">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Area:</span>
+        <!-- Quest filters -->
+        <div id="dbQuestControls" class="db-filter-bar" style="display:none">
+          <div class="db-filter-row">
+            <span class="db-filter-label">Area</span>
             <div id="dbLogChips" style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="db-log-chip active" data-log="">All</button>
               <button class="db-log-chip" data-log="0">San d'Oria</button>
@@ -529,16 +554,15 @@
               <button class="db-log-chip" data-log="10">Coalition</button>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Script:</span>
+          <div class="db-filter-row">
+            <span class="db-filter-label">Script</span>
             <div id="dbScriptChips" style="display:flex;gap:4px">
               <button class="db-script-chip active" data-scripted="">All</button>
               <button class="db-script-chip" data-scripted="1">Scripted</button>
               <button class="db-script-chip" data-scripted="0">No script</button>
             </div>
-          </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Sort:</span>
+            <div style="width:1px;height:16px;background:var(--border);margin:0 4px;flex-shrink:0"></div>
+            <span class="db-filter-label">Sort</span>
             <div id="dbQuestSortChips" style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="db-qsort-chip active" data-qsort="">ID</button>
               <button class="db-qsort-chip" data-qsort="name">Name</button>
@@ -548,10 +572,10 @@
             </div>
           </div>
         </div>
-        <!-- NPC / Mob controls: region + sort -->
-        <div id="dbGeoControls" style="display:none;flex-direction:column;gap:6px;margin-bottom:4px">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Region:</span>
+        <!-- NPC / Mob filters -->
+        <div id="dbGeoControls" class="db-filter-bar" style="display:none">
+          <div class="db-filter-row">
+            <span class="db-filter-label">Region</span>
             <div id="dbRegionChips" style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="db-region-chip active" data-region="">All</button>
               <button class="db-region-chip" data-region="san_doria">San d'Oria</button>
@@ -562,8 +586,8 @@
               <button class="db-region-chip" data-region="adoulin">Adoulin</button>
             </div>
           </div>
-          <div id="dbEcoRow" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Type:</span>
+          <div id="dbEcoRow" class="db-filter-row" style="display:none">
+            <span class="db-filter-label">Type</span>
             <div id="dbEcoChips" style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="db-eco-chip active" data-eco="">All</button>
               <button class="db-eco-chip" data-eco="Amorph">Amorph</button>
@@ -583,17 +607,15 @@
               <button class="db-eco-chip" data-eco="Vermin">Vermin</button>
             </div>
           </div>
-          <div id="dbGeoSortRow" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Sort:</span>
-            <div id="dbGeoSortChips" style="display:flex;gap:4px;flex-wrap:wrap">
-              <!-- populated per-cat in JS -->
-            </div>
+          <div id="dbGeoSortRow" class="db-filter-row">
+            <span class="db-filter-label">Sort</span>
+            <div id="dbGeoSortChips" style="display:flex;gap:4px;flex-wrap:wrap"><!-- populated per-cat in JS --></div>
           </div>
         </div>
-        <!-- Zone controls -->
-        <div id="dbZoneControls" style="display:none;flex-direction:column;gap:6px;margin-bottom:4px">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Type:</span>
+        <!-- Zone filters -->
+        <div id="dbZoneControls" class="db-filter-bar" style="display:none">
+          <div class="db-filter-row">
+            <span class="db-filter-label">Type</span>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="db-ztype-chip active" data-ztype="">All</button>
               <button class="db-ztype-chip" data-ztype="1">City</button>
@@ -604,8 +626,8 @@
               <button class="db-ztype-chip" data-ztype="256">Assault</button>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Content:</span>
+          <div class="db-filter-row">
+            <span class="db-filter-label">Content</span>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="db-zcontent-chip active" data-zcontent="">All</button>
               <button class="db-zcontent-chip" data-zcontent="hub">Hub Cities</button>
@@ -619,8 +641,8 @@
               <button class="db-zcontent-chip" data-zcontent="map">Has Map</button>
             </div>
           </div>
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            <span style="font-size:11px;color:var(--text3);white-space:nowrap">Sort:</span>
+          <div class="db-filter-row">
+            <span class="db-filter-label">Sort</span>
             <div style="display:flex;gap:4px;flex-wrap:wrap">
               <button class="db-zsort-chip active" data-zsort="name">Name</button>
               <button class="db-zsort-chip" data-zsort="id">ID</button>
@@ -632,17 +654,49 @@
             </div>
           </div>
         </div>
-        <!-- Sub-type chips (weapon skill / armor slot) -->
+        <!-- Ability filters -->
+        <div id="dbAbilityControls" class="db-filter-bar" style="display:none">
+          <div class="db-filter-row">
+            <span class="db-filter-label">Job</span>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <button class="db-ajob-chip active" data-ajob="">All</button>
+              <button class="db-ajob-chip" data-ajob="1">WAR</button>
+              <button class="db-ajob-chip" data-ajob="2">MNK</button>
+              <button class="db-ajob-chip" data-ajob="3">WHM</button>
+              <button class="db-ajob-chip" data-ajob="4">BLM</button>
+              <button class="db-ajob-chip" data-ajob="5">RDM</button>
+              <button class="db-ajob-chip" data-ajob="6">THF</button>
+              <button class="db-ajob-chip" data-ajob="7">PLD</button>
+              <button class="db-ajob-chip" data-ajob="8">DRK</button>
+              <button class="db-ajob-chip" data-ajob="9">BST</button>
+              <button class="db-ajob-chip" data-ajob="10">BRD</button>
+              <button class="db-ajob-chip" data-ajob="11">RNG</button>
+              <button class="db-ajob-chip" data-ajob="12">SAM</button>
+              <button class="db-ajob-chip" data-ajob="13">NIN</button>
+              <button class="db-ajob-chip" data-ajob="14">DRG</button>
+              <button class="db-ajob-chip" data-ajob="15">SMN</button>
+              <button class="db-ajob-chip" data-ajob="16">BLU</button>
+              <button class="db-ajob-chip" data-ajob="17">COR</button>
+              <button class="db-ajob-chip" data-ajob="18">PUP</button>
+              <button class="db-ajob-chip" data-ajob="19">DNC</button>
+              <button class="db-ajob-chip" data-ajob="20">SCH</button>
+              <button class="db-ajob-chip" data-ajob="21">GEO</button>
+              <button class="db-ajob-chip" data-ajob="22">RUN</button>
+            </div>
+          </div>
+        </div>
+        <!-- Sub-type chips -->
         <div id="dbSubRow" style="display:none;margin-bottom:8px;gap:6px;align-items:center;flex-wrap:wrap">
           <span id="dbSubLabel" style="font-size:11px;color:var(--text3);white-space:nowrap;font-weight:600;text-transform:uppercase;letter-spacing:.4px"></span>
           <div id="dbSubChipList" style="display:flex;gap:4px;flex-wrap:wrap"></div>
         </div>
-        <div id="dbResultMeta" style="font-size:11px;color:var(--text3);margin-bottom:6px"></div>
-        <div id="dbResults"></div>
-        <div style="text-align:center;margin-top:10px">
+        <div id="dbResultMeta" style="font-size:11px;color:var(--text3);margin-bottom:8px;flex-shrink:0"></div>
+        <div id="dbResults" style="flex:1;min-height:0;overflow-y:auto"></div>
+        <div style="text-align:center;margin-top:10px;flex-shrink:0">
           <button id="dbMore" class="btn-sm" style="display:none">Load more</button>
         </div>
-      </div>
+        </div><!-- /db-content -->
+      </div><!-- /db-layout -->
     </div>
 
     <!-- POP TIMERS -->
@@ -5277,7 +5331,7 @@ function _dbItemDetail(r, wiki){
   return sections.join('');
 }
 
-let _dbState={cat:'items',page:0,rows:[],searchTimer:null,hasMore:false,typeBit:'',sort:'',rareOnly:false,flagMask:'',flagVal:'',skill:null,slot:null,logId:null,scripted:null,qsort:'',npcRegion:'',geoSort:'',mobEco:'',zType:'',zContent:'',zSort:'name'};
+let _dbState={cat:'items',page:0,rows:[],searchTimer:null,hasMore:false,typeBit:'',sort:'',rareOnly:false,flagMask:'',flagVal:'',skill:null,slot:null,logId:null,scripted:null,qsort:'',npcRegion:'',geoSort:'',mobEco:'',zType:'',zContent:'',zSort:'name',abilityJob:null};
 
 const _WPN_SUBS=[
   {label:'All',skill:null},{label:'H2H',skill:0},{label:'Dagger',skill:1},{label:'Sword',skill:2},
@@ -5530,6 +5584,128 @@ function _dbTable(cat, rows, append){
         <td style="padding:5px 8px">${z.player_count>0?`<span style="color:var(--online);font-weight:600">${z.player_count} ●</span>`:'<span class="muted">—</span>'}</td>
         <td style="padding:5px 8px">${z.hasMap?'<span style="color:var(--accent)">🗺</span>':'<span class="muted">—</span>'}</td>`;
       tr.addEventListener('click',()=>_dbZoneDetail(tr,z));
+      tb.appendChild(tr);
+    });
+  }
+
+  else if(cat==='keyitems'){
+    if(!append) el.innerHTML=`<table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr>
+        <th style="text-align:right;padding:6px 8px;color:var(--text3);font-weight:500;width:60px">ID</th>
+        <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500">Name</th>
+      </tr></thead><tbody id="dbTbody"></tbody></table>`;
+    const tb=document.getElementById('dbTbody');
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.style.cssText='border-bottom:1px solid rgba(42,42,61,.4)';
+      tr.innerHTML=`
+        <td style="padding:5px 8px;text-align:right;color:var(--text3);font-family:monospace">${r.id}</td>
+        <td style="padding:5px 8px">${esc(r.name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}</td>`;
+      tb.appendChild(tr);
+    });
+  }
+
+  else if(cat==='skills'){
+    const JOBS=['war','mnk','whm','blm','rdm','thf','pld','drk','bst','brd','rng','sam','nin','drg','smn','blu','cor','pup','dnc','sch','geo','run'];
+    const CAP_COLS=['r0','r1','r2','r3','r4','r5','r6','r7','r8','r9','r10','r11','r12','r13'];
+    if(!append) el.innerHTML=`<table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr>
+        <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500">Skill</th>
+        ${JOBS.map(j=>`<th style="text-align:center;padding:4px 4px;color:var(--text3);font-weight:500;font-size:10px">${j.toUpperCase()}</th>`).join('')}
+      </tr></thead><tbody id="dbTbody"></tbody></table>`;
+    const tb=document.getElementById('dbTbody');
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.style.cssText='border-bottom:1px solid rgba(42,42,61,.4)';
+      const jobCells=JOBS.map(j=>{
+        const rank=r[j];
+        if(!rank) return `<td style="padding:4px 4px;text-align:center;color:var(--text3);font-size:10px">—</td>`;
+        const cap=r[CAP_COLS[rank]]||0;
+        const col=cap>=300?'var(--ok)':cap>=200?'var(--gold)':'var(--text2)';
+        return `<td style="padding:4px 4px;text-align:center;font-size:11px;color:${col};font-weight:500">${cap}</td>`;
+      }).join('');
+      tr.innerHTML=`
+        <td style="padding:5px 8px;font-weight:500">${esc(r.name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}<span style="color:var(--text3);font-size:10px;margin-left:5px">#${r.skillid}</span></td>
+        ${jobCells}`;
+      tb.appendChild(tr);
+    });
+  }
+
+  else if(cat==='jobs'){
+    const JOB_LABELS={war:'WAR',mnk:'MNK',whm:'WHM',blm:'BLM',rdm:'RDM',thf:'THF',pld:'PLD',drk:'DRK',bst:'BST',brd:'BRD',rng:'RNG',sam:'SAM',nin:'NIN',drg:'DRG',smn:'SMN',blu:'BLU',cor:'COR',pup:'PUP',dnc:'DNC',sch:'SCH',geo:'GEO',run:'RUN'};
+    const JOB_NAMES={war:'Warrior',mnk:'Monk',whm:'White Mage',blm:'Black Mage',rdm:'Red Mage',thf:'Thief',pld:'Paladin',drk:'Dark Knight',bst:'Beastmaster',brd:'Bard',rng:'Ranger',sam:'Samurai',nin:'Ninja',drg:'Dragoon',smn:'Summoner',blu:'Blue Mage',cor:'Corsair',pup:'Puppetmaster',dnc:'Dancer',sch:'Scholar',geo:'Geomancer',run:'Rune Fencer'};
+    const JOB_COLOR={war:'#c0392b',mnk:'#e67e22',whm:'#ecf0f1',blm:'#8e44ad',rdm:'#c0392b',thf:'#16a085',pld:'#2980b9',drk:'#6c3483',bst:'#27ae60',brd:'#f39c12',rng:'#1abc9c',sam:'#e74c3c',nin:'#1a5276',drg:'#2e86c1',smn:'#154360',blu:'#1b4f72',cor:'#7d6608',pup:'#6d4c41',dnc:'#880e4f',sch:'#1a237e',geo:'#33691e',run:'#b71c1c'};
+    el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;padding:10px">
+      ${rows.map(r=>{
+        const col=JOB_COLOR[r.job]||'#888';
+        const pct=Math.round((r.max/99)*100);
+        return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:12px;position:relative;overflow:hidden">
+          <div style="position:absolute;bottom:0;left:0;height:3px;width:${pct}%;background:${col};transition:width .3s"></div>
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+            <span style="background:${col}22;color:${col};border:1px solid ${col}55;border-radius:4px;padding:2px 7px;font-weight:700;font-size:13px">${JOB_LABELS[r.job]||r.job.toUpperCase()}</span>
+            <span style="color:var(--text1);font-size:12px">${JOB_NAMES[r.job]||r.job}</span>
+          </div>
+          <div style="font-size:22px;font-weight:700;color:${r.max>1?'var(--text1)':'var(--text3)'}">${r.max>0?r.max:'—'}</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px">${r.count} char${r.count!==1?'s':''} leveled</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  else if(cat==='trusts'){
+    if(!append) el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;padding:10px" id="dbTrustGrid"></div>`;
+    const grid=document.getElementById('dbTrustGrid')||el.firstChild;
+    rows.forEach(r=>{
+      const card=document.createElement('div');
+      card.style.cssText='background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:8px 12px;display:flex;align-items:center;gap:8px';
+      card.innerHTML=`<span style="font-size:18px">🤝</span><div>
+        <div style="font-weight:500;font-size:13px">${esc(r.label)}</div>
+        <div style="font-size:10px;color:var(--text3)">Item #${r.itemid}</div>
+      </div>`;
+      grid.appendChild(card);
+    });
+  }
+
+  else if(cat==='mounts'){
+    if(!append) el.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px;padding:10px" id="dbMountGrid"></div>`;
+    const grid=document.getElementById('dbMountGrid')||el.firstChild;
+    rows.forEach(r=>{
+      const card=document.createElement('div');
+      card.style.cssText='background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:10px 12px;display:flex;align-items:center;gap:8px';
+      card.innerHTML=`<span style="font-size:20px">🐾</span><div>
+        <div style="font-weight:500;font-size:13px">${esc(r.label)}</div>
+        <div style="font-size:10px;color:var(--text3)">#${r.itemid}</div>
+      </div>`;
+      grid.appendChild(card);
+    });
+  }
+
+  else if(cat==='abilities'){
+    const ACTION_LABEL={6:'JA',3:'Ranged',13:'Pet',14:'Dance',15:'Song'};
+    const JOB_ABBR={0:'—',1:'WAR',2:'MNK',3:'WHM',4:'BLM',5:'RDM',6:'THF',7:'PLD',8:'DRK',9:'BST',10:'BRD',11:'RNG',12:'SAM',13:'NIN',14:'DRG',15:'SMN',16:'BLU',17:'COR',18:'PUP',19:'DNC',20:'SCH',21:'GEO',22:'RUN',23:'MON'};
+    const JOB_COLOR={1:'#c0392b',2:'#e67e22',3:'#ecf0f1',4:'#8e44ad',5:'#c0392b',6:'#16a085',7:'#2980b9',8:'#6c3483',9:'#27ae60',10:'#f39c12',11:'#1abc9c',12:'#e74c3c',13:'#1a5276',14:'#2e86c1',15:'#154360',16:'#1b4f72',17:'#7d6608',18:'#6d4c41',19:'#880e4f',20:'#1a237e',21:'#33691e',22:'#b71c1c',23:'#555'};
+    const fmtRecast=s=>s>=3600?`${(s/3600)|0}h`:s>=60?`${(s/60)|0}m`:s?`${s}s`:'—';
+    if(!append) el.innerHTML=`<table style="width:100%;font-size:12px;border-collapse:collapse">
+      <thead style="position:sticky;top:0;background:var(--bg2);z-index:1"><tr>
+        <th style="text-align:left;padding:6px 8px;color:var(--text3);font-weight:500">Ability</th>
+        <th style="text-align:center;padding:6px 6px;color:var(--text3);font-weight:500">Job</th>
+        <th style="text-align:right;padding:6px 6px;color:var(--text3);font-weight:500">Lv</th>
+        <th style="text-align:right;padding:6px 6px;color:var(--text3);font-weight:500">Recast</th>
+        <th style="text-align:center;padding:6px 6px;color:var(--text3);font-weight:500">Type</th>
+      </tr></thead><tbody id="dbTbody"></tbody></table>`;
+    const tb=document.getElementById('dbTbody');
+    rows.forEach(r=>{
+      const tr=document.createElement('tr');
+      tr.style.cssText='border-bottom:1px solid rgba(42,42,61,.4)';
+      const jobAbbr=JOB_ABBR[r.job]||`J${r.job}`;
+      const jcol=JOB_COLOR[r.job]||'#888';
+      const aLabel=ACTION_LABEL[r.actionType]||`${r.actionType}`;
+      tr.innerHTML=`
+        <td style="padding:5px 8px;font-weight:500">${esc(r.name.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()))}<span style="color:var(--text3);font-size:10px;margin-left:5px">#${r.abilityId}</span></td>
+        <td style="padding:5px 6px;text-align:center"><span style="background:${jcol}22;color:${jcol};border:1px solid ${jcol}55;border-radius:4px;padding:1px 5px;font-weight:700;font-size:10px">${jobAbbr}</span></td>
+        <td style="padding:5px 6px;text-align:right;color:${r.level>0?'var(--text1)':'var(--text3)'}">${r.level>0?r.level:'—'}</td>
+        <td style="padding:5px 6px;text-align:right;color:var(--text3)">${fmtRecast(r.recastTime)}</td>
+        <td style="padding:5px 6px;text-align:center;color:var(--text3);font-size:10px">${aLabel}</td>`;
       tb.appendChild(tr);
     });
   }
@@ -5829,6 +6005,19 @@ async function _dbLoad(append=false){
     return;
   }
 
+  if(cat==='jobs'){
+    const JOB_NAMES_FILTER={war:'warrior',mnk:'monk',whm:'white mage',blm:'black mage',rdm:'red mage',thf:'thief',pld:'paladin',drk:'dark knight',bst:'beastmaster',brd:'bard',rng:'ranger',sam:'samurai',nin:'ninja',drg:'dragoon',smn:'summoner',blu:'blue mage',cor:'corsair',pup:'puppetmaster',dnc:'dancer',sch:'scholar',geo:'geomancer',run:'rune fencer'};
+    let rows=await api('/api/db/jobs').catch(()=>[]);
+    const qj=document.getElementById('dbSearch').value.trim().toLowerCase();
+    if(qj) rows=rows.filter(r=>r.job===qj||JOB_NAMES_FILTER[r.job]?.startsWith(qj));
+    _dbState.hasMore=false;
+    document.getElementById('dbMore').style.display='none';
+    const meta=document.getElementById('dbResultMeta');
+    if(meta) meta.textContent=`${rows.length} jobs`;
+    _dbTable('jobs', rows, false);
+    return;
+  }
+
   const params=new URLSearchParams({q, page:_dbState.page});
   if(zone) params.set('zone',zone);
   if(cat==='items'){
@@ -5847,6 +6036,7 @@ async function _dbLoad(append=false){
     if(_dbState.geoSort)   params.set('sort', _dbState.geoSort);
     if(cat==='mobs'&&_dbState.mobEco) params.set('ecosystem', _dbState.mobEco);
   }
+  if(cat==='abilities'&&_dbState.abilityJob!==null) params.set('job',_dbState.abilityJob);
   let rows=await api(`/api/db/${cat}?${params}`).catch(()=>[]);
   if(cat==='quests'){
     if(_dbState.scripted !== null) rows = rows.filter(r => _dbState.scripted ? !!r.reward : !r.reward);
@@ -5860,7 +6050,8 @@ async function _dbLoad(append=false){
       return lb-la||a.name.localeCompare(b.name);
     });
   }
-  _dbState.hasMore=rows.length===50;
+  const _nonPaged=cat==='skills'||cat==='trusts'||cat==='mounts';
+  _dbState.hasMore=!_nonPaged&&rows.length===50;
   document.getElementById('dbMore').style.display=_dbState.hasMore?'':'none';
   const meta=document.getElementById('dbResultMeta');
   if(meta){
@@ -5982,28 +6173,30 @@ function initDbTab(){
   if(_dbInited) return;
   _dbInited=true;
 
-  const PLACEHOLDERS={items:'Search items…',npcs:'Search NPCs…',mobs:'Search mobs…',quests:'Search quests…',zones:'Search zones…'};
+  const PLACEHOLDERS={items:'Search items…',npcs:'Search NPCs…',mobs:'Search mobs…',quests:'Search quests…',zones:'Search zones…',keyitems:'Search key items…',skills:'Search skills…',jobs:'Filter jobs…',trusts:'Search trusts…',abilities:'Search abilities…',mounts:'Search mounts…'};
 
-  document.querySelectorAll('.db-tab').forEach(btn=>{
+  document.querySelectorAll('.db-nav-item').forEach(btn=>{
     btn.addEventListener('click',()=>{
-      document.querySelectorAll('.db-tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.db-nav-item').forEach(b=>b.classList.remove('active'));
       btn.classList.add('active');
       _dbState.cat=btn.dataset.cat;
       _dbState.typeBit=''; _dbState.sort=''; _dbState.rareOnly=false; _dbState.flagMask=''; _dbState.flagVal='';
       _dbState.logId=null; _dbState.scripted=null; _dbState.qsort='';
       _dbState.npcRegion=''; _dbState.geoSort=''; _dbState.mobEco='';
       _dbState.zType=''; _dbState.zContent=''; _dbState.zSort='name';
+      _dbState.abilityJob=null;
       const isGeo=(_dbState.cat==='npcs'||_dbState.cat==='mobs');
       const isMob=_dbState.cat==='mobs';
       const isZone=_dbState.cat==='zones';
       document.getElementById('dbZone').style.display=isGeo?'':'none';
-      document.getElementById('dbItemControls').style.display=_dbState.cat==='items'?'':'none';
+      document.getElementById('dbItemControls').style.display=_dbState.cat==='items'?'flex':'none';
       document.getElementById('dbQuestControls').style.display=_dbState.cat==='quests'?'flex':'none';
       document.getElementById('dbGeoControls').style.display=isGeo?'flex':'none';
       document.getElementById('dbEcoRow').style.display=isMob?'flex':'none';
       document.getElementById('dbZoneControls').style.display=isZone?'flex':'none';
+      document.getElementById('dbAbilityControls').style.display=_dbState.cat==='abilities'?'flex':'none';
       if(isGeo) _dbBuildGeoSortChips(_dbState.cat);
-      document.getElementById('dbSearch').placeholder=PLACEHOLDERS[_dbState.cat]||'Search…';
+      _dbUpdateSearchHint();
       // reset chips
       document.querySelectorAll('.db-type-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
       document.querySelectorAll('.db-sort-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
@@ -6013,6 +6206,7 @@ function initDbTab(){
       document.querySelectorAll('.db-qsort-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
       document.querySelectorAll('.db-region-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
       document.querySelectorAll('.db-eco-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
+      document.querySelectorAll('.db-ajob-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
       document.querySelectorAll('.db-ztype-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
       document.querySelectorAll('.db-zcontent-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
       document.querySelectorAll('.db-zsort-chip').forEach((c,i)=>c.classList.toggle('active',i===0));
@@ -6049,11 +6243,19 @@ function initDbTab(){
     });
   });
 
+  const SORT_HINTS={level:'Min level (e.g. 75)…',ilevel:'Min iLevel…',dmg:'Min damage…',sell:'Min sell price…'};
+  function _dbUpdateSearchHint(){
+    const hint=(_dbState.cat==='items'&&SORT_HINTS[_dbState.sort])||PLACEHOLDERS[_dbState.cat]||'Search…';
+    document.getElementById('dbSearch').placeholder=hint;
+  }
+
   document.querySelectorAll('.db-sort-chip').forEach(chip=>{
     chip.addEventListener('click',()=>{
       document.querySelectorAll('.db-sort-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
       _dbState.sort=chip.dataset.sort;
+      document.getElementById('dbSearch').value='';
+      _dbUpdateSearchHint();
       _dbLoad();
     });
   });
@@ -6149,6 +6351,15 @@ function initDbTab(){
       document.querySelectorAll('.db-zsort-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
       _dbState.zSort=chip.dataset.zsort;
+      _dbLoad();
+    });
+  });
+
+  document.querySelectorAll('.db-ajob-chip').forEach(chip=>{
+    chip.addEventListener('click',()=>{
+      document.querySelectorAll('.db-ajob-chip').forEach(c=>c.classList.remove('active'));
+      chip.classList.add('active');
+      _dbState.abilityJob=chip.dataset.ajob===''?null:Number(chip.dataset.ajob);
       _dbLoad();
     });
   });

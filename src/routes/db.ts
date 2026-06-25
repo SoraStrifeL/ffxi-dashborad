@@ -7,15 +7,23 @@ import {
   QUEST_SETTINGS,
   ROE_RECORDS,
   _mobRegionMatch,
+  KEY_ITEM_NAMES,
 } from '../catalog';
 import { cacheGetJSON, cacheSetJSON, WIKI_TTL, ITEM_TYPES_TTL } from '../cache';
 
 export function createDbRouter(pool: Pool): Router {
   const router = Router();
 
+  const ITEM_NUMERIC_COLS: Record<string, string> = {
+    level: 'ie.level', ilevel: 'ie.ilevel', dmg: 'iw.dmg', sell: 'ib.BaseSell',
+  };
+
   router.get('/api/db/items', requireAuth, async (req, res) => {
     try {
-      const q = `%${((req.query.q as string) || '').trim()}%`;
+      const qRaw    = ((req.query.q as string) || '').trim();
+      const sort    = (req.query.sort as string) || '';
+      const numCol  = ITEM_NUMERIC_COLS[sort];
+      const qNumVal = numCol && /^\d+$/.test(qRaw) ? parseInt(qRaw) : null;
       const typeBit = req.query.type ? parseInt(req.query.type as string) : null;
       const rareOnly = req.query.rare === '1';
       const flagMask = req.query.flagmask ? parseInt(req.query.flagmask as string) : null;
@@ -24,9 +32,16 @@ export function createDbRouter(pool: Pool): Router {
       const slotBit = req.query.slot ? parseInt(req.query.slot as string) : null;
       const page = Math.max(0, parseInt((req.query.page as string) || '0'));
       const sortMap: Record<string, string> = { level: 'ie.level DESC, ib.itemid', ilevel: 'ie.ilevel DESC, ib.itemid', sell: 'ib.BaseSell DESC, ib.itemid', dmg: 'iw.dmg DESC, ib.itemid', name: 'ib.name ASC' };
-      const orderBy = sortMap[req.query.sort as string] || 'ib.itemid';
-      const params: (string | number | null)[] = [q];
+      const orderBy = sortMap[sort] || 'ib.itemid';
+      const params: (string | number | null)[] = [];
       const extra: string[] = [];
+      if (qNumVal !== null) {
+        extra.push(`AND ${numCol} >= ?`);
+        params.push(qNumVal);
+      } else {
+        extra.push('AND CONVERT(ib.name USING utf8) LIKE ?');
+        params.push(`%${qRaw}%`);
+      }
       if (typeBit !== null) { extra.push('AND ib.type=?'); params.push(typeBit); }
       if (rareOnly) extra.push('AND (ib.flags & 0x8000) != 0');
       if (flagMask !== null && !isNaN(flagMask)) {
@@ -42,7 +57,7 @@ export function createDbRouter(pool: Pool): Router {
          FROM item_basic ib
          LEFT JOIN item_equipment ie ON ie.itemId=ib.itemid
          LEFT JOIN item_weapon iw ON iw.itemId=ib.itemid
-         WHERE CONVERT(ib.name USING utf8) LIKE ? AND ib.name IS NOT NULL ${extra.join(' ')}
+         WHERE ib.name IS NOT NULL ${extra.join(' ')}
          ORDER BY ${orderBy} LIMIT ? OFFSET ?`, params);
       res.json(rows);
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
@@ -319,6 +334,112 @@ export function createDbRouter(pool: Pool): Router {
         }
       }
       res.json(result);
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  router.get('/api/db/keyitems', requireAuth, (req, res) => {
+    const q = ((req.query.q as string) || '').toLowerCase().trim();
+    const page = Math.max(0, parseInt(req.query.page as string) || 0);
+    const entries = Object.entries(KEY_ITEM_NAMES)
+      .filter(([, name]) => !q || name.toLowerCase().includes(q))
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .slice(page * DB_PAGE, (page + 1) * DB_PAGE)
+      .map(([id, name]) => ({ id: Number(id), name }));
+    res.json(entries);
+  });
+
+  router.get('/api/db/skills', requireAuth, async (req, res) => {
+    try {
+      const q = ((req.query.q as string) || '').toLowerCase().trim();
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT sr.skillid, sr.name,
+           sr.war, sr.mnk, sr.whm, sr.blm, sr.rdm, sr.thf, sr.pld, sr.drk,
+           sr.bst, sr.brd, sr.rng, sr.sam, sr.nin, sr.drg, sr.smn, sr.blu,
+           sr.cor, sr.pup, sr.dnc, sr.sch, sr.geo, sr.run,
+           sc.r0, sc.r1, sc.r2, sc.r3, sc.r4, sc.r5, sc.r6,
+           sc.r7, sc.r8, sc.r9, sc.r10, sc.r11, sc.r12, sc.r13
+         FROM skill_ranks sr
+         JOIN skill_caps sc ON sc.level = 99
+         WHERE sr.name IS NOT NULL AND sr.name != ''
+         ORDER BY sr.skillid`
+      );
+      const ranks = q ? rows.filter(r => (r.name as string).toLowerCase().includes(q)) : rows;
+      res.json(ranks);
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  const JOBS_LIST = ['war','mnk','whm','blm','rdm','thf','pld','drk','bst','brd','rng','sam','nin','drg','smn','blu','cor','pup','dnc','sch','geo','run'] as const;
+
+  router.get('/api/db/jobs', requireAuth, async (_req, res) => {
+    try {
+      const sel = JOBS_LIST.map(j => `cj.${j}`).join(', ');
+      const [rows] = await pool.execute<RowDataPacket[]>(`SELECT ${sel} FROM chars c JOIN char_jobs cj ON cj.charid = c.charid`);
+      const stats = JOBS_LIST.map(job => {
+        const leveled = rows.filter(r => (r[job] as number) > 1);
+        return { job, max: leveled.length ? Math.max(...leveled.map(r => r[job] as number)) : 0, count: leveled.length };
+      });
+      res.json(stats);
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  router.get('/api/db/trusts', requireAuth, async (req, res) => {
+    try {
+      const q = ((req.query.q as string) || '').toLowerCase().trim();
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT itemid, name FROM item_basic WHERE name LIKE 'cipher_of_%_alter_ego%' ORDER BY name`
+      );
+      const trusts = (rows as Array<{itemid: number; name: string}>)
+        .map(r => {
+          const isII = r.name.endsWith('_alter_ego_ii');
+          let label = r.name
+            .replace(/^cipher_of_/, '')
+            .replace(/_alter_ego_ii$/, '')
+            .replace(/_alter_ego.*$/, '')
+            .replace(/\._/g, '. ')
+            .replace(/_/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .replace(/\b\w/g, c => c.toUpperCase())
+            + (isII ? ' II' : '');
+          return { itemid: r.itemid, name: r.name, label };
+        })
+        .filter(r => !q || r.label.toLowerCase().includes(q));
+      res.json(trusts);
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  router.get('/api/db/abilities', requireAuth, async (req, res) => {
+    try {
+      const q = `%${((req.query.q as string) || '').trim()}%`;
+      const job = req.query.job !== undefined ? parseInt(req.query.job as string) : null;
+      const page = Math.max(0, parseInt((req.query.page as string) || '0'));
+      const params: (string | number)[] = [q];
+      let where = 'WHERE a.name IS NOT NULL AND a.name != \'\' AND a.name LIKE ?';
+      if (job !== null && !isNaN(job)) { where += ' AND a.job = ?'; params.push(job); }
+      params.push(DB_PAGE, page * DB_PAGE);
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT a.abilityId, a.name, a.job, a.level, a.recastTime, a.castTime, a.actionType, a.range, a.isAOE
+         FROM abilities a ${where} ORDER BY a.job, a.level, a.abilityId LIMIT ? OFFSET ?`,
+        params
+      );
+      res.json(rows);
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
+  router.get('/api/db/mounts', requireAuth, async (req, res) => {
+    try {
+      const q = ((req.query.q as string) || '').toLowerCase().trim();
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT itemid, name FROM item_basic WHERE name LIKE '♪%' ORDER BY itemid`
+      );
+      const mounts = (rows as Array<{itemid: number; name: string}>)
+        .map(r => ({
+          itemid: r.itemid,
+          name: r.name,
+          label: r.name.replace(/^♪/, '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        }))
+        .filter(r => !q || r.label.toLowerCase().includes(q));
+      res.json(mounts);
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
