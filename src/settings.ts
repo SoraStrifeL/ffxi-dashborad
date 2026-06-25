@@ -116,6 +116,10 @@ export interface DashboardSettings {
   motd: string;
   autoSwitchZone: boolean;
   autologin: boolean;
+  tokenTtlHours: number;
+  adminGmLevel: number;
+  loginRateLimitMax: number;
+  allowPlayerLogin: boolean;
 }
 
 const DASHBOARD_DEFAULTS: DashboardSettings = {
@@ -123,18 +127,30 @@ const DASHBOARD_DEFAULTS: DashboardSettings = {
   motd: '',
   autoSwitchZone: true,
   autologin: process.env.AUTOLOGIN === 'true',
+  tokenTtlHours: 24,
+  adminGmLevel: 1,
+  loginRateLimitMax: 10,
+  allowPlayerLogin: true,
 };
 
+let _settingsCache: DashboardSettings | null = null;
+let _settingsTs = 0;
+
 export function loadDashboardSettings(): DashboardSettings {
+  if (_settingsCache && Date.now() - _settingsTs < 5000) return _settingsCache;
   try {
-    return { ...DASHBOARD_DEFAULTS, ...JSON.parse(fs.readFileSync(DASHBOARD_SETTINGS_PATH, 'utf8')) };
+    _settingsCache = { ...DASHBOARD_DEFAULTS, ...JSON.parse(fs.readFileSync(DASHBOARD_SETTINGS_PATH, 'utf8')) };
   } catch (_) {
-    return { ...DASHBOARD_DEFAULTS };
+    _settingsCache = { ...DASHBOARD_DEFAULTS };
   }
+  _settingsTs = Date.now();
+  return _settingsCache!;
 }
 
 export function saveDashboardSettings(s: DashboardSettings): void {
   fs.writeFileSync(DASHBOARD_SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf8');
+  _settingsCache = s;
+  _settingsTs = Date.now();
 }
 export const CURATED_KEYS = new Set(RATE_CATALOG.map(e => e.key));
 

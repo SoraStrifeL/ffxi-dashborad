@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Pool } from 'mysql2/promise';
 import { requireAuth } from '../auth';
-import { requirePermission, ROLE_PERMISSIONS } from '../rbac';
+import { requirePermission, ROLE_PERMISSIONS, getAccountOverrides } from '../rbac';
 import { redisClient } from '../cache';
 import { listPlugins } from '../plugin';
 import { version } from '../../package.json';
@@ -43,12 +43,11 @@ export function createHealthRouter(pool: Pool): Router {
 
   // ── Current user's permissions ─────────────────────────────────────────────
   router.get('/api/me/permissions', requireAuth, (req, res) => {
-    const tier = req.user!.tier;
-    res.json({
-      login:       req.user!.login,
-      tier,
-      permissions: ROLE_PERMISSIONS[tier] ?? [],
-    });
+    const { tier, accid, login } = req.user!;
+    const rolePerms = ROLE_PERMISSIONS[tier] ?? [];
+    const overrides = getAccountOverrides(accid);
+    const permissions = [...new Set([...rolePerms, ...overrides])];
+    res.json({ login, tier, permissions, overrides });
   });
 
   // ── OpenAPI 3.0 spec ───────────────────────────────────────────────────────

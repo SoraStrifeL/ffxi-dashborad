@@ -10,8 +10,9 @@ const multer    = require('multer');
 const auth      = require('./auth');
 
 // ── Dashboard settings (needed early for autologin gate) ─────────────────────
-const DASHBOARD_SETTINGS_PATH = path.join(__dirname, 'data', 'dashboard.json');
-const DASHBOARD_DEFAULTS = { serverName: 'FFXI Dashboard', motd: '', autoSwitchZone: true, autologin: process.env.AUTOLOGIN === 'true' };
+const DATA_DIR = path.join(__dirname, 'data');
+const DASHBOARD_SETTINGS_PATH = path.join(DATA_DIR, 'dashboard.json');
+const DASHBOARD_DEFAULTS = { serverName: 'FFXI Dashboard', motd: '', autoSwitchZone: true, autologin: process.env.AUTOLOGIN === 'true', allowPlayerLogin: true, tokenTtlHours: 24, adminGmLevel: 1, loginRateLimitMax: 10 };
 function loadDashboardSettings() {
   try { return { ...DASHBOARD_DEFAULTS, ...JSON.parse(fs.readFileSync(DASHBOARD_SETTINGS_PATH, 'utf8')) }; }
   catch (_) { return { ...DASHBOARD_DEFAULTS }; }
@@ -346,6 +347,28 @@ wss.on('connection', (ws) => {
 });
 
 // ── REST endpoints ────────────────────────────────────────────────────────────
+const _startTime = Date.now();
+const _pkg = (() => { try { return require('./package.json'); } catch(_) { return {}; } })();
+
+app.get('/api/health', async (_req, res) => {
+  let dbOk = false;
+  try { await pool.execute('SELECT 1'); dbOk = true; } catch(_) {}
+  const mem = process.memoryUsage();
+  const status = dbOk ? 200 : 503;
+  res.status(status).json({
+    status:  dbOk ? 'ok' : 'degraded',
+    version: _pkg.version || 'unknown',
+    uptime:  Math.floor((Date.now() - _startTime) / 1000),
+    db:      dbOk ? 'ok' : 'unreachable',
+    redis:   'unavailable',
+    plugins: [],
+    memory: {
+      heapUsedMb:  +(mem.heapUsed  / 1024 / 1024).toFixed(1),
+      heapTotalMb: +(mem.heapTotal / 1024 / 1024).toFixed(1),
+      rssMb:       +(mem.rss       / 1024 / 1024).toFixed(1),
+    },
+  });
+});
 
 app.get('/api/stats', auth.requireAuth, async (_req, res) => {
   try { res.json(await queryStats()); }
@@ -1898,7 +1921,7 @@ app.get('/api/dashboard/paths', auth.requireAuth, auth.requireAdmin, (_req, res)
   try { saved = JSON.parse(fs.readFileSync(PATH_CONFIG_FILE, 'utf8')); } catch(_) {}
   res.json({
     effective: { LSB_SCRIPTS_DIR, LSB_SETTINGS_DIR, LSB_LOG_DIR,
-                 MAPS_DIR: MAPS_DIR_ROOT, UPLOADS_DIR: UPLOADS_DIR_ROOT, DATA_DIR: path.join(__dirname, 'data') },
+                 MAPS_DIR: MAPS_DIR_ROOT, UPLOADS_DIR: UPLOADS_DIR_ROOT, DATA_DIR },
     saved,
     defaults: { LSB_SCRIPTS_DIR: '/ffxi-scripts', LSB_SETTINGS_DIR: '/ffxi-settings', LSB_LOG_DIR: '/ffxi-log' },
   });
@@ -2405,12 +2428,18 @@ app.get('/api/dashboard/settings', auth.requireAuth, (_req, res) => res.json(loa
 
 app.post('/api/dashboard/settings', auth.requireAuth, auth.requireAdmin, (req, res) => {
   const current = loadDashboardSettings();
-  const { serverName, motd, autoSwitchZone, autologin } = req.body || {};
+  const body = req.body || {};
+  const clampInt = (v, min, max, fallback) =>
+    typeof v === 'number' && Number.isInteger(v) ? Math.max(min, Math.min(max, v)) : fallback;
   const updated = {
-    serverName:     typeof serverName     === 'string'  ? serverName.slice(0, 100)  : current.serverName,
-    motd:           typeof motd           === 'string'  ? motd.slice(0, 500)        : current.motd,
-    autoSwitchZone: typeof autoSwitchZone === 'boolean' ? autoSwitchZone             : current.autoSwitchZone,
-    autologin:      typeof autologin      === 'boolean' ? autologin                  : current.autologin,
+    serverName:        typeof body.serverName        === 'string'  ? body.serverName.slice(0, 100)  : current.serverName,
+    motd:              typeof body.motd              === 'string'  ? body.motd.slice(0, 500)        : current.motd,
+    autoSwitchZone:    typeof body.autoSwitchZone    === 'boolean' ? body.autoSwitchZone             : current.autoSwitchZone,
+    autologin:         typeof body.autologin         === 'boolean' ? body.autologin                  : current.autologin,
+    allowPlayerLogin:  typeof body.allowPlayerLogin  === 'boolean' ? body.allowPlayerLogin            : current.allowPlayerLogin,
+    tokenTtlHours:     clampInt(body.tokenTtlHours,     1,   720, current.tokenTtlHours     ?? 24),
+    adminGmLevel:      clampInt(body.adminGmLevel,      1,    10, current.adminGmLevel      ?? 1),
+    loginRateLimitMax: clampInt(body.loginRateLimitMax, 1,   100, current.loginRateLimitMax ?? 10),
   };
   saveDashboardSettings(updated);
   res.json({ ok: true, settings: updated });
@@ -3006,10 +3035,14 @@ const PORT = process.env.PORT || 3000;
 // EXP needed per level (from exp_base; index = current level, value = XP to reach next level)
 let EXP_PER_LEVEL = [];
 async function loadExpTable() {
-  const [rows] = await pool.execute('SELECT level, exp FROM exp_base ORDER BY level');
-  EXP_PER_LEVEL = [];
-  rows.forEach(r => { EXP_PER_LEVEL[r.level] = r.exp; });
-  console.log(`[exp] loaded ${rows.length} level thresholds`);
+  try {
+    const [rows] = await pool.execute('SELECT level, exp FROM exp_base ORDER BY level');
+    EXP_PER_LEVEL = [];
+    rows.forEach(r => { EXP_PER_LEVEL[r.level] = r.exp; });
+    console.log(`[exp] loaded ${rows.length} level thresholds`);
+  } catch (e) {
+    console.error('[exp] DB unavailable, exp table not loaded:', e.message);
+  }
 }
 
 buildZoneMaps().then(() => loadExpTable()).then(async () => {

@@ -10,7 +10,8 @@ export function createAuthRouter(pool: Pool): Router {
   // ── Login rate limiter ───────────────────────────────────────────────────────
   const loginAttempts = new Map<string, { start: number; count: number }>();
   function checkLoginRateLimit(key: string): boolean {
-    const now = Date.now(), window = 15 * 60 * 1000, max = 10;
+    const now = Date.now(), window = 15 * 60 * 1000;
+    const max = loadDashboardSettings().loginRateLimitMax ?? 10;
     let e = loginAttempts.get(key);
     if (!e || now - e.start > window) { e = { start: now, count: 0 }; loginAttempts.set(key, e); }
     return ++e.count > max;
@@ -29,7 +30,7 @@ export function createAuthRouter(pool: Pool): Router {
         `SELECT a.id, a.login FROM accounts a
          JOIN chars c ON c.accid = a.id
          WHERE a.status = 1 AND c.gmlevel >= ? ORDER BY c.gmlevel DESC LIMIT 1`,
-        [auth.ADMIN_GM_LEVEL]);
+        [ds.adminGmLevel ?? auth.ADMIN_GM_LEVEL]);
       if (!rows.length) { res.status(403).json({ error: 'no admin account found' }); return; }
       const { id, login } = rows[0];
       const identity = { accid: id as number, tier: 'admin' as const, login: login as string };

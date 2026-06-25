@@ -14,9 +14,9 @@ import jwt from 'jsonwebtoken';
 import { RequestHandler } from 'express';
 import { Pool, RowDataPacket } from 'mysql2/promise';
 import { AuthUser } from './types';
+import { loadDashboardSettings } from './settings';
 
-export const ADMIN_GM_LEVEL = 1;
-const TOKEN_TTL = '24h';
+export const ADMIN_GM_LEVEL = 1; // kept for server.js compat; auth.ts reads from settings
 
 const JWT_SECRET = process.env.DASHBOARD_JWT_SECRET;
 if (!JWT_SECRET || JWT_SECRET.length < 16) {
@@ -69,19 +69,27 @@ export async function authenticate(
   const ok = await bcrypt.compare(password, acc.password as string);
   if (!ok) return null;
 
+  const ds = loadDashboardSettings();
+  const adminLevel = ds.adminGmLevel ?? 1;
+
   const [gmRows] = await pool.execute<RowDataPacket[]>(
     'SELECT MAX(gmlevel) AS maxgm FROM chars WHERE accid = ?', [acc.id]);
   const maxGm = gmRows.length ? Number(gmRows[0].maxgm || 0) : 0;
-  const tier: 'admin' | 'player' = maxGm >= ADMIN_GM_LEVEL ? 'admin' : 'player';
+
+  if (ds.allowPlayerLogin === false && maxGm < adminLevel) return null;
+
+  const tier: 'admin' | 'player' = maxGm >= adminLevel ? 'admin' : 'player';
 
   return { accid: acc.id as number, tier, login };
 }
 
 export function issueToken(identity: { accid: number; tier: string; login: string }): string {
+  const ds = loadDashboardSettings();
+  const ttl = `${Math.max(1, Math.min(720, ds.tokenTtlHours ?? 24))}h`;
   return jwt.sign(
     { accid: identity.accid, tier: identity.tier, login: identity.login },
     SECRET,
-    { expiresIn: TOKEN_TTL });
+    { expiresIn: ttl as `${number}h` });
 }
 
 // Express middleware: verifies the Bearer token, attaches req.user.

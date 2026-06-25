@@ -47,12 +47,16 @@
 
   /* ── Map page ────────────────────────────────────────── */
   .map-layout{display:flex;height:100%}
-  .map-side{width:260px;background:var(--bg2);border-right:1px solid var(--border);padding:16px;overflow:auto;flex-shrink:0;transition:width .15s,padding .15s}
-  .map-side.collapsed{width:0!important;padding:0!important;overflow:hidden!important;border:none!important}
-  .map-side h3{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:10px}
-  .map-side select{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:8px;border-radius:7px;font-size:13px;margin-bottom:16px}
-  .layer-toggle{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;font-size:13px;color:var(--text2);cursor:pointer;margin-bottom:4px;border:1px solid transparent}
-  .layer-toggle.active{background:var(--bg3);color:var(--text)}
+  .map-side{width:240px;background:var(--bg1);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;transition:width .15s,opacity .15s;overflow:hidden}
+  .map-side.collapsed{width:0!important;opacity:0;pointer-events:none;overflow:hidden;border:none}
+  .map-section{padding:10px 12px;border-bottom:1px solid var(--border)}
+  .map-section:last-child{border-bottom:none;flex:1}
+  .map-sec-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;color:var(--text3);margin-bottom:7px;display:flex;align-items:center;justify-content:space-between}
+  .map-side select{width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:7px 9px;border-radius:7px;font-size:12px}
+  .layer-toggle{display:flex;align-items:center;gap:7px;padding:5px 8px;border-radius:6px;font-size:12px;color:var(--text3);cursor:pointer;border:1px solid transparent;transition:all .12s;user-select:none}
+  .layer-toggle:hover{background:var(--bg2);color:var(--text2)}
+  .layer-toggle.active{background:var(--bg2);color:var(--text);border-color:rgba(255,255,255,.06)}
+  .layer-sub{margin-left:14px;font-size:11px}
   .layer-dot{width:9px;height:9px;border-radius:50%}
   .map-canvas-wrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:#07070e;overflow:hidden}
   .map-search{width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 10px;border-radius:7px;font-size:12px;margin-bottom:8px;outline:none}
@@ -92,12 +96,32 @@
   tr.clickable:hover td{background:var(--bg3)}
   .pill{font-size:11px;padding:2px 8px;border-radius:12px;background:var(--bg3);color:var(--text2)}
 
+  /* ── Character list cards ────────────────────────────── */
+  #charGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px}
+  .char-card{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:border-color .12s,background .12s;border-left:3px solid var(--border)}
+  .char-card:hover{border-color:var(--accent);background:var(--bg3)}
+  .char-card.is-online{border-left-color:var(--online)}
+  .char-card-name{font-size:15px;font-weight:700;display:flex;align-items:center;gap:7px;margin-bottom:2px}
+  .char-card-meta{font-size:11px;color:var(--text3);margin-bottom:8px}
+  .char-card-zone{font-size:11px;color:var(--text2);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .char-filter-btns{display:flex;gap:4px}
+  .char-filter{background:var(--bg3);border:1px solid var(--border);color:var(--text3);padding:5px 12px;border-radius:20px;font-size:12px;cursor:pointer;transition:all .12s}
+  .char-filter.active{background:var(--accent);border-color:var(--accent);color:#fff}
   /* ── Character detail ────────────────────────────────── */
-  .char-detail{padding:20px;max-width:1100px;margin:0 auto}
-  .back-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:7px 14px;border-radius:8px;font-size:13px;margin-bottom:16px}
+  .char-detail{padding:0;max-width:none;margin:0}
+  .back-btn{background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:6px 12px;border-radius:7px;font-size:12px;margin:0}
+  .char-header-bar{position:sticky;top:0;z-index:20;background:var(--bg1);border-bottom:1px solid var(--border);padding:12px 20px 0}
+  .char-hrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px}
+  .char-hrow .name{font-size:18px;font-weight:700}
+  .char-tabs{display:flex}
+  .char-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:var(--text3);padding:9px 16px;font-size:13px;font-weight:500;cursor:pointer;transition:color .12s,border-color .12s;white-space:nowrap}
+  .char-tab:hover{color:var(--text)}
+  .char-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .char-tab-content{display:none;padding:20px;max-width:1100px;margin:0 auto}
+  .char-tab-content.active{display:block}
+  .char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:16px}
   .char-head{display:flex;align-items:center;gap:16px;margin-bottom:20px}
   .char-head .name{font-size:22px;font-weight:700}
-  .char-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-bottom:16px}
   .panel{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:16px}
   .panel h3{font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:12px}
   .stat-row{display:flex;justify-content:space-between;padding:5px 0;font-size:13px;border-bottom:1px solid rgba(42,42,61,.5)}
@@ -249,79 +273,90 @@
     <div class="page active" id="mapPage">
       <div class="map-layout">
         <div class="map-side" id="mapSide">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
-            <h3 style="margin:0">Zone</h3>
-            <button id="sidebarToggle" title="Collapse sidebar" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;padding:0 4px;line-height:1">◀</button>
+
+          <!-- Zone selector -->
+          <div class="map-section">
+            <div class="map-sec-title">
+              Zone
+              <button id="sidebarToggle" title="Collapse sidebar" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;padding:0 2px;line-height:1;opacity:.6">◀</button>
+            </div>
+            <input class="map-search" id="zoneSearchInput" placeholder="Filter zones…" autocomplete="off" style="margin-bottom:6px">
+            <select id="zoneSelect"></select>
+            <select id="floorSelect" style="display:none;margin-top:5px"></select>
           </div>
-          <input class="map-search" id="zoneSearchInput" placeholder="Filter zones…" autocomplete="off">
-          <select id="zoneSelect"></select>
-          <select id="floorSelect" style="display:none;margin-top:-10px"></select>
-          <h3 style="margin-top:4px">Layers</h3>
-          <div class="layer-toggle active" id="togglePlayers" data-layer="players"><span class="layer-dot" style="background:var(--player)"></span>Players</div>
-          <div class="layer-toggle" id="toggleOfflinePlayers" data-layer="offlineplayers" style="padding-left:26px;font-size:11px;color:var(--text3)"><span class="layer-dot" style="background:#555"></span>Show offline</div>
-          <div class="layer-toggle active" id="toggleNpcs" data-layer="npcs"><span class="layer-dot" style="background:var(--npc)"></span>NPCs</div>
-          <div class="layer-toggle active" id="toggleMobs" data-layer="mobs"><span class="layer-dot" style="background:var(--mob)"></span>Monsters</div>
-          <div class="layer-toggle active" id="toggleAggroOnly" data-layer="aggroonly" style="padding-left:26px;font-size:11px;color:var(--text3)">Aggro only</div>
-          <div class="layer-toggle" id="toggleBounds" data-layer="bounds"><span class="layer-dot" style="background:#f0c040"></span>Bounds</div>
-          <div class="layer-toggle" id="toggleLabels" data-layer="labels"><span class="layer-dot" style="background:#aaa"></span>Labels</div>
-          <!-- Legend -->
-          <div style="margin-top:12px;margin-bottom:2px;display:flex;align-items:center;justify-content:space-between;cursor:pointer" id="legendToggle">
-            <span class="map-side h3" style="font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin:0">Legend</span>
-            <span id="legendArrow" style="font-size:10px;color:var(--text3)">▸</span>
+
+          <!-- Layers -->
+          <div class="map-section">
+            <div class="map-sec-title">Layers</div>
+            <div class="layer-toggle active" id="togglePlayers" data-layer="players">
+              <span class="layer-dot" style="background:var(--player)"></span>Players
+            </div>
+            <div class="layer-toggle layer-sub" id="toggleOfflinePlayers" data-layer="offlineplayers">
+              <span class="layer-dot" style="background:#666;width:7px;height:7px"></span>Show offline
+            </div>
+            <div class="layer-toggle active" id="toggleNpcs" data-layer="npcs">
+              <span class="layer-dot" style="background:var(--npc)"></span>NPCs
+            </div>
+            <div class="layer-toggle active" id="toggleMobs" data-layer="mobs">
+              <span class="layer-dot" style="background:var(--mob)"></span>Monsters
+            </div>
+            <div class="layer-toggle layer-sub" id="toggleAggroOnly" data-layer="aggroonly">
+              <span class="layer-dot" style="background:#e05c5c;width:7px;height:7px"></span>Aggro only
+            </div>
+            <div class="layer-toggle" id="toggleBounds" data-layer="bounds">
+              <span class="layer-dot" style="background:#f0c040"></span>Bounds
+            </div>
+            <div class="layer-toggle" id="toggleLabels" data-layer="labels">
+              <span class="layer-dot" style="background:#888"></span>Labels
+            </div>
+
+            <!-- Legend inline -->
+            <div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.05)">
+              <div style="cursor:pointer;display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;color:var(--text3);margin-bottom:5px" id="legendToggle">
+                Legend <span id="legendArrow" style="font-size:9px">▸</span>
+              </div>
+              <div id="legendPanel" style="display:none;font-size:11px;color:var(--text2);line-height:1.7">
+                <div style="display:flex;align-items:center;gap:7px"><svg width="12" height="12"><circle cx="6" cy="6" r="4" fill="#7c6af7" opacity=".9"/></svg> Player</div>
+                <div style="display:flex;align-items:center;gap:7px"><svg width="12" height="12"><circle cx="6" cy="6" r="3.5" fill="#4fc3a1"/></svg> NPC</div>
+                <div style="display:flex;align-items:center;gap:7px"><svg width="12" height="12"><polygon points="6,1 12,11 0,11" fill="#ccc"/><circle cx="6" cy="6" r="6" fill="none" stroke="#ccc" stroke-width=".8" opacity=".4"/></svg> Aggro mob</div>
+                <div style="display:flex;align-items:center;gap:7px"><svg width="12" height="12"><polygon points="6,2 11,10 1,10" fill="#999" opacity=".7"/></svg> Passive mob</div>
+                <div style="font-size:10px;color:var(--text3);margin-top:4px;line-height:1.7">
+                  Mob color = family:<br>
+                  <span style="color:#96cc3a">■</span> Vermin <span style="color:#d4823a">■</span> Beast <span style="color:#3acc7a">■</span> Lizard<br>
+                  <span style="color:#3a8adc">■</span> Aquan <span style="color:#5ab83a">■</span> Plantoid <span style="color:#9868d8">■</span> Undead<br>
+                  <span style="color:#d8386a">■</span> Demon <span style="color:#3ac8a8">■</span> Dragon <span style="color:#d838d0">■</span> Amorph<br>
+                  <span style="color:#7898b8">■</span> Arcana <span style="color:#d8a838">■</span> Beastmen <span style="color:#e0e040">■</span> Other
+                </div>
+              </div>
+            </div>
           </div>
-          <div id="legendPanel" style="display:none;padding:8px 0 4px 0;font-size:11px;color:var(--text2)">
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-              <svg width="14" height="14"><circle cx="7" cy="7" r="5" fill="#7c6af7" opacity=".8"/></svg>
-              Player
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-              <svg width="14" height="14"><circle cx="7" cy="7" r="4" fill="#4fc3a1"/></svg>
-              NPC
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-              <svg width="14" height="14"><polygon points="7,0 14,13 0,13" fill="#aaa"/><circle cx="7" cy="7" r="7" fill="none" stroke="#aaa" stroke-width="1" opacity=".4"/></svg>
-              Aggro mob (large + ring)
-            </div>
-            <div style="display:flex;align-items:center;gap:8px;margin-bottom:5px">
-              <svg width="14" height="14"><polygon points="7,2 12,11 2,11" fill="#aaa" opacity=".7"/></svg>
-              Passive mob (small)
-            </div>
-            <div style="color:var(--text3);font-size:10px;margin-top:2px;line-height:1.6">
-              Mob color = ecosystem:<br>
-              <span style="color:#96cc3a">■</span> Vermin &nbsp;<span style="color:#d4823a">■</span> Beast &nbsp;<span style="color:#3acc7a">■</span> Lizard<br>
-              <span style="color:#3a8adc">■</span> Aquan &nbsp;<span style="color:#5ab83a">■</span> Plantoid &nbsp;<span style="color:#9868d8">■</span> Undead<br>
-              <span style="color:#d8386a">■</span> Demon &nbsp;<span style="color:#3ac8a8">■</span> Dragon &nbsp;<span style="color:#d838d0">■</span> Amorph<br>
-              <span style="color:#7898b8">■</span> Arcana &nbsp;<span style="color:#d8a838">■</span> Beastmen &nbsp;<span style="color:#c8906a">■</span> Humanoid<br>
-              <span style="color:#70b8e0">■</span> Bird &nbsp;<span style="color:#e0e040">■</span> Elemental
-            </div>
-          </div>
-          <div class="layer-toggle" id="calBtn" style="margin-top:8px;color:var(--gold)">📍 Calibrate Zone</div>
+
           <!-- Players in Zone -->
-          <div style="margin-top:16px;display:flex;align-items:center;justify-content:space-between">
-            <h3 style="margin:0">Players in Zone</h3>
-            <span id="mapZonePlayerCount" style="font-size:10px;color:var(--text3)"></span>
-          </div>
-          <div id="mapPlayerPanel" style="margin-top:6px;margin-bottom:12px;max-height:200px;overflow-y:auto">
-            <div style="color:var(--text3);font-size:11px;padding:4px 0">No players in zone</div>
-          </div>
-          <h3 style="margin-top:4px">Overlay Adjust</h3>
-          <div class="layer-toggle" id="adjBtn" style="color:var(--text2)">↔ Adjust Overlay</div>
-          <div id="adjPanel" style="display:none;margin-top:10px;padding:10px;background:var(--bg3);border-radius:8px;border:1px solid var(--border)">
-            <div class="adj-row"><label>X Offset</label><input type="range" id="adjOX" min="-400" max="400" value="0" step="1"><span id="adjOXVal">0</span></div>
-            <div class="adj-row"><label>Y Offset</label><input type="range" id="adjOY" min="-400" max="400" value="0" step="1"><span id="adjOYVal">0</span></div>
-            <div class="adj-row"><label>X Scale</label><input type="range" id="adjSX" min="40" max="200" value="100" step="1"><span id="adjSXVal">100%</span></div>
-            <div class="adj-row"><label>Y Scale</label><input type="range" id="adjSY" min="40" max="200" value="100" step="1"><span id="adjSYVal">100%</span></div>
-            <div class="adj-row"><label>Margin</label><input type="range" id="adjPad" min="0" max="200" value="50" step="1"><span id="adjPadVal">50px</span></div>
-            <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
-            <div class="adj-row"><label>Zoom</label><input type="range" id="adjZoom" min="25" max="1000" value="100" step="1"><span id="adjZoomVal">100%</span></div>
-            <div class="adj-btn-row">
-              <button class="btn-sm" id="adjReset" style="flex:1">Reset</button>
-              <button class="btn-sm" id="adjUniform" style="flex:1;font-size:11px">Lock X=Y</button>
+          <div class="map-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:80px">
+            <div class="map-sec-title">
+              Players in Zone
+              <span id="mapZonePlayerCount" style="font-size:10px;color:var(--accent);font-weight:600;text-transform:none;letter-spacing:0"></span>
+            </div>
+            <div id="mapPlayerPanel" style="flex:1;overflow-y:auto;min-height:0">
+              <div style="color:var(--text3);font-size:11px;padding:2px 0">No players in zone</div>
             </div>
           </div>
+
+          <!-- Tools: Calibrate + Adjust -->
+          <div class="map-section" style="padding:10px 12px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+              <button id="calBtn" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 6px;border-radius:7px;font-size:11px;font-weight:600;border:1px solid rgba(240,192,64,.3);background:rgba(240,192,64,.08);color:var(--gold);cursor:pointer;transition:all .12s">
+                📍 Calibrate
+              </button>
+              <button id="adjBtn" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:7px 6px;border-radius:7px;font-size:11px;font-weight:600;border:1px solid var(--border);background:var(--bg2);color:var(--text2);cursor:pointer;transition:all .12s">
+                ↔ Adjust
+              </button>
+            </div>
+          </div>
+
         </div>
         <div class="map-canvas-wrap">
-          <button id="sidebarReopen" title="Expand sidebar" style="display:none;position:absolute;top:12px;left:8px;z-index:15;background:rgba(10,10,18,.82);border:1px solid var(--border);color:var(--text2);border-radius:6px;padding:4px 8px;cursor:pointer;font-size:13px;line-height:1">▶</button>
+          <button id="sidebarReopen" title="Expand sidebar" style="display:none;position:absolute;top:12px;left:8px;z-index:15;background:rgba(10,10,18,.9);border:1px solid var(--border);color:var(--text3);border-radius:7px;padding:6px 10px;cursor:pointer;font-size:12px;line-height:1;letter-spacing:.5px">▶ Map</button>
           <div class="map-stats" id="mapStats"></div>
           <div id="mapEntitySearchWrap">
             <input id="mapEntitySearch" placeholder="Find entity… (Ctrl+F)" autocomplete="off" spellcheck="false">
@@ -377,6 +412,24 @@
               <button id="calClear" style="width:100%;background:transparent;border:1px solid var(--danger);color:var(--danger);padding:5px;border-radius:6px;font-size:11px;cursor:pointer">Clear calibration</button>
             </div>
           </div>
+          <!-- Overlay Adjust — floating panel bottom-left -->
+          <div id="adjPanel" style="display:none;position:absolute;bottom:50px;left:12px;background:rgba(10,10,18,.96);border:1px solid var(--border);border-radius:9px;padding:14px 16px;width:240px;z-index:10">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+              <span style="font-size:12px;font-weight:600;color:var(--text)">↔ Overlay Adjust</span>
+              <button id="adjClose" style="background:none;border:none;color:var(--text3);cursor:pointer;font-size:14px;line-height:1;padding:0 2px">✕</button>
+            </div>
+            <div class="adj-row"><label>X Offset</label><input type="range" id="adjOX" min="-400" max="400" value="0" step="1"><span id="adjOXVal">0</span></div>
+            <div class="adj-row"><label>Y Offset</label><input type="range" id="adjOY" min="-400" max="400" value="0" step="1"><span id="adjOYVal">0</span></div>
+            <div class="adj-row"><label>X Scale</label><input type="range" id="adjSX" min="40" max="200" value="100" step="1"><span id="adjSXVal">100%</span></div>
+            <div class="adj-row"><label>Y Scale</label><input type="range" id="adjSY" min="40" max="200" value="100" step="1"><span id="adjSYVal">100%</span></div>
+            <div class="adj-row"><label>Margin</label><input type="range" id="adjPad" min="0" max="200" value="50" step="1"><span id="adjPadVal">50px</span></div>
+            <hr style="border:none;border-top:1px solid var(--border);margin:8px 0">
+            <div class="adj-row"><label>Zoom</label><input type="range" id="adjZoom" min="25" max="1000" value="100" step="1"><span id="adjZoomVal">100%</span></div>
+            <div class="adj-btn-row">
+              <button class="btn-sm" id="adjReset" style="flex:1">Reset</button>
+              <button class="btn-sm" id="adjUniform" style="flex:1;font-size:11px">Lock X=Y</button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -386,12 +439,13 @@
       <div class="list-page">
         <div class="toolbar">
           <input id="charSearch" placeholder="Search characters…">
-          <span class="muted" id="charCount"></span>
+          <div class="char-filter-btns">
+            <button class="char-filter active" data-filter="all">All</button>
+            <button class="char-filter" data-filter="online">Online</button>
+          </div>
+          <span class="muted" id="charCount" style="margin-left:auto"></span>
         </div>
-        <table>
-          <thead><tr><th></th><th>Name</th><th>Nation</th><th>Main Job</th><th>Sub Job</th><th>Zone</th><th>HP / MP</th><th></th></tr></thead>
-          <tbody id="charRows"></tbody>
-        </table>
+        <div id="charGrid"></div>
       </div>
     </div>
 
@@ -672,7 +726,7 @@
           <span class="muted" id="acctCount"></span>
         </div>
         <table>
-          <thead><tr><th>Login</th><th>Status</th><th>Role</th><th>Created</th><th>Last Active</th><th></th></tr></thead>
+          <thead><tr><th>Login</th><th>Status</th><th>Role</th><th>Created</th><th>Last Active</th><th></th><th></th></tr></thead>
           <tbody id="acctRows"></tbody>
         </table>
       </div>
@@ -971,6 +1025,26 @@
   </div>
 </div>
 
+<!-- Account permissions modal -->
+<div id="acctPermsOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9000;align-items:center;justify-content:center">
+  <div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;width:480px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6)">
+    <div style="padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px">
+      <span style="font-weight:600;font-size:14px">Extra Permissions</span>
+      <span id="acctPermsTitle" class="muted" style="font-size:12px"></span>
+      <button id="acctPermsCloseBtn" class="btn-sm" style="margin-left:auto;border-color:var(--text3);color:var(--text3)">✕</button>
+    </div>
+    <div style="padding:14px 18px;font-size:12px;color:var(--text3);border-bottom:1px solid var(--border)">
+      Grant additional permissions beyond what the account's role provides. These are stored server-side and checked on every request.
+    </div>
+    <div id="acctPermsList" style="flex:1;overflow-y:auto;padding:12px 18px;display:grid;grid-template-columns:1fr 1fr;gap:6px"></div>
+    <div style="padding:12px 18px;border-top:1px solid var(--border);display:flex;gap:8px;align-items:center;justify-content:flex-end">
+      <span id="acctPermsSaved" style="font-size:12px;color:var(--ok);display:none">Saved</span>
+      <button class="btn-sm" id="acctPermsCloseBtn2" style="border-color:var(--text3);color:var(--text3)">Cancel</button>
+      <button class="btn-run" id="acctPermsSaveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
 <!-- GitHub file/dir picker modal -->
 <div id="ghPickerOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9001;align-items:center;justify-content:center">
   <div style="background:var(--bg1);border:1px solid var(--border);border-radius:10px;width:580px;max-width:95vw;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.6)">
@@ -1141,6 +1215,7 @@ function showPage(id){
 //  Accounts tab (admin only)
 // ════════════════════════════════════════════════════════
 const PRIV_LABEL=['Player','GM1','GM2','GM3','GM4','Admin'];
+const ALL_PERM_KEYS=['view:characters','edit:characters','view:accounts','manage:accounts','run:console','manage:settings','manage:scripts','view:db','manage:timers','upload:images','submit:queue','view:queue'];
 let accountsData=[];
 async function loadAccountsTab(){
   try{
@@ -1169,6 +1244,10 @@ function renderAccountList(list){
           ${PRIV_LABEL.map((l,i)=>`<option value="${i}"${i===privIdx?' selected':''}>${l}</option>`).join('')}
         </select>
         <button class="btn-sm acct-priv-btn" data-id="${a.id}">Set</button>
+      </td>
+      <td style="padding:6px 8px">
+        <button class="btn-sm acct-perms-btn" data-id="${a.id}" data-login="${esc(a.login)}"
+          style="color:var(--accent)">Perms</button>
       </td>`;
     tbody.appendChild(tr);
   });
@@ -1198,6 +1277,43 @@ function wireAccountActions(){
       }catch(e){ alert('Error: '+e.message); }
     };
   });
+  document.querySelectorAll('.acct-perms-btn').forEach(btn=>{
+    btn.onclick=()=>openPermsModal(btn.dataset.id, btn.dataset.login);
+  });
+}
+
+let _permsModalSeq=0;
+async function openPermsModal(accid, login){
+  const seq=++_permsModalSeq;
+  const overlay=document.getElementById('acctPermsOverlay');
+  document.getElementById('acctPermsTitle').textContent=`— ${login}`;
+  document.getElementById('acctPermsSaved').style.display='none';
+  const list=document.getElementById('acctPermsList');
+  list.innerHTML='<div class="muted" style="font-size:12px;grid-column:1/-1">Loading…</div>';
+  overlay.style.display='flex';
+  try{
+    const {overrides=[]}=await api('/api/accounts/'+accid+'/permissions');
+    if(seq!==_permsModalSeq) return;
+    list.innerHTML=ALL_PERM_KEYS.map(p=>`
+      <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:12px;padding:4px 6px;border-radius:5px;background:var(--bg2);border:1px solid var(--border)">
+        <input type="checkbox" class="perm-cb" data-perm="${p}" ${overrides.includes(p)?'checked':''}
+          style="width:13px;height:13px;accent-color:var(--accent)">
+        <span style="font-family:monospace;color:var(--text2)">${p}</span>
+      </label>`).join('');
+  }catch(e){ if(seq===_permsModalSeq) list.innerHTML=`<div class="muted" style="font-size:12px;grid-column:1/-1">${esc(e.message)}</div>`; }
+  document.getElementById('acctPermsSaveBtn').onclick=async()=>{
+    const checked=[...list.querySelectorAll('.perm-cb:checked')].map(c=>c.dataset.perm);
+    try{
+      await api('/api/accounts/'+accid+'/permissions',{method:'POST',body:JSON.stringify({permissions:checked})});
+      const msg=document.getElementById('acctPermsSaved');
+      msg.style.display='inline';
+      setTimeout(()=>msg.style.display='none',2000);
+    }catch(e){ alert('Error: '+e.message); }
+  };
+  const close=()=>{ overlay.style.display='none'; };
+  document.getElementById('acctPermsCloseBtn').onclick=close;
+  document.getElementById('acctPermsCloseBtn2').onclick=close;
+  overlay.onclick=e=>{ if(e.target===overlay) close(); };
 }
 
 document.getElementById('acctSearch').addEventListener('input',e=>{
@@ -1241,27 +1357,63 @@ function calcCharStats(c){
 }
 const NATIONS={1:"Sandy",2:"Bastok",3:"Windy"};
 
+let _charFilter='all';
+
 function renderCharList(list){
-  const tbody=document.getElementById('charRows'); tbody.innerHTML='';
-  document.getElementById('charCount').textContent = `${list.length} character${list.length!==1?'s':''}`;
-  list.forEach(c=>{
-    const tr=document.createElement('tr'); tr.className='clickable';
-    tr.innerHTML = `<td><span class="${c.online?'online-dot':'offline-dot'}" title="${c.online?'Online':'Offline'}"></span></td>
-      <td>${esc(c.charname)}${c.gmlevel>0?' <span class="pill">GM'+c.gmlevel+'</span>':''}</td>
-      <td>${c.nation?'<span class="pill">'+esc(NATIONS[c.nation]||'?')+'</span>':''}</td>
-      <td><span class="pill">${(JOBS[c.mjob]||'?')+' '+esc(String(c.mlvl||''))}</span></td>
-      <td>${c.sjob?'<span class="pill" style="opacity:.7">'+esc((JOBS[c.sjob]||'?')+' '+(c.slvl||''))+'</span>':''}</td>
-      <td><span class="pill">${esc(c.zone_name||('Zone '+c.pos_zone))}</span></td>
-      <td>${c.hp!=null?c.hp:'—'} &nbsp; ${c.mp!=null?c.mp:'—'}</td>
-      <td>›</td>`;
-    tr.onclick=()=>openCharacter(c.charid);
-    tbody.appendChild(tr);
-  });
+  const grid=document.getElementById('charGrid');
+  const filtered=_charFilter==='online'?list.filter(c=>c.online):list;
+  document.getElementById('charCount').textContent=`${filtered.length} character${filtered.length!==1?'s':''}`;
+  if(!filtered.length){ grid.innerHTML='<div class="muted" style="padding:20px 0">No characters found.</div>'; return; }
+  grid.innerHTML=filtered.map(c=>{
+    const hp=c.hp&&c.maxhp?Math.round(c.hp/c.maxhp*100):null;
+    const mp=c.mp&&c.maxmp?Math.round(c.mp/c.maxmp*100):null;
+    const hpCol=hp==null?'var(--border)':hp>50?'var(--online)':hp>25?'var(--gold)':'var(--danger)';
+    const job=`${JOBS[c.mjob]||'?'} ${c.mlvl||''}${c.sjob?` <span style="color:var(--text3);font-weight:400">/ ${JOBS[c.sjob]||'?'} ${c.slvl||''}</span>`:''}`;
+    const nation=c.nation?`<span class="pill" style="font-size:10px">${esc(NATIONS[c.nation]||'?')}</span>`:'';
+    const race=c.race?`<span style="color:var(--text3)">${esc(RACES[c.race]||'')}</span>`:'';
+    const zone=esc(c.zone_name||('Zone '+c.pos_zone));
+    return `<div class="char-card${c.online?' is-online':''}" onclick="openCharacter(${c.charid})">
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px">
+        <div style="min-width:0;flex:1">
+          <div class="char-card-name">
+            <span class="${c.online?'online-dot':'offline-dot'}"></span>
+            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(c.charname)}</span>
+            ${c.gmlevel>0?`<span class="badge admin" style="font-size:10px;padding:1px 6px">GM${c.gmlevel}</span>`:''}
+          </div>
+          <div class="char-card-meta">${race}${race&&nation?' · ':''}${nation}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:13px;font-weight:700">${job}</div>
+        </div>
+      </div>
+      <div class="char-card-zone">📍 ${zone}</div>
+      ${c.online&&hp!=null?`<div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:4px">
+        <div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:2px">HP ${c.hp}</div>
+          <div style="height:4px;border-radius:2px;background:var(--bg3);overflow:hidden"><div style="width:${hp}%;height:100%;background:${hpCol};border-radius:2px"></div></div>
+        </div>
+        ${mp!=null?`<div>
+          <div style="font-size:10px;color:var(--text3);margin-bottom:2px">MP ${c.mp}</div>
+          <div style="height:4px;border-radius:2px;background:var(--bg3);overflow:hidden"><div style="width:${mp}%;height:100%;background:var(--accent);border-radius:2px;opacity:.7"></div></div>
+        </div>`:''}
+      </div>`:`<div style="margin-top:6px;font-size:11px;color:var(--text3)">${c.online?'Online':'Offline'}</div>`}
+    </div>`;
+  }).join('');
 }
 
 document.getElementById('charSearch').addEventListener('input', e=>{
   const q=e.target.value.toLowerCase();
   renderCharList(state.chars.filter(c=>c.charname.toLowerCase().includes(q)));
+});
+
+document.querySelectorAll('.char-filter').forEach(btn=>{
+  btn.onclick=()=>{
+    document.querySelectorAll('.char-filter').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    _charFilter=btn.dataset.filter;
+    const q=document.getElementById('charSearch').value.toLowerCase();
+    renderCharList(state.chars.filter(c=>!q||c.charname.toLowerCase().includes(q)));
+  };
 });
 
 async function openCharacter(charid){
@@ -2324,16 +2476,7 @@ function renderDetail(c, inv, ext=null, quests=[], effects=[], equipment=[], blo
       ${isAdmin?`<button class="del" data-item="${i.itemId}" title="Remove one">✕</button>`:''}
     </div>`).join('') : '<div class="muted">Inventory empty</div>';
 
-  return `
-    <button class="back-btn" onclick="showPage('playersPage')">← Back to characters</button>
-    <div class="char-head">
-      <div class="name">${c.online?'<span class="online-dot"></span>':''}${esc(c.charname)}</div>
-      ${c.gmlevel>0?'<span class="badge admin">GM '+c.gmlevel+'</span>':''}
-      ${c.race?`<span class="pill">${esc(RACES[c.race]||'Unknown')}</span>`:''}
-      <span class="pill">${JOBS[c.mjob]||'?'} ${c.mlvl||''}${c.sjob?' / '+(JOBS[c.sjob]||'?')+' '+(c.slvl||''):''}</span>
-    </div>
-    ${editPanel}
-    <div class="char-grid">
+  const overviewPanels=`<div class="char-grid">
       <div class="panel"><h3>Character</h3>
         ${stat('Nation', NATIONS[c.nation]||'—')}
         ${stat('Home Zone', esc(c.home_zone_name||'—'))}
@@ -2422,16 +2565,57 @@ function renderDetail(c, inv, ext=null, quests=[], effects=[], equipment=[], blo
         ${bars}
       </div>`;
     })()}
-    ${renderEquipment(equipment)}
-    ${renderExtended(c, ext, bags)}
-    ${renderBlobs(blobs)}
-    ${renderEffects(effects)}
-    ${renderQuests(quests, isAdmin, c.charid)}
-    <div class="panel"><h3>Inventory (${inv.length})</h3><div class="inv-grid">${invItems}</div></div>
+    ${renderEffects(effects)}`;
+
+  return `
+    <div class="char-header-bar">
+      <div class="char-hrow">
+        <button class="back-btn" onclick="showPage('playersPage')">← Back</button>
+        <div class="name">${c.online?'<span class="online-dot"></span>':''}${esc(c.charname)}</div>
+        ${c.gmlevel>0?'<span class="badge admin">GM '+c.gmlevel+'</span>':''}
+        ${c.race?`<span class="pill" style="font-size:11px">${esc(RACES[c.race]||'Unknown')}</span>`:''}
+        <span class="pill" style="font-size:11px">${JOBS[c.mjob]||'?'} ${c.mlvl||''}${c.sjob?' / '+(JOBS[c.sjob]||'?')+' '+(c.slvl||''):''}</span>
+        <span class="muted" style="font-size:12px">📍 ${esc(c.zone_name||('Zone '+c.pos_zone))}</span>
+        <span class="gil" style="font-size:14px;margin-left:auto">${Number(c.gil||0).toLocaleString()} G</span>
+      </div>
+      <nav class="char-tabs">
+        <button class="char-tab active" data-tab="overview">Overview</button>
+        <button class="char-tab" data-tab="gear">Gear &amp; Items</button>
+        <button class="char-tab" data-tab="progress">Progress</button>
+        ${isAdmin?'<button class="char-tab" data-tab="admin">⚙ Admin</button>':''}
+      </nav>
+    </div>
+
+    <div class="char-tab-content active" id="charTab-overview">
+      ${overviewPanels}
+    </div>
+
+    <div class="char-tab-content" id="charTab-gear">
+      ${renderEquipment(equipment)}
+      <div class="panel"><h3>Inventory (${inv.length})</h3><div class="inv-grid">${invItems}</div></div>
+    </div>
+
+    <div class="char-tab-content" id="charTab-progress">
+      ${renderExtended(c, ext, bags)}
+      ${renderBlobs(blobs)}
+      ${renderQuests(quests, isAdmin, c.charid)}
+    </div>
+
+    ${isAdmin?`<div class="char-tab-content" id="charTab-admin">${editPanel}</div>`:''}
   `;
 }
 
 function wireDetail(c, inv, quests, charVars){
+  // Tab navigation
+  document.querySelectorAll('.char-tab').forEach(tab=>{
+    tab.onclick=()=>{
+      document.querySelectorAll('.char-tab').forEach(t=>t.classList.remove('active'));
+      document.querySelectorAll('.char-tab-content').forEach(s=>s.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById('charTab-'+tab.dataset.tab)?.classList.add('active');
+      document.getElementById('detailPage').scrollTop=0;
+    };
+  });
   wireQuests(quests, charVars, c.charid, state.tier==='admin');
   // RoE track button — admin adds active record to timer tracker
   if(state.tier==='admin'){
@@ -2823,7 +3007,14 @@ document.getElementById('adjBtn').onclick=()=>{
   const p=document.getElementById('adjPanel');
   const open=p.style.display==='none';
   p.style.display=open?'block':'none';
-  document.getElementById('adjBtn').classList.toggle('active',open);
+  const btn=document.getElementById('adjBtn');
+  btn.style.borderColor=open?'var(--accent)':'var(--border)';
+  btn.style.color=open?'var(--accent)':'var(--text2)';
+};
+document.getElementById('adjClose').onclick=()=>{
+  document.getElementById('adjPanel').style.display='none';
+  const btn=document.getElementById('adjBtn');
+  btn.style.borderColor='var(--border)'; btn.style.color='var(--text2)';
 };
 
 ['adjOX','adjOY','adjSX','adjSY','adjPad'].forEach(id=>document.getElementById(id).addEventListener('input',()=>{
@@ -3272,7 +3463,10 @@ function _clearCalibration(zoneId) {
 function _updateCalStatus(zoneId) {
   if(!zoneId) return;
   const hasCustom=!!_serverCals[zoneId];
-  document.getElementById('calBtn').innerHTML=`📍 Calibrate Zone <span style="font-size:10px;font-weight:400;margin-left:4px;color:${hasCustom?'var(--ok)':'var(--text3)'}">${hasCustom?'✓ custom':'default'}</span>`;
+  const cb=document.getElementById('calBtn');
+  cb.innerHTML=`📍 Calibrate <span style="font-size:10px;font-weight:400;margin-left:2px;color:${hasCustom?'var(--ok)':'rgba(240,192,64,.5)'}">${hasCustom?'✓':'○'}</span>`;
+  cb.style.borderColor=hasCustom?'rgba(79,195,161,.35)':'rgba(240,192,64,.3)';
+  cb.style.color=hasCustom?'var(--ok)':'var(--gold)';
 }
 function _calHintText(lp) {
   if(lp){
@@ -4105,6 +4299,40 @@ async function loadDashboardSettingsPanel(){
             <span style="font-size:13px">Autologin <span class="muted" style="font-size:11px">(auto-login as top GM on page load)</span></span>
           </label>
         </div>
+        <div style="border-top:1px solid var(--border);padding-top:14px;margin-top:2px">
+          <div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--text3);margin-bottom:12px">Auth &amp; Security</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:${isAdmin?'pointer':'default'};grid-column:1/-1">
+              <input type="checkbox" id="dsAllowPlayer" ${s.allowPlayerLogin!==false?'checked':''} ${isAdmin?'':'disabled'}
+                style="width:15px;height:15px;accent-color:var(--accent)">
+              <span style="font-size:13px">Allow player login <span class="muted" style="font-size:11px">(if off, only admins can log in)</span></span>
+            </label>
+            <div>
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Token TTL (hours)</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="number" id="dsTokenTtl" min="1" max="720" value="${s.tokenTtlHours??24}" ${isAdmin?'':'disabled'}
+                  style="width:90px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-size:13px">
+                ${isAdmin?`<button class="btn-sm" id="dsTokenTtlSave">Save</button>`:''}
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Admin GM level</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="number" id="dsAdminGm" min="1" max="10" value="${s.adminGmLevel??1}" ${isAdmin?'':'disabled'}
+                  style="width:90px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-size:13px">
+                ${isAdmin?`<button class="btn-sm" id="dsAdminGmSave">Save</button>`:''}
+              </div>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--text3);display:block;margin-bottom:4px">Login rate limit (attempts/15 min)</label>
+              <div style="display:flex;gap:6px;align-items:center">
+                <input type="number" id="dsRateLimit" min="1" max="100" value="${s.loginRateLimitMax??10}" ${isAdmin?'':'disabled'}
+                  style="width:90px;background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-size:13px">
+                ${isAdmin?`<button class="btn-sm" id="dsRateLimitSave">Save</button>`:''}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>`;
     if(isAdmin){
       const save=async(patch)=>{
@@ -4117,6 +4345,11 @@ async function loadDashboardSettingsPanel(){
       document.getElementById('dsMotdSave').onclick=()=>save({motd:document.getElementById('dsMotd').value});
       document.getElementById('dsAutoSwitch').onchange=e=>save({autoSwitchZone:e.target.checked});
       document.getElementById('dsAutologin').onchange=e=>save({autologin:e.target.checked});
+      document.getElementById('dsAllowPlayer').onchange=e=>save({allowPlayerLogin:e.target.checked});
+      const clampInt=(id,min,max,def)=>{const v=parseInt(document.getElementById(id).value);return Math.max(min,Math.min(max,Number.isNaN(v)?def:v));};
+      document.getElementById('dsTokenTtlSave').onclick=()=>save({tokenTtlHours:clampInt('dsTokenTtl',1,720,24)});
+      document.getElementById('dsAdminGmSave').onclick=()=>save({adminGmLevel:clampInt('dsAdminGm',1,10,1)});
+      document.getElementById('dsRateLimitSave').onclick=()=>save({loginRateLimitMax:clampInt('dsRateLimit',1,100,10)});
     }
   }catch(e){ el.innerHTML=`<div class="muted" style="font-size:12px">Error: ${esc(e.message)}</div>`; }
 }

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Pool, RowDataPacket } from 'mysql2/promise';
 import { requireAuth } from '../auth';
-import { requirePermission } from '../rbac';
+import { requirePermission, getAccountOverrides, setAccountOverrides, ALL_PERMISSIONS, type Permission } from '../rbac';
 import { audit } from '../audit';
 
 export function createAccountsRouter(pool: Pool): Router {
@@ -39,6 +39,23 @@ export function createAccountsRouter(pool: Pool): Router {
       audit(req.user!.login, 'account.priv', `account:${id}`, { priv: privNum });
       res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: (err as Error).message }); }
+  });
+
+  router.get('/api/accounts/:id/permissions', requireAuth, requirePermission('manage:accounts'), (req, res) => {
+    const accid = parseInt(req.params.id as string);
+    if (isNaN(accid)) { res.status(400).json({ error: 'invalid id' }); return; }
+    res.json({ accid, overrides: getAccountOverrides(accid) });
+  });
+
+  router.post('/api/accounts/:id/permissions', requireAuth, requirePermission('manage:accounts'), (req, res) => {
+    const accid = parseInt(req.params.id as string);
+    if (isNaN(accid)) { res.status(400).json({ error: 'invalid id' }); return; }
+    const { permissions } = (req.body as { permissions?: unknown }) || {};
+    if (!Array.isArray(permissions)) { res.status(400).json({ error: 'permissions must be an array' }); return; }
+    const valid = (permissions as string[]).filter(p => ALL_PERMISSIONS.includes(p as Permission)) as Permission[];
+    setAccountOverrides(accid, valid);
+    audit(req.user!.login, 'account.permissions', `account:${accid}`, { permissions: valid });
+    res.json({ ok: true, overrides: valid });
   });
 
   return router;

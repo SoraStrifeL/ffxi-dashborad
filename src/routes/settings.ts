@@ -85,11 +85,17 @@ export function createSettingsRouter(pool: Pool): Router {
   router.post('/api/dashboard/settings', requireAuth, requirePermission('manage:settings'), (req, res) => {
     const current = loadDashboardSettings();
     const body = (req.body as Partial<DashboardSettings>) || {};
+    const clampInt = (v: unknown, min: number, max: number, fallback: number) =>
+      typeof v === 'number' && Number.isInteger(v) ? Math.max(min, Math.min(max, v)) : fallback;
     const updated: DashboardSettings = {
-      serverName:     typeof body.serverName     === 'string'  ? body.serverName.slice(0, 100) : current.serverName,
-      motd:           typeof body.motd           === 'string'  ? body.motd.slice(0, 500)       : current.motd,
-      autoSwitchZone: typeof body.autoSwitchZone === 'boolean' ? body.autoSwitchZone            : current.autoSwitchZone,
-      autologin:      typeof body.autologin      === 'boolean' ? body.autologin                 : current.autologin,
+      serverName:        typeof body.serverName        === 'string'  ? body.serverName.slice(0, 100)                             : current.serverName,
+      motd:              typeof body.motd              === 'string'  ? body.motd.slice(0, 500)                                   : current.motd,
+      autoSwitchZone:    typeof body.autoSwitchZone    === 'boolean' ? body.autoSwitchZone                                       : current.autoSwitchZone,
+      autologin:         typeof body.autologin         === 'boolean' ? body.autologin                                            : current.autologin,
+      allowPlayerLogin:  typeof body.allowPlayerLogin  === 'boolean' ? body.allowPlayerLogin                                     : current.allowPlayerLogin,
+      tokenTtlHours:     clampInt(body.tokenTtlHours,     1,   720, current.tokenTtlHours),
+      adminGmLevel:      clampInt(body.adminGmLevel,      1,    10, current.adminGmLevel),
+      loginRateLimitMax: clampInt(body.loginRateLimitMax, 1,   100, current.loginRateLimitMax),
     };
     saveDashboardSettings(updated);
     audit(req.user!.login, 'settings.dashboard', undefined, body);
