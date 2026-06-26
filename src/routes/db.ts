@@ -37,7 +37,9 @@ export function createDbRouter(pool: Pool): Router {
       const slotBit = req.query.slot ? parseInt(req.query.slot as string) : null;
       const page = Math.max(0, parseInt((req.query.page as string) || '0'));
       const sortMap: Record<string, string> = { level: 'ie.level DESC, ib.itemid', ilevel: 'ie.ilevel DESC, ib.itemid', sell: 'ib.BaseSell DESC, ib.itemid', dmg: 'iw.dmg DESC, ib.itemid', name: 'ib.name ASC' };
-      const orderBy = sortMap[sort] || 'ib.itemid';
+      // numeric sorts only apply when a filter value is active; without one, fall back to ID
+      // so items with no equipment row (NULL level/dmg etc.) remain on page 0
+      const orderBy = (qNumVal !== null && numCol) ? sortMap[sort] : (numCol ? 'ib.itemid' : sortMap[sort] || 'ib.itemid');
       const params: (string | number | null)[] = [];
       const extra: string[] = [];
       if (qNumVal !== null) {

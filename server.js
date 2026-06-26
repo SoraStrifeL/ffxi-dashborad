@@ -1162,7 +1162,7 @@ app.get('/api/db/items', auth.requireAuth, async (req, res) => {
     const slotBit = req.query.slot ? parseInt(req.query.slot) : null;
     const page = Math.max(0, parseInt(req.query.page)||0);
     const sortMap = { level:'ie.level DESC, ib.itemid', ilevel:'ie.ilevel DESC, ib.itemid', sell:'ib.BaseSell DESC, ib.itemid', dmg:'iw.dmg DESC, ib.itemid', name:'ib.name ASC' };
-    const orderBy = sortMap[sort] || 'ib.itemid';
+    const orderBy = (qNumVal !== null && numCol) ? sortMap[sort] : (numCol ? 'ib.itemid' : sortMap[sort] || 'ib.itemid');
     const params = [];
     const extra = [];
     if (qNumVal !== null) {
