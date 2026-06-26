@@ -995,6 +995,17 @@
         </div>
         <div class="console-log" id="logOutput"></div>
       </div>
+      <div class="panel" style="margin-bottom:16px" id="crashLogPanel">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+          <h3 style="margin:0">Crash Log</h3>
+          <span id="crashLogBadge" style="display:none;background:var(--danger);color:#fff;border-radius:10px;padding:1px 8px;font-size:11px;font-weight:700"></span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn-sm" onclick="loadCrashLog()">&#8635; Refresh</button>
+            <button class="btn-sm" style="color:var(--danger);border-color:var(--danger)" onclick="clearCrashLog()">Clear</button>
+          </div>
+        </div>
+        <div id="crashLogEntries" style="max-height:220px;overflow-y:auto;font-family:monospace;font-size:12px"><span class="muted">No crashes recorded.</span></div>
+      </div>
       <div class="panel">
         <h3>Lua Console</h3>
         <textarea class="lua-input" id="luaInput" rows="4" placeholder="GetPlayerByName('Sora'):addGil(1000)&#10;-- Runs directly on the live map server process"></textarea>
@@ -1173,14 +1184,18 @@ async function api(path, opts={}){
   const headers = Object.assign({'Content-Type':'application/json'}, opts.headers||{});
   if(state.token) headers['Authorization'] = 'Bearer '+state.token;
   const res = await fetch(path, Object.assign({}, opts, {headers}));
-  if(res.status === 401){ clearToken(); showLogin(); throw new Error('session expired'); }
+  if(res.status === 401){ clearToken(); showLogin('Session expired. Please sign in again.'); throw new Error('session expired'); }
   if(!res.ok){ const e = await res.json().catch(()=>({error:res.statusText})); throw new Error(e.error||'request failed'); }
   return res.json();
 }
 
 // ── Login flow ──────────────────────────────────────────
 const loginView=document.getElementById('loginView'), appView=document.getElementById('appView');
-function showLogin(){ loginView.style.display='flex'; appView.style.display='none'; }
+function showLogin(msg){
+  loginView.style.display='flex'; appView.style.display='none';
+  const errEl=document.getElementById('loginErr');
+  if(errEl) errEl.textContent=msg||'';
+}
 function showApp(){ loginView.style.display='none'; appView.style.display='flex'; }
 
 document.getElementById('loginBtn').onclick = doLogin;
@@ -1200,7 +1215,7 @@ async function doLogin(){
   }catch(e){ errEl.textContent='Connection error.'; }
 }
 
-document.getElementById('logoutBtn').onclick = ()=>{ clearToken(); showLogin(); };
+document.getElementById('logoutBtn').onclick = ()=>{ clearToken(); showLogin(); };  // no msg on voluntary logout
 
 let _dashSettings={serverName:'FFXI Dashboard',motd:'',autoSwitchZone:true,autologin:true};
 async function applyDashboardSettings(s){
@@ -4002,7 +4017,7 @@ function connectWS(){
       }
     }catch(_){}
   };
-  gWS.onclose=(e)=>{ gWS=null; if(e.code===1008){ clearToken(); showLogin(); return; } const el=document.getElementById('onlineCount'); if(el) el.textContent=`Reconnecting in ${Math.round(_wsDelay/1000)}s...`; setTimeout(connectWS,_wsDelay); _wsDelay=Math.min(_wsDelay*2,30000); };
+  gWS.onclose=(e)=>{ gWS=null; if(e.code===1008){ clearToken(); showLogin('Session expired. Please sign in again.'); return; } const el=document.getElementById('onlineCount'); if(el) el.textContent=`Reconnecting in ${Math.round(_wsDelay/1000)}s...`; setTimeout(connectWS,_wsDelay); _wsDelay=Math.min(_wsDelay*2,30000); };
 }
 
 // ════════════════════════════════════════════════════════
@@ -4023,9 +4038,34 @@ function initConsole(){
     document.getElementById('luaInput').addEventListener('keydown', e=>{
       if(e.ctrlKey&&e.key==='Enter'){ e.preventDefault(); runLua(); }
     });
+    loadCrashLog();
   }
   wsSend({type:'log_sub', data:{file:'map'}});
   document.querySelectorAll('.log-file-tab').forEach(b=>b.classList.toggle('active', b.dataset.lf==='map'));
+}
+
+async function loadCrashLog(){
+  const el=document.getElementById('crashLogEntries');
+  const badge=document.getElementById('crashLogBadge');
+  if(!el) return;
+  let entries=[];
+  try{ entries=await api('/api/crash-log'); }catch(_){ el.innerHTML='<span class="muted">Error loading crash log.</span>'; return; }
+  if(!Array.isArray(entries)) entries=[];
+  badge.style.display=entries.length?'':'none';
+  badge.textContent=entries.length;
+  if(!entries.length){ el.innerHTML='<span class="muted">No crashes recorded.</span>'; return; }
+  el.innerHTML=entries.map(e=>{
+    const color=e.type==='uncaughtException'?'var(--danger)':'var(--gold,#f59e0b)';
+    const stackHtml=e.stack?`<details style="margin-top:3px"><summary style="cursor:pointer;opacity:.6;font-size:11px">stack trace</summary><pre style="margin:4px 0 0;white-space:pre-wrap;font-size:10px;opacity:.75;overflow-x:auto">${esc(e.stack)}</pre></details>`:'';
+    const ts=e.ts?new Date(e.ts).toLocaleString():'—';
+    return `<div style="border-bottom:1px solid var(--border);padding:5px 0"><span style="background:${color};color:#fff;border-radius:4px;padding:1px 6px;font-size:10px;font-weight:700;margin-right:6px">${esc(e.type)}</span><span style="opacity:.55;font-size:11px">${ts}</span><div style="margin-top:3px">${esc(e.msg)}</div>${stackHtml}</div>`;
+  }).join('');
+}
+
+async function clearCrashLog(){
+  if(!confirm('Clear all crash log entries?')) return;
+  try{ await api('/api/crash-log',{method:'DELETE'}); }catch(e){ document.getElementById('crashLogEntries').innerHTML=`<span class="muted">Clear failed: ${esc(e?.message||'unknown error')}</span>`; return; }
+  await loadCrashLog();
 }
 
 function appendLogLines(file, lines){
@@ -5331,7 +5371,7 @@ function _dbItemDetail(r, wiki){
   return sections.join('');
 }
 
-let _dbState={cat:'items',page:0,rows:[],searchTimer:null,hasMore:false,typeBit:'',sort:'',rareOnly:false,flagMask:'',flagVal:'',skill:null,slot:null,logId:null,scripted:null,qsort:'',npcRegion:'',geoSort:'',mobEco:'',zType:'',zContent:'',zSort:'name',abilityJob:null};
+let _dbState={cat:'items',page:0,rows:[],searchTimer:null,hasMore:false,typeBit:'',sort:'',rareOnly:false,flagMask:'',flagVal:'',skill:null,slot:null,logId:null,scripted:null,qsort:'',npcRegion:'',geoSort:'',mobEco:'',zType:'',zContent:'',zSort:'name',abilityJob:null,jobsCache:null,trustsCache:null,mountsCache:null};
 
 const _WPN_SUBS=[
   {label:'All',skill:null},{label:'H2H',skill:0},{label:'Dagger',skill:1},{label:'Sword',skill:2},
@@ -5960,6 +6000,9 @@ async function _dbDetail(tr, r, cat){
   _uploadWidgetBind(td);
 }
 
+const DB_PAGE=50;
+const JOB_NAMES_FILTER={war:'warrior',mnk:'monk',whm:'white mage',blm:'black mage',rdm:'red mage',thf:'thief',pld:'paladin',drk:'dark knight',bst:'beastmaster',brd:'bard',rng:'ranger',sam:'samurai',nin:'ninja',drg:'dragoon',smn:'summoner',blu:'blue mage',cor:'corsair',pup:'puppetmaster',dnc:'dancer',sch:'scholar',geo:'geomancer',run:'rune fencer'};
+
 async function _dbLoad(append=false){
   const cat=_dbState.cat;
   const q=document.getElementById('dbSearch').value.trim();
@@ -6006,15 +6049,39 @@ async function _dbLoad(append=false){
   }
 
   if(cat==='jobs'){
-    const JOB_NAMES_FILTER={war:'warrior',mnk:'monk',whm:'white mage',blm:'black mage',rdm:'red mage',thf:'thief',pld:'paladin',drk:'dark knight',bst:'beastmaster',brd:'bard',rng:'ranger',sam:'samurai',nin:'ninja',drg:'dragoon',smn:'summoner',blu:'blue mage',cor:'corsair',pup:'puppetmaster',dnc:'dancer',sch:'scholar',geo:'geomancer',run:'rune fencer'};
-    let rows=await api('/api/db/jobs').catch(()=>[]);
+    if(!_dbState.jobsCache) _dbState.jobsCache=await api('/api/db/jobs').catch(()=>[]);
+    let rows=[..._dbState.jobsCache];
     const qj=document.getElementById('dbSearch').value.trim().toLowerCase();
-    if(qj) rows=rows.filter(r=>r.job===qj||JOB_NAMES_FILTER[r.job]?.startsWith(qj));
+    if(qj) rows=rows.filter(r=>r.job===qj||JOB_NAMES_FILTER[r.job]?.includes(qj));
     _dbState.hasMore=false;
     document.getElementById('dbMore').style.display='none';
     const meta=document.getElementById('dbResultMeta');
     if(meta) meta.textContent=`${rows.length} jobs`;
     _dbTable('jobs', rows, false);
+    return;
+  }
+
+  if(cat==='trusts'){
+    if(!_dbState.trustsCache) _dbState.trustsCache=await api('/api/db/trusts').catch(()=>[]);
+    const qt=q.toLowerCase();
+    const rows=qt?_dbState.trustsCache.filter(r=>r.label.toLowerCase().includes(qt)):_dbState.trustsCache;
+    _dbState.hasMore=false;
+    document.getElementById('dbMore').style.display='none';
+    const meta=document.getElementById('dbResultMeta');
+    if(meta) meta.textContent=rows.length?`${rows.length} trusts`:'No results.';
+    _dbTable('trusts', rows, false);
+    return;
+  }
+
+  if(cat==='mounts'){
+    if(!_dbState.mountsCache) _dbState.mountsCache=await api('/api/db/mounts').catch(()=>[]);
+    const qm=q.toLowerCase();
+    const rows=qm?_dbState.mountsCache.filter(r=>r.label.toLowerCase().includes(qm)):_dbState.mountsCache;
+    _dbState.hasMore=false;
+    document.getElementById('dbMore').style.display='none';
+    const meta=document.getElementById('dbResultMeta');
+    if(meta) meta.textContent=rows.length?`${rows.length} mounts`:'No results.';
+    _dbTable('mounts', rows, false);
     return;
   }
 
@@ -6051,7 +6118,7 @@ async function _dbLoad(append=false){
     });
   }
   const _nonPaged=cat==='skills'||cat==='trusts'||cat==='mounts';
-  _dbState.hasMore=!_nonPaged&&rows.length===50;
+  _dbState.hasMore=!_nonPaged&&rows.length===DB_PAGE;
   document.getElementById('dbMore').style.display=_dbState.hasMore?'':'none';
   const meta=document.getElementById('dbResultMeta');
   if(meta){
@@ -6253,8 +6320,10 @@ function initDbTab(){
     chip.addEventListener('click',()=>{
       document.querySelectorAll('.db-sort-chip').forEach(c=>c.classList.remove('active'));
       chip.classList.add('active');
+      const prev=_dbState.sort;
       _dbState.sort=chip.dataset.sort;
-      document.getElementById('dbSearch').value='';
+      // clear search only when switching between text and numeric sort modes
+      if(!!SORT_HINTS[prev]!==!!SORT_HINTS[_dbState.sort]) document.getElementById('dbSearch').value='';
       _dbUpdateSearchHint();
       _dbLoad();
     });

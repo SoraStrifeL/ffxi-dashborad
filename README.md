@@ -14,7 +14,7 @@ Connects directly to the LSB MariaDB database and pushes live updates over WebSo
 | **Characters** | All | Sortable table; click for full detail — jobs, inventory, equipment, blobs, effects, quests, missions |
 | **Zones** | All | All zones ranked by population |
 | **Timers** | All | NM pop timer tracker; import directly from server DB |
-| **DB** | All | Searchable: Mobs, NPCs, Items (with augments/stats), Quests (with BG-wiki descriptions + charvar status), Zones |
+| **DB** | All | Searchable: Items (with augments/stats), Mobs, NPCs, Zones, Quests (with BG-wiki descriptions + charvar status), Jobs (max level + player count per job), Skills (ranks + level-99 caps), Abilities (filterable by job), Key Items, Trusts, Mounts |
 | **Accounts** | Admin | Status, priv, session info |
 | **Console** | Admin | Live log tail (map/world/connect/search) + Lua console; execute Lua directly on the live map-server VM |
 | **Scripts** | Admin | Save/run reusable Lua snippets; browse and edit server-side Lua files |
@@ -92,8 +92,7 @@ docker compose logs -f   # watch startup
 
 Open `http://<host>:3001` in a browser.
 
-> **Redeploying after code changes:** `docker compose build` then restart the container in Portainer (or `docker compose up -d --force-recreate`).  
-> **Exception:** if you changed env vars in `.env`, always use `docker compose up -d` to recreate the container.
+> **Redeploying after code changes:** `docker compose build && docker compose up -d --force-recreate`
 
 ### 5. Get map images
 
@@ -134,16 +133,31 @@ Edit `.env` — set `DB_HOST` to the IP/hostname of your MariaDB instance (not t
 ```env
 DB_HOST=192.168.1.10
 DB_PASS=changeme
-DASHBOARD_JWT_SECRET=$(openssl rand -hex 32)
+DASHBOARD_JWT_SECRET=<random-string>   # openssl rand -hex 32
 ```
 
 Load the file before starting:
 ```bash
-# Option A — export manually
+# Linux/macOS — export manually
 export $(grep -v '^#' .env | xargs)
+node server.js
 
-# Option B — use dotenv-cli
-npx dotenv-cli node server.js
+# Any platform — dotenv-cli
+npx dotenv -e .env -- node server.js
+```
+
+**Windows:**
+```cmd
+set DASHBOARD_JWT_SECRET=<random-string>
+set DB_HOST=192.168.1.10
+set DB_PASS=changeme
+node server.js
+```
+Or in PowerShell:
+```powershell
+$env:DASHBOARD_JWT_SECRET = "<random-string>"
+$env:DB_HOST = "192.168.1.10"
+node server.js
 ```
 
 ### 3. Apply the database schema (once)
@@ -155,13 +169,13 @@ mariadb -u xiadmin -p xidb < sql/dashboard_queue.sql
 ### 4. Start
 
 ```bash
-node server.js
+node server.js       # or: npm start
 # → FFXI Dashboard running on port 3000
 ```
 
 Open `http://localhost:3000`.
 
-> The process must stay running. Use `pm2`, `systemd`, or `screen` for persistence.
+> The process must stay running. Use `pm2`, `systemd`, `screen`, or Task Scheduler (Windows) for persistence.
 
 ### 5. Get map images
 

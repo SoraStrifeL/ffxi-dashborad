@@ -2,10 +2,10 @@
   "name": "ffxi-dashboard",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/server.js",
+  "main": "server.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/server.js",
+    "start": "node server.js",
     "dev": "npx ts-node src/server.ts",
     "test": "vitest run",
     "test:watch": "vitest",

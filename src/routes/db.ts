@@ -14,6 +14,11 @@ import { cacheGetJSON, cacheSetJSON, WIKI_TTL, ITEM_TYPES_TTL } from '../cache';
 export function createDbRouter(pool: Pool): Router {
   const router = Router();
 
+  const TRUST_NATURAL_S = new Set(['iris']);
+  const KEY_ITEM_SORTED = Object.entries(KEY_ITEM_NAMES)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([id, name]: [string, string]) => ({ id: Number(id), name }));
+
   const ITEM_NUMERIC_COLS: Record<string, string> = {
     level: 'ie.level', ilevel: 'ie.ilevel', dmg: 'iw.dmg', sell: 'ib.BaseSell',
   };
@@ -340,11 +345,9 @@ export function createDbRouter(pool: Pool): Router {
   router.get('/api/db/keyitems', requireAuth, (req, res) => {
     const q = ((req.query.q as string) || '').toLowerCase().trim();
     const page = Math.max(0, parseInt(req.query.page as string) || 0);
-    const entries = Object.entries(KEY_ITEM_NAMES)
-      .filter(([, name]) => !q || name.toLowerCase().includes(q))
-      .sort(([a], [b]) => Number(a) - Number(b))
-      .slice(page * DB_PAGE, (page + 1) * DB_PAGE)
-      .map(([id, name]) => ({ id: Number(id), name }));
+    const entries = KEY_ITEM_SORTED
+      .filter(e => !q || e.name.toLowerCase().includes(q))
+      .slice(page * DB_PAGE, (page + 1) * DB_PAGE);
     res.json(entries);
   });
 
@@ -391,15 +394,17 @@ export function createDbRouter(pool: Pool): Router {
       const trusts = (rows as Array<{itemid: number; name: string}>)
         .map(r => {
           const isII = r.name.endsWith('_alter_ego_ii');
-          let label = r.name
+          const base = r.name
             .replace(/^cipher_of_/, '')
             .replace(/_alter_ego_ii$/, '')
-            .replace(/_alter_ego.*$/, '')
+            .replace(/_alter_ego.*$/, '');
+          const label = (TRUST_NATURAL_S.has(base) ? base : base.replace(/s$/, ''))
             .replace(/\._/g, '. ')
             .replace(/_/g, ' ')
             .replace(/\s+/g, ' ')
             .trim()
             .replace(/\b\w/g, c => c.toUpperCase())
+            .replace(/\b(Ii|Iii)\b/g, (s: string) => s.toUpperCase())
             + (isII ? ' II' : '');
           return { itemid: r.itemid, name: r.name, label };
         })

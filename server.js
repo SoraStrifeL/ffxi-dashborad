@@ -21,6 +21,53 @@ function saveDashboardSettings(s) {
   fs.writeFileSync(DASHBOARD_SETTINGS_PATH, JSON.stringify(s, null, 2), 'utf8');
 }
 
+// ── Crash log ─────────────────────────────────────────────────────────────────
+const CRASH_LOG_FILE = path.join(DATA_DIR, 'crash.log');
+const CRASH_LOG = [];
+const MAX_CRASH_ENTRIES = 100;
+
+function writeCrashEntry(type, err) {
+  const entry = {
+    ts: new Date().toISOString(),
+    type,
+    msg: (err instanceof Error ? err.message : String(err)) || 'unknown error',
+    stack: err instanceof Error ? err.stack || null : null,
+  };
+  CRASH_LOG.push(entry);
+  // Capture overflow before shift so we only touch the file when the array actually grew past cap
+  const overflow = CRASH_LOG.length > MAX_CRASH_ENTRIES;
+  if (overflow) CRASH_LOG.shift();
+  try {
+    fs.appendFileSync(CRASH_LOG_FILE, JSON.stringify(entry) + '\n', 'utf8');
+    // File is exactly MAX+1 lines when overflow is true; read back and trim to MAX
+    if (overflow) {
+      const lines = fs.readFileSync(CRASH_LOG_FILE, 'utf8').split('\n').filter(Boolean);
+      fs.writeFileSync(CRASH_LOG_FILE, lines.slice(-MAX_CRASH_ENTRIES).join('\n') + '\n', 'utf8');
+    }
+  } catch (_) {}
+}
+
+// Load persisted crash entries from previous runs
+try {
+  fs.readFileSync(CRASH_LOG_FILE, 'utf8').split('\n').filter(Boolean)
+    .slice(-MAX_CRASH_ENTRIES).forEach(l => { try { CRASH_LOG.push(JSON.parse(l)); } catch (_) {} });
+} catch (_) {}
+
+// ── Process-level error handlers (registered early to catch startup exceptions) ──
+process.on('uncaughtException', (err) => {
+  console.error('[CRASH] uncaughtException:', err);
+  writeCrashEntry('uncaughtException', err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  const err = reason instanceof Error ? reason : new Error(String(reason));
+  console.error('[CRASH] unhandledRejection:', err);
+  writeCrashEntry('unhandledRejection', err);
+  // Intentionally no process.exit: all route handlers have try/catch; background pollers do too.
+  // Staying up (and letting Docker restart only on uncaughtException) beats a crash loop on any
+  // transient DB rejection. If a poller dies silently the crash log will capture it.
+});
+
 const app = express();
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
 app.use(express.json());
@@ -1094,6 +1141,10 @@ app.get('/api/character/:charid/quests', auth.requireAuth, async (req, res) => {
 
 // ── Server Database search endpoints ─────────────────────────────────────────
 const DB_PAGE = 50;
+// Trust names whose display label genuinely ends in 's' (not a possessive cipher form).
+// Most ciphers encode a possessive: cipher_of_arcielas → 'arciela' (correct after strip).
+// Add to this set for any trust whose actual in-game name ends in 's', so the strip is skipped.
+const TRUST_NATURAL_S = new Set(['iris']);
 
 const ITEM_NUMERIC_COLS = { level:'ie.level', ilevel:'ie.ilevel', dmg:'iw.dmg', sell:'ib.BaseSell' };
 
@@ -1468,15 +1519,17 @@ app.get('/api/db/trusts', auth.requireAuth, async (req, res) => {
     );
     const trusts = rows.map(r => {
       const isII = r.name.endsWith('_alter_ego_ii');
-      const label = r.name
+      const base = r.name
         .replace(/^cipher_of_/, '')
         .replace(/_alter_ego_ii$/, '')
-        .replace(/_alter_ego.*$/, '')
+        .replace(/_alter_ego.*$/, '');
+      const label = (TRUST_NATURAL_S.has(base) ? base : base.replace(/s$/, ''))
         .replace(/\._/g, '. ')
         .replace(/_/g, ' ')
         .replace(/\s+/g, ' ')
         .trim()
         .replace(/\b\w/g, c => c.toUpperCase())
+        .replace(/\b(Ii|Iii)\b/g, s => s.toUpperCase())
         + (isII ? ' II' : '');
       return { itemid: r.itemid, name: r.name, label };
     }).filter(r => !q || r.label.toLowerCase().includes(q));
@@ -1520,11 +1573,9 @@ app.get('/api/db/mounts', auth.requireAuth, async (req, res) => {
 app.get('/api/db/keyitems', auth.requireAuth, (req, res) => {
   const q = ((req.query.q) || '').toLowerCase().trim();
   const page = Math.max(0, parseInt(req.query.page) || 0);
-  const entries = Object.entries(KEY_ITEM_NAMES)
-    .filter(([, name]) => !q || name.toLowerCase().includes(q))
-    .sort(([a], [b]) => Number(a) - Number(b))
-    .slice(page * DB_PAGE, (page + 1) * DB_PAGE)
-    .map(([id, name]) => ({ id: Number(id), name }));
+  const entries = KEY_ITEM_SORTED
+    .filter(e => !q || e.name.toLowerCase().includes(q))
+    .slice(page * DB_PAGE, (page + 1) * DB_PAGE);
   res.json(entries);
 });
 
@@ -1754,6 +1805,9 @@ function buildLuaEnum(filepath) {
 const KEY_ITEM_NAMES = buildLuaEnum('/ffxi-scripts/key_item.lua');
 const TITLE_NAMES    = buildLuaEnum('/ffxi-scripts/title.lua');
 console.log(`[enum] ${Object.keys(KEY_ITEM_NAMES).length} key items, ${Object.keys(TITLE_NAMES).length} titles`);
+const KEY_ITEM_SORTED = Object.entries(KEY_ITEM_NAMES)
+  .sort(([a], [b]) => Number(a) - Number(b))
+  .map(([id, name]) => ({ id: Number(id), name }));
 
 // RoE records from roe_records.lua: [ID] = { -- Name\n  flags = set{'daily',...}, goal = N }
 function buildRoeRecords() {
@@ -3144,6 +3198,17 @@ app.post('/api/claude', async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+// ── Crash log endpoints ───────────────────────────────────────────────────────
+app.get('/api/crash-log', auth.requireAuth, auth.requireAdmin, (_req, res) => {
+  res.json([...CRASH_LOG].reverse());
+});
+app.delete('/api/crash-log', auth.requireAuth, auth.requireAdmin, (_req, res) => {
+  CRASH_LOG.length = 0;
+  try { fs.writeFileSync(CRASH_LOG_FILE, '', 'utf8'); } catch (_) {}
+  res.json({ ok: true });
+});
+
 
 const PORT = process.env.PORT || 3000;
 // EXP needed per level (from exp_base; index = current level, value = XP to reach next level)

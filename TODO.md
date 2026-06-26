@@ -22,7 +22,7 @@
 - [x] v3 queue action: `setskill` — Set any skill level (weapons, magic, crafts)
 
 ### Database Browser (DB Tab)
-- [x] Database tab: Quests, Mobs, NPCs, Items — searchable, expandable rows
+- [x] Database tab: Items, Mobs, NPCs, Zones, Quests, Jobs, Skills, Abilities, Key Items, Trusts, Mounts — sidebar nav, searchable, expandable rows
 - [x] Items detail panel: weapon stats, equipment slots/jobs, usable charges, stat mods (60-entry mod map), Rare/Ex flags, drop sources, synth recipes, guild shop prices
 - [x] Quests detail: NPC names + `!pos` coordinates, requirements (fame/level/rank/job/key item/prereq quest/mission), trade items, rewards (gil/exp/fame/bayld/item/key item/title)
 - [x] Quest "scripted" badge — shows whether a Lua script was found for the quest
@@ -53,6 +53,9 @@
 
 ## Needs FFXI server rebuild (via Portainer)
 - [x] Activate live position feed: `ffxi-map` rebuilt; `dashboard_positions.json` confirmed writing to volume.
+
+- [x] DB tab — Jobs: max level + player count per job; Skills: ranks + level-99 caps per job; Abilities: full list with job filter chips; Key Items: paginated from pre-sorted startup cache; Trusts: label built from cipher name with possessive-s stripping (Iris guard) and Roman numeral normalization (Shantotto II); Mounts: items with ♪ prefix
+- [x] Windows bare-metal support — `npm start` fixed to point to `server.js` (was `dist/server.js`); README updated with Windows env var instructions
 
 ## Optional / Future
 - [x] Fine-tune zone bounds with 2-point calibration for zones where auto-bounds feel off

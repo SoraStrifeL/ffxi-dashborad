@@ -6,19 +6,27 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Docker (preferred):**
 ```bash
-docker compose build        # rebuild image after code changes
-docker compose up -d        # start container
-docker compose logs -f      # tail logs
+docker compose build                        # rebuild image after code changes
+docker compose up -d --force-recreate       # deploy new image
+docker compose logs -f                      # tail logs
 ```
-After `docker compose build`, restart the running container in Portainer (not via `docker compose up` again) to deploy the new image without altering the container configuration. **Exception:** if `docker-compose.yml` env vars changed (e.g. `WINDOWER_API_KEY`), use `docker compose up -d` to recreate the container.
+Use `docker compose up -d --force-recreate` after every build to swap to the new image.
 
-**Bare-metal (dev/test):**
+**Bare-metal — Linux/macOS (dev/test):**
 ```bash
 npm install
 DASHBOARD_JWT_SECRET=$(openssl rand -hex 32) node server.js
 ```
 
-There are no tests, no lint step, and no build step — `node server.js` is the only runtime.
+**Bare-metal — Windows:**
+```cmd
+npm install
+set DASHBOARD_JWT_SECRET=<random-string>
+node server.js
+```
+Load all vars from `.env` on any platform: `npx dotenv -e .env -- node server.js`
+
+There are no tests, no lint step, and no build step — `node server.js` is the only runtime. `npm start` also works (it points to `server.js`).
 
 **First-time DB setup:** apply `sql/dashboard_queue.sql` against the LSB `xidb` database once:
 ```bash
@@ -82,6 +90,8 @@ These paths are only available inside the container — graceful degradation app
 
 All Lua catalogs (quests, effects, merits, key items, titles, missions, RoE records) are parsed once at startup into in-memory lookup maps. Quest rewards are also parsed at startup by scanning every quest Lua file under `/ffxi-scripts/quests/`.
 
+The key item list is also pre-sorted at startup into `KEY_ITEM_SORTED` (sorted by ID) so the `/api/db/keyitems` endpoint can filter+slice without re-sorting on every request.
+
 ## Map images
 
 Map PNGs live in `public/maps/` and are served statically. `buildZoneMaps()` at startup scans this directory and matches filenames to zone IDs via `zone_settings.name` normalization. Multi-floor zones use the suffix `_N.png` (e.g. `tavnazian_safehold_1.png`).
@@ -96,6 +106,28 @@ Map PNGs live in `public/maps/` and are served statically. `buildZoneMaps()` at 
 - **Blob decoding:** binary columns `keyitems`, `titles`, `zones`, `eminence`, `missions`, `assault`, `campaign` on the `chars` table are decoded server-side in `server.js` (functions `decodeKeyItems`, `decodeBitfield`, `decodeEminence`, `decodeMissions`, etc.).
 - **Wiki cache:** BG-wiki quest descriptions are fetched on demand and cached in-memory for 24 h (`WIKI_CACHE` Map). No persistence across restarts.
 - **Settings writes:** `/api/settings/rates` (POST) edits `main.lua`/`map.lua`/`login.lua` in-place using regex replace — the LSB server must be reloaded separately for changes to take effect.
+
+## Database tab (`/api/db/*`)
+
+The DB tab has a sidebar nav with 11 categories. All endpoints require `auth.requireAuth`.
+
+| Category | Endpoint | Notes |
+|---|---|---|
+| Items | `/api/db/items` | Paginated (DB_PAGE=50), sortable, filterable by type/flags/slot/skill |
+| NPCs | `/api/db/npcs` | Paginated, zone-filterable |
+| Mobs | `/api/db/mobs` | Paginated, zone-filterable |
+| Zones | `/api/db/zones` | All zones (non-paged) |
+| Jobs | `/api/db/jobs` | Returns `{job, max, count}[]` — max level and leveled-character count per job; filtered client-side |
+| Skills | `/api/db/skills` | All skill ranks + level-99 caps from `skill_ranks` JOIN `skill_caps`; JS-filtered |
+| Abilities | `/api/db/abilities` | Paginated; filterable by job chip (`?job=1..22`) |
+| Quests | `/api/db/quests` | Paginated |
+| Key Items | `/api/db/keyitems` | Paginated from `KEY_ITEM_SORTED` (pre-sorted at startup) |
+| Trusts | `/api/db/trusts` | All trust ciphers from `item_basic`; label built by stripping cipher_of_/alter_ego_ affixes; possessive 's' stripped unless name is in `TRUST_NATURAL_S` (e.g. 'iris'); Roman numeral suffixes (Ii→II) normalized |
+| Mounts | `/api/db/mounts` | All mount items (name LIKE '♪%') from `item_basic` |
+
+**`DB_PAGE = 50`** is defined in both `server.js` and as a frontend constant in `index.html`. Both must match.
+
+**`_nonPaged`** in `_dbLoad` (index.html): categories that return all results without server-side paging (`skills`, `trusts`, `mounts`) — the `hasMore` / Load More button is suppressed for these.
 
 ## Windower addon integration
 
@@ -112,4 +144,4 @@ The `Dashboard` Windower4 addon (`addons/Dashboard/Dashboard.lua` on the gaming 
 - Immediately broadcasts `zone_players` to WebSocket clients watching that zone
 - Also broadcasts `windower_positions` (full map) to all connected clients
 
-**`WINDOWER_API_KEY`** is set in `.env` and passed into the container via `docker-compose.yml`. To rotate the key, update `.env` and run `docker compose up -d` to recreate the container, then update `api_key` in `addons/Dashboard/data/settings.xml` on the gaming PC.
+**`WINDOWER_API_KEY`** is set in `.env` and passed into the container via `docker-compose.yml`. To rotate the key, update `.env` and run `docker compose up -d --force-recreate` to recreate the container, then update `api_key` in `addons/Dashboard/data/settings.xml` on the gaming PC.
