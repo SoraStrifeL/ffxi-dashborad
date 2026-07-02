@@ -157,8 +157,9 @@ export function createSettingsRouter(pool: Pool): Router {
       patch.DB_PORT = Math.max(1, Math.min(65535, parseInt(String(body.DB_PORT)) || 3306));
     if (typeof body.DB_USER === 'string') patch.DB_USER = body.DB_USER.trim();
     if (typeof body.DB_NAME === 'string') patch.DB_NAME = body.DB_NAME.trim();
-    if (typeof body.DB_PASS === 'string' && !body.DB_PASS.includes('•'))
-      patch.DB_PASS = body.DB_PASS; // only update if not the masked placeholder
+    // empty = unchanged (the form sends '' when untouched), masked = unchanged
+    if (typeof body.DB_PASS === 'string' && body.DB_PASS !== '' && !body.DB_PASS.includes('•'))
+      patch.DB_PASS = body.DB_PASS;
     saveDbConfig(patch);
     audit(req.user!.login, 'settings.db', undefined, { ...patch, DB_PASS: patch.DB_PASS ? '[set]' : undefined });
     res.json({ ok: true, restartRequired: true });
@@ -171,7 +172,7 @@ export function createSettingsRouter(pool: Pool): Router {
       DB_HOST: (typeof body.DB_HOST === 'string' && body.DB_HOST.trim()) ? body.DB_HOST.trim() : current.DB_HOST,
       DB_PORT: body.DB_PORT ? Math.max(1, parseInt(String(body.DB_PORT)) || 3306) : current.DB_PORT,
       DB_USER: (typeof body.DB_USER === 'string' && body.DB_USER.trim()) ? body.DB_USER.trim() : current.DB_USER,
-      DB_PASS: (typeof body.DB_PASS === 'string' && !body.DB_PASS.includes('•')) ? body.DB_PASS : current.DB_PASS,
+      DB_PASS: (typeof body.DB_PASS === 'string' && body.DB_PASS !== '' && !body.DB_PASS.includes('•')) ? body.DB_PASS : current.DB_PASS,
       DB_NAME: (typeof body.DB_NAME === 'string' && body.DB_NAME.trim()) ? body.DB_NAME.trim() : current.DB_NAME,
     };
     let conn;

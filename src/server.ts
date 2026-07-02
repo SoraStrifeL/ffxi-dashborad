@@ -5,6 +5,9 @@ import http from 'http';
 import WebSocket from 'ws';
 import { rateLimit } from 'express-rate-limit';
 
+import { installCrashHandlers } from './crashlog';
+installCrashHandlers();
+
 import { pool } from './db';
 import { initRedis } from './cache';
 import { buildZoneMaps, loadMobCatalog, loadNpcCatalog, loadZoneCache, loadExpTable } from './catalog';
