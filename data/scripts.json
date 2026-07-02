@@ -118,5 +118,13 @@
     "code": "local p = GetPlayerByName('CharName')\nif not p then return 'Player not found' end\nlocal kiId = 1  -- replace with key item ID\np:addKeyItem(kiId)\nreturn 'Key item '..kiId..' added to '..p:getName()",
     "created": 1782117300014,
     "updated": 1782117300014
+  },
+  {
+    "id": "594d29cd-60a8-4570-a402-91d06aceb403",
+    "name": "Hello World!",
+    "description": "Hello World!",
+    "code": "print(\"Hello World!\")\n",
+    "created": 1782637204312,
+    "updated": 1782637204312
   }
 ]

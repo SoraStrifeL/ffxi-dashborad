@@ -329,8 +329,9 @@ export function createDbRouter(pool: Pool): Router {
 
   router.get('/api/db/quests', requireAuth, async (req, res) => {
     try {
-      const q   = ((req.query.q as string) || '').trim().toLowerCase();
-      const log = req.query.log !== undefined ? parseInt(req.query.log as string) : null;
+      const q    = ((req.query.q as string) || '').trim().toLowerCase();
+      const log  = req.query.log !== undefined ? parseInt(req.query.log as string) : null;
+      const page = Math.max(0, parseInt(req.query.page as string) || 0);
       const result = [];
       for (let logId = 0; logId < 11; logId++) {
         if (log !== null && logId !== log) continue;
@@ -340,7 +341,7 @@ export function createDbRouter(pool: Pool): Router {
           result.push({ logId, logName: QUEST_LOG_NAMES[logId], questId, name, reward: QUEST_REWARDS[logId]?.[questId] || null });
         }
       }
-      res.json(result);
+      res.json(result.slice(page * DB_PAGE, (page + 1) * DB_PAGE));
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 

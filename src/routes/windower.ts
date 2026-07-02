@@ -1,12 +1,76 @@
 import { Router } from 'express';
-import { WINDOWER_API_KEY, windowerPositions, windowerZoneEntities } from '../catalog';
+import { Pool, RowDataPacket } from 'mysql2/promise';
+import { WINDOWER_API_KEY, windowerPositions, windowerZoneEntities, calStore, saveCalStore } from '../catalog';
 import { broadcast, broadcastToZone } from '../ws';
 import type { WindowerPosition, ZoneEntity } from '../types';
 
-export function createWindowerRouter(): Router {
+interface WindowerDbRow { charid: number; mjob: number; mlvl: number; sjob: number; slvl: number; gmlevel: number; nation: number; }
+const windowerDbCache = new Map<string, WindowerDbRow>();
+
+function normalizeWindower(p: WindowerPosition) {
+  const db = windowerDbCache.get(p.name);
+  return {
+    charname:  p.name,
+    pos_x:     p.x,
+    pos_y:     p.z,   // Windower z = elevation (game Z) = DB pos_y
+    pos_z:     p.y,   // Windower y = north/south (game Y) = DB pos_z
+    pos_zone:  p.zone,
+    map_index: p.map_index,
+    hp:        p.hp,
+    mp:        p.mp,
+    online:    1,
+    charid:    db?.charid   ?? null,
+    mjob:      db?.mjob     ?? 0,
+    mlvl:      db?.mlvl     ?? 0,
+    sjob:      db?.sjob     ?? 0,
+    slvl:      db?.slvl     ?? 0,
+    gmlevel:   db?.gmlevel  ?? 0,
+    nation:    db?.nation   ?? 0,
+  };
+}
+
+// --- Auto-calibration from windower.ffxi.get_map_data() ---
+// The addon sends the exact pixel (on the native 512x512 map sheet) that the game
+// draws the player at, straight from the client's map DAT constants. Two samples far
+// enough apart solve the affine world->sheet transform per zone; the calibration
+// bounds are the world coords at the sheet edges. Convention matches the client
+// renderer: maxX = left edge, maxZ = top edge. Zones already in calStore are skipped.
+const SHEET = 512;
+const CAL_MIN_DELTA = 25; // world units of separation required on each axis
+interface CalSample { x: number; z: number; px: number; py: number }
+const calSamples = new Map<number, CalSample[]>();
+
+function recordCalSample(zone: number, s: CalSample): void {
+  if (calStore[zone]) return;
+  const arr = calSamples.get(zone) ?? [];
+  const mate = arr.find(o => Math.abs(o.x - s.x) >= CAL_MIN_DELTA && Math.abs(o.z - s.z) >= CAL_MIN_DELTA);
+  if (!mate) {
+    arr.push(s);
+    if (arr.length > 50) arr.shift();
+    calSamples.set(zone, arr);
+    return;
+  }
+  const sx = (s.px - mate.px) / (s.x - mate.x);
+  const sy = (s.py - mate.py) / (s.z - mate.z);
+  if (!isFinite(sx) || !isFinite(sy) || Math.abs(sx) < 0.02 || Math.abs(sy) < 0.02) return;
+  const ox = s.px - s.x * sx;
+  const oy = s.py - s.z * sy;
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  calStore[zone] = {
+    minX: r1((SHEET - ox) / sx), // world X at sheet right edge
+    maxX: r1((0 - ox) / sx),     // left edge
+    minZ: r1((SHEET - oy) / sy), // bottom edge
+    maxZ: r1((0 - oy) / sy),     // top edge
+  };
+  saveCalStore();
+  calSamples.delete(zone);
+  console.log(`[autocal] zone ${zone} calibrated from Windower map data:`, JSON.stringify(calStore[zone]));
+}
+
+export function createWindowerRouter(pool: Pool): Router {
   const router = Router();
 
-  router.post('/api/windower/position', (req, res) => {
+  router.post('/api/windower/position', async (req, res) => {
     if (!WINDOWER_API_KEY || req.headers['x-windower-key'] !== WINDOWER_API_KEY)
       return void res.status(401).json({ error: 'unauthorized' });
 
@@ -28,7 +92,33 @@ export function createWindowerRouter(): Router {
     };
     windowerPositions.set(entry.name, entry);
 
-    const zonePlayers = [...windowerPositions.values()].filter(p => p.zone === entry.zone);
+    // Optional get_map_data fields from the addon: map pixel on the native 512px sheet.
+    // Windower y = north/south = DB pos_z, so entry.y is the world Z for calibration.
+    // Only samples from sub-map 0 are used (dashboard calibration is per-zone, floor 0).
+    const { map_id, map_x, map_y } = (req.body as { map_id?: unknown; map_x?: unknown; map_y?: unknown });
+    if (map_x != null && map_y != null && parseInt(String(map_id ?? 0)) === 0) {
+      const px = parseFloat(String(map_x)), py = parseFloat(String(map_y));
+      if (isFinite(px) && isFinite(py) && px >= 0 && px <= SHEET && py >= 0 && py <= SHEET)
+        recordCalSample(entry.zone, { x: entry.x, z: entry.y, px, py });
+      else if (isFinite(px) && isFinite(py))
+        console.log(`[autocal] zone ${entry.zone}: map pixel out of 0..${SHEET} range (${px}, ${py}) — sheet size assumption may be wrong`);
+    }
+
+    // Refresh DB data for the posting player (job, level, charid for Map overlay)
+    try {
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT c.charid, c.nation, c.gmlevel, cs.mjob, cs.mlvl, cs.sjob, cs.slvl
+         FROM chars c LEFT JOIN char_stats cs ON c.charid = cs.charid
+         WHERE c.charname = ? LIMIT 1`,
+        [entry.name]
+      );
+      if (rows.length > 0) windowerDbCache.set(entry.name, rows[0] as WindowerDbRow);
+    } catch (_) {}
+
+    // Each player in the zone is normalized using their own cached DB row
+    const zonePlayers = [...windowerPositions.values()]
+      .filter(p => p.zone === entry.zone)
+      .map(normalizeWindower);
     broadcastToZone(entry.zone, 'zone_players', { zoneId: entry.zone, players: zonePlayers });
     broadcast('windower_positions', Object.fromEntries(windowerPositions));
 

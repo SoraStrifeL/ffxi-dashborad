@@ -71,13 +71,19 @@ app.use(createSettingsRouter(pool));
 app.use(createAccountsRouter(pool));
 app.use(createScriptsRouter());
 app.use(createUploadRouter(pool));
-app.use(createWindowerRouter());
+app.use(createWindowerRouter(pool));
 app.use(createFilesRouter());
 app.use(createLsbUpdateRouter());
 app.use(createDockerRouter());
 app.use(createGithubFilesRouter());
 app.use(createAdminRouter());
 loadPlugins({ pool, app });
+
+// SPA fallback — serve index.html for all non-API routes so React Router works
+app.use((req: Request, res: Response, next: NextFunction) => {
+  if (req.path.startsWith('/api/')) { next(); return; }
+  res.sendFile(path.join(__dirname, '..', 'public', 'index.html'), (err) => { if (err) next(err); });
+});
 
 // ── Global error handler ──────────────────────────────────────────────────────
 // Express 5 passes async errors here automatically; no need for try/catch wrapping.

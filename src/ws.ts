@@ -8,6 +8,8 @@ import { verifyToken } from './auth';
 import { hasPermission } from './rbac';
 import { setBroadcastAuditEvent } from './audit';
 
+type PosEntry = { i: number; n: string; x: number; y: number; z: number; z_id: number };
+
 // ── WebSocket state ────────────────────────────────────────────────────────────
 export const clients = new Map<WebSocket, WsClientState>();
 
@@ -198,9 +200,29 @@ export function startPosWatcher(): void {
       const { mtimeMs } = fs.statSync(POS_FILE);
       if (mtimeMs <= lastMtime) return;
       lastMtime = mtimeMs;
+      if (clients.size === 0) return;
       const raw = fs.readFileSync(POS_FILE, 'utf8');
-      const positions = JSON.parse(raw) as unknown;
-      if (clients.size > 0) broadcast('positions', positions);
+      const pos = JSON.parse(raw) as { players?: PosEntry[]; npcs?: PosEntry[]; mobs?: PosEntry[] };
+      const players = pos.players ?? [];
+      const npcs    = pos.npcs    ?? [];
+      const mobs    = pos.mobs    ?? [];
+
+      // Zone-watching clients receive one positions message with fully filtered data.
+      const watched = new Set<number>();
+      clients.forEach(s => { if (s.watchZone != null) watched.add(s.watchZone); });
+      watched.forEach(zid => {
+        broadcastToZone(zid, 'positions', {
+          players: players.filter(e => e.z_id === zid),
+          npcs:    npcs.filter(e => e.z_id === zid),
+          mobs:    mobs.filter(e => e.z_id === zid),
+        });
+      });
+      // Non-zone-watching clients get player positions only (chars-panel zone tracking).
+      // Always send even when players is empty so the chars panel clears on logout.
+      const posMsg = JSON.stringify({ type: 'positions', data: { players, npcs: [], mobs: [] }, ts: Date.now() });
+      clients.forEach((state, ws) => {
+        if (ws.readyState === WebSocket.OPEN && state.watchZone == null) ws.send(posMsg);
+      });
     } catch (_) {}
   }, 1000);
 }
@@ -246,7 +268,7 @@ export function initWebSocket(wss: WebSocket.Server, pool: Pool): void {
           return;
         }
         const state = clients.get(ws)!;
-        if (type === 'watch_zone') state.watchZone = data.zoneId as number;
+        if (type === 'watch_zone') state.watchZone = Number(data.zoneId);
         if (type === 'pong') wsAlive.set(ws, true);
         if (type === 'log_sub' && hasPermission(state.user.tier, 'run:console', state.user.accid))
           subscribeLog(ws, data.file as string);

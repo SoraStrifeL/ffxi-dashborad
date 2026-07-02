@@ -61,7 +61,7 @@ export function createMapRouter(pool: Pool): Router {
                ms.mobname AS name,
                ms.pos_x, ms.pos_y, ms.pos_z,
                mp.mJob, mp.aggro, mp.links,
-               mss.family, mss.ecosystem
+               mss.family, mss.ecosystem, mss.detects
         FROM mob_spawn_points ms
         LEFT JOIN mob_groups mg ON ms.groupid = mg.groupid AND ((ms.mobid>>12)&0xFFF)=mg.zoneid
         LEFT JOIN mob_pools  mp ON mg.poolid  = mp.poolid
@@ -116,7 +116,7 @@ export function createMapRouter(pool: Pool): Router {
     const zoneId = parseInt(req.params.zoneId as string);
     if (!Number.isFinite(zoneId)) { res.status(400).json({ error: 'Invalid zone' }); return; }
     const { minX, maxX, minZ, maxZ } = (req.body as { minX?: number; maxX?: number; minZ?: number; maxZ?: number }) || {};
-    if ([minX, maxX, minZ, maxZ].some(v => typeof v !== 'number' || !isFinite(v)) || (minX as number) >= (maxX as number) || (minZ as number) >= (maxZ as number)) {
+    if ([minX, maxX, minZ, maxZ].some(v => typeof v !== 'number' || !isFinite(v)) || (minX as number) === (maxX as number) || (minZ as number) === (maxZ as number)) {
       res.status(400).json({ error: 'Invalid bounds' }); return;
     }
     calStore[zoneId] = { minX, maxX, minZ, maxZ };

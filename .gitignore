@@ -7,6 +7,15 @@ node_modules/
 # Runtime state
 calibrations.json
 
+# Runtime config written by the dashboard — contains tokens/credentials
+data/*.json
+!data/scripts.json
+
+# Build artifacts (Docker builds these from src/ and client/)
+dist/
+public/assets/
+*.tsbuildinfo
+
 # Map images (648 MB — download separately; see README)
 public/maps/
 

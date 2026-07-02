@@ -137,6 +137,8 @@ function saveCalStore() {
 const WINDOWER_API_KEY = process.env.WINDOWER_API_KEY || '';
 // charname → { name, zone, x, y, z, map_index, hp, mp, tp, ts }
 const windowerPositions = new Map();
+// Per-player DB data cache — updated whenever that player sends a position update
+const windowerDbCache = new Map();
 // Evict entries with no update in the last 30 s
 setInterval(() => {
   const cutoff = Date.now() - 30_000;
@@ -290,9 +292,29 @@ function startPosWatcher() {
       const { mtimeMs } = fs.statSync(POS_FILE);
       if (mtimeMs <= lastMtime) return;
       lastMtime = mtimeMs;
+      if (clients.size === 0) return;
       const raw = fs.readFileSync(POS_FILE, 'utf8');
-      const positions = JSON.parse(raw);
-      if (clients.size > 0) broadcast('positions', positions);
+      const pos = JSON.parse(raw);
+      const players = pos.players ?? [];
+      const npcs    = pos.npcs    ?? [];
+      const mobs    = pos.mobs    ?? [];
+
+      // Zone-watching clients receive one positions message with fully filtered data.
+      const watched = new Set();
+      clients.forEach(s => { if (s.watchZone != null) watched.add(s.watchZone); });
+      watched.forEach(zid => {
+        broadcastToZone(zid, 'positions', {
+          players: players.filter(e => e.z_id === zid),
+          npcs:    npcs.filter(e => e.z_id === zid),
+          mobs:    mobs.filter(e => e.z_id === zid),
+        });
+      });
+      // Non-zone-watching clients get player positions only (chars-panel zone tracking).
+      // Always send even when players is empty so the chars panel clears on logout.
+      const posMsg = JSON.stringify({ type: 'positions', data: { players, npcs: [], mobs: [] } });
+      clients.forEach((state, ws) => {
+        if (ws.readyState === WebSocket.OPEN && state.watchZone == null) ws.send(posMsg);
+      });
     } catch (_) {}
   }, 1000);
 }
@@ -379,7 +401,7 @@ wss.on('connection', (ws) => {
         if (type === 'auth' && data?.token) acceptAuth(data.token);
         return;
       }
-      if (type === 'watch_zone') clients.get(ws).watchZone = data.zoneId;
+      if (type === 'watch_zone') clients.get(ws).watchZone = Number(data.zoneId);
       if (type === 'log_sub'   && clients.get(ws).user.tier === 'admin') subscribeLog(ws, data.file);
       if (type === 'log_unsub') unsubscribeLog(ws);
     } catch (_) {}
@@ -471,7 +493,7 @@ app.get('/api/mobs/:zone', auth.requireAuth, async (req, res) => {
              ms.mobname AS name,
              ms.pos_x, ms.pos_y, ms.pos_z,
              mp.mJob, mp.aggro, mp.links,
-             mss.family, mss.ecosystem
+             mss.family, mss.ecosystem, mss.detects
       FROM mob_spawn_points ms
       LEFT JOIN mob_groups mg ON ms.groupid = mg.groupid AND ((ms.mobid>>12)&0xFFF)=mg.zoneid
       LEFT JOIN mob_pools  mp ON mg.poolid  = mp.poolid
@@ -1721,8 +1743,9 @@ app.get('/api/db/quest-logs', auth.requireAuth, (_req, res) => {
 
 app.get('/api/db/quests', auth.requireAuth, async (req, res) => {
   try {
-    const q = (req.query.q||'').trim().toLowerCase();
-    const log = req.query.log !== undefined ? parseInt(req.query.log) : null;
+    const q    = (req.query.q||'').trim().toLowerCase();
+    const log  = req.query.log !== undefined ? parseInt(req.query.log) : null;
+    const page = Math.max(0, parseInt(req.query.page || '0'));
     const result = [];
     for (let logId = 0; logId < 11; logId++) {
       if (log !== null && logId !== log) continue;
@@ -1733,7 +1756,7 @@ app.get('/api/db/quests', auth.requireAuth, async (req, res) => {
                       reward: QUEST_REWARDS[logId]?.[questId] || null });
       }
     }
-    res.json(result);
+    res.json(result.slice(page * DB_PAGE, (page + 1) * DB_PAGE));
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -3092,7 +3115,7 @@ app.post('/api/upload/mob', auth.requireAuth, auth.requireAdmin, (req, res) => {
 });
 
 // ── Windower client → dashboard position ingestion ────────────────────────────
-app.post('/api/windower/position', (req, res) => {
+app.post('/api/windower/position', async (req, res) => {
   if (!WINDOWER_API_KEY || req.headers['x-windower-key'] !== WINDOWER_API_KEY)
     return res.status(401).json({ error: 'unauthorized' });
 
@@ -3114,8 +3137,39 @@ app.post('/api/windower/position', (req, res) => {
   };
   windowerPositions.set(entry.name, entry);
 
-  // Push immediately to clients watching this zone
-  const zonePlayers = [...windowerPositions.values()].filter(p => p.zone === entry.zone);
+  // Refresh DB data for the posting player (charid, job, level for Map overlay)
+  try {
+    const [rows] = await pool.execute(
+      `SELECT c.charid, c.nation, c.gmlevel, cs.mjob, cs.mlvl, cs.sjob, cs.slvl
+       FROM chars c LEFT JOIN char_stats cs ON c.charid = cs.charid
+       WHERE c.charname = ? LIMIT 1`, [entry.name]);
+    if (rows.length) windowerDbCache.set(entry.name, rows[0]);
+  } catch (_) {}
+
+  // Each player in the zone is normalized using their own cached DB row
+  const zonePlayers = [...windowerPositions.values()]
+    .filter(p => p.zone === entry.zone)
+    .map(e => {
+      const db = windowerDbCache.get(e.name);
+      return {
+        charname:  e.name,
+        pos_x:     e.x,
+        pos_y:     e.y,
+        pos_z:     e.z,
+        pos_zone:  e.zone,
+        map_index: e.map_index,
+        hp:        e.hp,
+        mp:        e.mp,
+        online:    1,
+        charid:    db?.charid  ?? null,
+        mjob:      db?.mjob    ?? 0,
+        mlvl:      db?.mlvl    ?? 0,
+        sjob:      db?.sjob    ?? 0,
+        slvl:      db?.slvl    ?? 0,
+        gmlevel:   db?.gmlevel ?? 0,
+        nation:    db?.nation  ?? 0,
+      };
+    });
   broadcastToZone(entry.zone, 'zone_players', { zoneId: entry.zone, players: zonePlayers });
   broadcast('windower_positions', Object.fromEntries(windowerPositions));
 
@@ -3223,6 +3277,12 @@ async function loadExpTable() {
     console.error('[exp] DB unavailable, exp table not loaded:', e.message);
   }
 }
+
+// SPA fallback — serve index.html for all non-API routes so React Router works
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  res.sendFile(path.join(__dirname, 'public', 'index.html'), (err) => { if (err) next(err); });
+});
 
 buildZoneMaps().then(() => loadExpTable()).then(async () => {
   startPosWatcher();

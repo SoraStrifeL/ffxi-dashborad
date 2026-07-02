@@ -5,6 +5,8 @@
   "main": "server.js",
   "scripts": {
     "build": "tsc",
+    "build:client": "npm run build --prefix client",
+    "build:all": "tsc && npm run build --prefix client",
     "start": "node server.js",
     "dev": "npx ts-node src/server.ts",
     "test": "vitest run",

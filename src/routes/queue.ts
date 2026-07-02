@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
-import { requireAuth } from '../auth';
+import { requireAuth, requireAdmin } from '../auth';
 import { requirePermission } from '../rbac';
 import { userOwnsChar } from '../auth';
 import { PLAYER_ALLOWED_ACTIONS } from '../catalog';
@@ -9,18 +9,31 @@ import { audit } from '../audit';
 export function createQueueRouter(pool: Pool): Router {
   const router = Router();
 
+  // Paginated queue history for the Admin tab
+  router.get('/api/queue', requireAuth, requireAdmin, async (req, res) => {
+    try {
+      const PAGE = 50;
+      const page = Math.max(0, parseInt(req.query.page as string) || 0);
+      const [rows] = await pool.execute<RowDataPacket[]>(
+        `SELECT id, charid, action, params, status, result, requested_by, created_at, processed_at
+         FROM dashboard_queue ORDER BY id DESC LIMIT ${PAGE + 1} OFFSET ${page * PAGE}`);
+      res.json({ rows: rows.slice(0, PAGE), hasMore: rows.length > PAGE });
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
+
   router.post('/api/queue', requireAuth, requirePermission('submit:queue'), async (req, res) => {
     try {
       const { charid, action, params } = (req.body as { charid?: number; action?: string; params?: unknown }) || {};
-      if (!charid || !action) { res.status(400).json({ error: 'charid and action required' }); return; }
+      // charid 0 is only meaningful for global luaexec (map-server VM)
+      if (charid === undefined || !action || (!charid && action !== 'luaexec')) { res.status(400).json({ error: 'charid and action required' }); return; }
       if (req.user!.tier !== 'admin') {
         if (!(await userOwnsChar(pool, req.user!.accid, charid))) { res.status(403).json({ error: 'not your character' }); return; }
         if (!PLAYER_ALLOWED_ACTIONS.has(action)) { res.status(403).json({ error: 'action not allowed for players' }); return; }
       }
       const paramStr = typeof params === 'string' ? params : JSON.stringify(params || {});
-      await pool.execute('INSERT INTO dashboard_queue (charid, action, params, requested_by) VALUES (?, ?, ?, ?)', [charid, action, paramStr, req.user!.login]);
+      const [result] = await pool.execute<ResultSetHeader>('INSERT INTO dashboard_queue (charid, action, params, requested_by) VALUES (?, ?, ?, ?)', [charid, action, paramStr, req.user!.login]);
       audit(req.user!.login, 'queue.action', `char:${charid}`, { action, params: paramStr });
-      res.json({ queued: true });
+      res.json({ queued: true, id: result.insertId });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 

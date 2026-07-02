@@ -29,7 +29,8 @@ services:
     ports:
       - "3001:3000"
     volumes:
-      - ./public:/app/public
+      - ./public/maps:/app/public/maps
+      - ./public/uploads:/app/public/uploads
       - ./data:/app/data
       - ffxi_ffxi-logs:/ffxi-log:ro
       - /opt/stacks/ffxi/settings:/ffxi-settings
