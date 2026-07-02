@@ -32,7 +32,7 @@ export function createMapRouter(pool: Pool): Router {
     const zoneId = parseInt(req.params.zoneId as string);
     const files  = ZONE_MAPS[zoneId];
     if (!files) { res.status(404).json({ error: 'No map for this zone' }); return; }
-    const floor    = Math.max(0, Math.min(parseInt((req.query.floor as string) || '0'), files.length - 1));
+    const floor    = Math.max(0, Math.min(parseInt((req.query.floor as string) || '0') || 0, files.length - 1));
     const filepath = path.join(MAPS_DIR, files[floor]);
     if (!fs.existsSync(filepath)) { res.status(404).json({ error: 'Map file not found on disk' }); return; }
     res.setHeader('Cache-Control', 'public, max-age=86400');

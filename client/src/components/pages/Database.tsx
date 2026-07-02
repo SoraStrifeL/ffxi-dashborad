@@ -140,12 +140,16 @@ export function Database() {
   const uploadRef = useRef<HTMLInputElement>(null);
   const user = useStore((s) => s.user);
   const [itemImageUrl, setItemImageUrl] = useState<string | null>(null);
+  // Guards against out-of-order responses: a slow request from a previous
+  // category/filter must not overwrite the rows of the current one
+  const loadSeq = useRef(0);
 
   useEffect(() => { api.zones().then(z => setZones(z)).catch(() => {}); }, []);
   useEffect(() => { api.dbItemTypes().then(setItemTypes).catch(() => {}); }, []);
   useEffect(() => { api.dbQuestLogs().then(setQuestLogs).catch(() => {}); }, []);
 
   const load = useCallback(async (reset = true) => {
+    const seq = ++loadSeq.current;
     setLoading(true);
     const p = reset ? 0 : page + 1;
     if (reset) setRows([]);
@@ -174,13 +178,13 @@ export function Database() {
         newRows = q ? GM_COMMANDS.filter(c => c.name.includes(q) || c.desc.toLowerCase().includes(q) || c.group.toLowerCase().includes(q)) : GM_COMMANDS;
       }
 
-      if (newRows !== null) {
+      if (newRows !== null && seq === loadSeq.current) {
         setRows((prev) => reset ? newRows! : [...prev, ...newRows!]);
         setHasMore(NON_PAGED.includes(cat) ? false : newRows.length === DB_PAGE);
         setPage(p);
       }
     } catch (_) {}
-    setLoading(false);
+    if (seq === loadSeq.current) setLoading(false);
   }, [cat, page, search, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir]);
 
   useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir]); // eslint-disable-line react-hooks/exhaustive-deps

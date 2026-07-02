@@ -466,7 +466,7 @@ app.get('/api/map/:zoneId', (req, res) => {
   const zoneId = parseInt(req.params.zoneId);
   const files  = ZONE_MAPS[zoneId];
   if (!files) return res.status(404).json({ error: 'No map for this zone' });
-  const floor   = Math.max(0, Math.min(parseInt(req.query.floor || 0), files.length - 1));
+  const floor   = Math.max(0, Math.min(parseInt(req.query.floor || 0) || 0, files.length - 1));
   const filepath = path.join(MAPS_DIR, files[floor]);
   if (!fs.existsSync(filepath)) return res.status(404).json({ error: 'Map file not found on disk' });
   res.setHeader('Cache-Control', 'public, max-age=86400');

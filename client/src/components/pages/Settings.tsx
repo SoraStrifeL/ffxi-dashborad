@@ -148,8 +148,10 @@ function ServerVarsPanel() {
   }
   async function addVar() {
     if (!newKey.trim()) return;
-    await api.saveServerVar(newKey.trim(), parseInt(newVal) || 0);
-    setNewKey(''); setNewVal('0'); load();
+    try {
+      await api.saveServerVar(newKey.trim(), parseInt(newVal) || 0);
+      setNewKey(''); setNewVal('0'); load();
+    } catch (_) {}
   }
 
   const visible = search ? vars.filter(v => v.varname.toLowerCase().includes(search.toLowerCase())) : vars;
@@ -258,7 +260,9 @@ function DbConfigPanel() {
 
   useEffect(() => {
     api.dashboardDb().then(r => {
-      const eff = (r as any).saved ?? (r as any).effective ?? {};
+      // `saved` holds only overrides (often {}); `effective` is the merged
+      // env+file+default config the server actually uses — show that
+      const eff = { ...((r as any).effective ?? {}), ...((r as any).saved ?? {}) };
       setCfg(r as Record<string, unknown>);
       setForm({ DB_HOST: String(eff.DB_HOST ?? ''), DB_PORT: String(eff.DB_PORT ?? '3306'), DB_USER: String(eff.DB_USER ?? ''), DB_NAME: String(eff.DB_NAME ?? ''), DB_PASS: '' });
     }).catch(() => {});
