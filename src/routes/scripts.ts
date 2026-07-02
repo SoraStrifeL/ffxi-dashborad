@@ -15,8 +15,10 @@ function writeScripts(scripts: unknown[]): void {
 }
 
 function safeBrowserPath(rel: string): string {
-  const full = path.resolve(SERVER_SCRIPTS_ROOT, rel || '');
-  if (!full.startsWith(SERVER_SCRIPTS_ROOT)) throw new Error('Invalid path');
+  const rootAbs = path.resolve(SERVER_SCRIPTS_ROOT);
+  const full = path.resolve(rootAbs, rel || '');
+  const relPath = path.relative(rootAbs, full);
+  if (relPath !== '' && (relPath.startsWith('..') || path.isAbsolute(relPath))) throw new Error('Invalid path');
   return full;
 }
 

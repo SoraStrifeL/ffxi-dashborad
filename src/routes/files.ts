@@ -28,8 +28,12 @@ export const FILE_DIRS: Record<string, DirConfig> = {
 };
 
 function safePath(root: string, sub: string): string | null {
-  const resolved = path.resolve(path.join(root, sub || ''));
-  return resolved.startsWith(path.resolve(root)) ? resolved : null;
+  const rootAbs = path.resolve(root);
+  const resolved = path.resolve(path.join(rootAbs, sub || ''));
+  // path.relative starting with '..' means resolved escaped the root;
+  // a bare startsWith would also accept sibling dirs like `${root}-other`
+  const rel = path.relative(rootAbs, resolved);
+  return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel)) ? resolved : null;
 }
 
 export function createFilesRouter(): Router {
@@ -109,7 +113,8 @@ export function createFilesRouter(): Router {
   const upload = multer({
     storage: multer.diskStorage({
       destination: (req: any, _f, cb) => cb(null, req._uploadDest ?? '/tmp'),
-      filename:    (_req, file, cb)    => cb(null, file.originalname),
+      // basename strips any client-supplied directory components (../../ traversal)
+      filename:    (_req, file, cb)    => cb(null, path.basename(file.originalname)),
     }),
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
@@ -130,8 +135,9 @@ export function createFilesRouter(): Router {
     upload(req, res, (err) => {
       if (err) return void res.status(400).json({ error: err.message });
       if (!req.file) return void res.status(400).json({ error: 'no file provided' });
-      audit(req.user!.login, 'files.upload', `${dirKey}/${sub ? sub + '/' : ''}${req.file.originalname}`);
-      res.json({ ok: true, name: req.file.originalname });
+      const stored = path.basename(req.file.originalname);
+      audit(req.user!.login, 'files.upload', `${dirKey}/${sub ? sub + '/' : ''}${stored}`);
+      res.json({ ok: true, name: stored });
     });
   });
 

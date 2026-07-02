@@ -39,6 +39,8 @@ export function createSettingsRouter(pool: Pool): Router {
       const writeVal = entry.type === 'bool'
         ? (value === true || value === 'true' ? 'true' : 'false')
         : parseFloat(String(value));
+      if (typeof writeVal === 'number' && !isFinite(writeVal))
+        return void res.status(400).json({ error: 'value must be a number' });
       const updated  = writeRate(content, key!, writeVal, entry.type);
       if (updated === content) return void res.status(400).json({ error: 'key not found in file' });
       fs.writeFileSync(filePath, updated, 'utf8');
@@ -65,6 +67,8 @@ export function createSettingsRouter(pool: Pool): Router {
       const isBool = value === 'true' || value === 'false' || value === true || value === false;
       const boolIsTrue = value === true || value === 'true';
       let writeVal: string | number = isBool ? (boolIsTrue ? 'true' : 'false') : parseFloat(String(value));
+      if (typeof writeVal === 'number' && !isFinite(writeVal))
+        return void res.status(400).json({ error: 'value must be a number' });
       let updated = writeRate(content, key!, writeVal, isBool ? 'bool' : undefined);
       if (updated === content && isBool) {
         // file uses 0/1 integers instead of true/false — write numeric equivalent

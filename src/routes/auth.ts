@@ -66,6 +66,9 @@ export function createAuthRouter(pool: Pool): Router {
         res.status(401).json({ error: 'invalid credentials' });
         return;
       }
+      // Successful logins shouldn't count toward the failure limit
+      loginAttempts.delete(`ip:${ip}`);
+      loginAttempts.delete(`acct:${String(login).toLowerCase()}`);
       audit(identity.login, 'auth.login.success', undefined, { ip, tier: identity.tier });
       res.json({ token: auth.issueToken(identity), tier: identity.tier, login: identity.login });
     } catch (e) {

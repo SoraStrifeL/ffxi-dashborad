@@ -135,7 +135,8 @@ export function createDockerRouter(): Router {
       const execR = await dockerReq('POST', `/containers/${id}/exec`, {
         AttachStdout: true,
         AttachStderr: false,
-        Cmd: ['sh', '-c', `ls -1ap "${dirPath}" 2>&1`],
+        // dirPath passed as a positional arg — never interpolated into the shell string
+        Cmd: ['sh', '-c', 'ls -1ap "$1" 2>&1', 'sh', dirPath],
       });
       if (execR.status !== 201) return void res.status(400).json({ error: execR.body?.message || 'Exec create failed' });
       const execId = execR.body.Id as string;
