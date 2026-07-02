@@ -74,7 +74,8 @@ export function createGithubFilesRouter(): Router {
     const patch: Partial<GithubFilesConfig> = {};
     if (typeof body.repo   === 'string') patch.repo   = body.repo.trim();
     if (typeof body.branch === 'string') patch.branch = body.branch.trim();
-    if (typeof body.token  === 'string' && !body.token.includes('•')) patch.token = body.token.trim();
+    // empty = unchanged (the form sends '' when untouched), masked = unchanged
+    if (typeof body.token  === 'string' && body.token !== '' && !body.token.includes('•')) patch.token = body.token.trim();
     if (body.paths && typeof body.paths === 'object') {
       patch.paths = {};
       for (const [k, v] of Object.entries(body.paths)) {

@@ -131,7 +131,8 @@ export function createLsbUpdateRouter(): Router {
     if (typeof body.forkRepo       === 'string') patch.forkRepo       = body.forkRepo.trim();
     if (typeof body.upstreamRepo   === 'string') patch.upstreamRepo   = body.upstreamRepo.trim();
     if (typeof body.upstreamBranch === 'string') patch.upstreamBranch = body.upstreamBranch.trim();
-    if (typeof body.githubToken    === 'string' && !body.githubToken.includes('•'))
+    // empty = unchanged (the form sends '' when untouched), masked = unchanged
+    if (typeof body.githubToken    === 'string' && body.githubToken !== '' && !body.githubToken.includes('•'))
       patch.githubToken = body.githubToken.trim();
     saveLsbConfig(patch);
     _cache.clear();

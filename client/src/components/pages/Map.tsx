@@ -208,26 +208,36 @@ export function MapPage() {
     if (zone !== null) loadMapImage(zone, floor);
   }, [floor, zone]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function loadMapImage(z: number, f: number) {
+  function loadMapImage(z: number, f: number, bustCache = false) {
     const app = appRef.current;
     if (!app) return;
-    if (bgSpriteRef.current) {
-      app.stage.removeChild(bgSpriteRef.current);
-      bgSpriteRef.current.destroy(true);
-      bgSpriteRef.current = null;
+    function removeOldSprite() {
+      if (bgSpriteRef.current) {
+        app!.stage.removeChild(bgSpriteRef.current);
+        bgSpriteRef.current.destroy(true);
+        bgSpriteRef.current = null;
+      }
     }
-    const url = api.mapImage(z, f);
+    // bustCache skips the 24h Cache-Control on /api/map — needed after replacing the image
+    const url = api.mapImage(z, f) + (bustCache ? `&t=${Date.now()}` : '');
     // Load via plain Image — never enters Pixi's async texture queue,
     // so there's no Pixi listener that can fire after app.destroy().
     const img = new Image();
     img.onload = () => {
       if (appRef.current !== app) return; // app was destroyed while image was loading
+      removeOldSprite(); // swap only once the new image is ready — no blank flash
       const tex = PIXI.Texture.from(img); // image is ready; tex.valid = true immediately
       const sprite = new PIXI.Sprite(tex);
       sprite.zIndex = 0; // behind all entity layers (zIndex 1-4)
       app.stage.addChild(sprite);
       bgSpriteRef.current = sprite;
       fitMap(app, sprite);
+    };
+    img.onerror = () => {
+      // New image failed to load — drop the old zone's map so entities aren't
+      // drawn over the wrong background
+      if (appRef.current !== app) return;
+      removeOldSprite();
     };
     img.src = url;
   }
@@ -915,6 +925,9 @@ export function MapPage() {
       await api.uploadMapImage(zone, file);
       setMapUploadMsg('Uploaded');
       setTimeout(() => setMapUploadMsg(''), 2500);
+      // Show the new image immediately — cache-busted, since /api/map serves
+      // with a 24h Cache-Control that would otherwise keep the old PNG
+      loadMapImage(zone, floorRef.current, true);
     } catch (err) { setMapUploadMsg((err as Error).message); }
     e.target.value = '';
   }
