@@ -75,7 +75,7 @@ export function Timers() {
     setEditForm({ name: t.name, zone: t.zone, min: String(t.respawnMin), max: String(t.respawnMax), notes: t.notes });
   }
   async function saveEdit(t: Timer) {
-    await api.saveTimer({ id: t.id, name: editForm.name.trim() || t.name, zone: editForm.zone, respawnMin: parseFloat(editForm.min)||1, respawnMax: parseFloat(editForm.max)||1, notes: editForm.notes, groupId: t.groupId, nmName: t.nmName, zoneId: t.zoneId, spawnX: t.spawnX, spawnY: t.spawnY, spawnZ: t.spawnZ, type: t.type });
+    await api.saveTimer({ id: t.id, name: editForm.name.trim() || t.name, zone: editForm.zone, respawnMin: parseFloat(editForm.min)||1, respawnMax: parseFloat(editForm.max)||1, notes: editForm.notes, groupId: t.groupId, nmName: t.nmName, zoneId: t.zoneId, spawnX: t.spawnX, spawnY: t.spawnY, spawnZ: t.spawnZ, type: t.type, roeId: t.roeId, goal: t.goal });
     setEditingId(null); load();
   }
 
@@ -111,19 +111,26 @@ export function Timers() {
       let tries = 0;
       const poll = setInterval(async () => {
         tries++;
-        const entry = await api.nmResult(r.id!);
-        if (entry.status === 'complete' && entry.result) {
-          clearInterval(poll);
-          const [spawned, hpp] = entry.result.split('|');
-          setChecks(p => ({ ...p, [t.id]: spawned === 'spawned' ? `HP ${hpp}%` : 'Not up' }));
-        } else if (entry.status === 'failed' || tries > 20) {
-          clearInterval(poll); setChecks(p => ({ ...p, [t.id]: 'timeout' }));
+        try {
+          const entry = await api.nmResult(r.id!);
+          if (entry.status === 'complete' && entry.result) {
+            clearInterval(poll);
+            const [spawned, hpp] = entry.result.split('|');
+            setChecks(p => ({ ...p, [t.id]: spawned === 'spawned' ? `HP ${hpp}%` : 'Not up' }));
+          } else if (entry.status === 'failed' || tries > 20) {
+            clearInterval(poll); setChecks(p => ({ ...p, [t.id]: 'timeout' }));
+          }
+        } catch (_) {
+          clearInterval(poll); setChecks(p => ({ ...p, [t.id]: 'error' }));
         }
       }, 600);
     } catch (_) { setChecks(p => ({ ...p, [t.id]: 'error' })); }
   }
   async function checkAll() {
-    const targets = timers.filter(t => t.groupId && t.nmName).map(t => ({ groupId: t.groupId!, nmName: t.nmName! }));
+    // Snapshot the trackable timers now — results are matched back by index,
+    // so re-filtering at poll time would misalign if the list changes meanwhile
+    const trackable = timers.filter(t => t.groupId && t.nmName);
+    const targets = trackable.map(t => ({ groupId: t.groupId!, nmName: t.nmName! }));
     if (!targets.length) return;
     setCheckAllLoading(true);
     try {
@@ -132,11 +139,12 @@ export function Timers() {
       let tries = 0;
       const poll = setInterval(async () => {
         tries++;
-        const entry = await api.nmResult(r.id!);
+        let entry;
+        try { entry = await api.nmResult(r.id!); }
+        catch (_) { clearInterval(poll); setCheckAllLoading(false); return; }
         if (entry.status === 'complete' && entry.result) {
           clearInterval(poll);
           const parts = String(entry.result).split(';');
-          const trackable = timers.filter(t => t.groupId && t.nmName);
           const newChecks: Record<string, string> = {};
           parts.forEach((p, i) => {
             const t = trackable[i];

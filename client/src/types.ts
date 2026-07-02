@@ -4,13 +4,12 @@ export interface User {
   accid: number;
 }
 
+// Shape of queryStats() — broadcast as the WS 'stats' message and /api/stats
 export interface ServerStats {
-  online: number;
+  online_players: number;
+  total_players: number;
   total_accounts: number;
-  total_chars: number;
   total_zones?: number;
-  version?: string;
-  database?: string;
 }
 
 // Shape returned by /api/players (queryPlayers) — also used in WS 'players' broadcast

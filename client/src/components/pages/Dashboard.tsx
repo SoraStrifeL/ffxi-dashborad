@@ -66,11 +66,10 @@ export function Dashboard() {
 
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 14, marginBottom: 28 }}>
-        <StatCard value={stats?.online ?? '—'} label="Online" color="var(--color-teal)" />
-        <StatCard value={stats?.total_chars ?? '—'} label="Characters" color="var(--color-accent)" />
+        <StatCard value={stats?.online_players ?? '—'} label="Online" color="var(--color-teal)" />
+        <StatCard value={stats?.total_players ?? '—'} label="Characters" color="var(--color-accent)" />
         <StatCard value={stats?.total_accounts ?? '—'} label="Accounts" color="var(--color-text2)" />
         {(stats?.total_zones ?? 0) > 0 && <StatCard value={stats!.total_zones!} label="Zones" color="var(--color-gold)" />}
-        {stats?.version && <StatCard value={stats.version} label="DB Version" color="var(--color-text3)" small />}
       </div>
 
       {/* Online players */}

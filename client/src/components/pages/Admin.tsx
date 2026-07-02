@@ -142,10 +142,10 @@ export function Admin() {
         </form>
 
         {/* Online players quick-select */}
-        {players.length > 0 && (
+        {players.some((p) => p.online) && (
           <div style={{ marginTop: 20 }}>
             <div className="section-title">Online Players</div>
-            {players.map((p) => (
+            {players.filter((p) => p.online).map((p) => (
               <button key={p.charid} onClick={() => setCharid(String(p.charid))}
                 style={{ display: 'flex', width: '100%', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 7, border: `1px solid ${charid === String(p.charid) ? 'var(--color-accent)' : 'transparent'}`, background: charid === String(p.charid) ? 'rgba(124,106,247,.1)' : 'transparent', cursor: 'pointer', marginBottom: 4, textAlign: 'left' }}>
                 <span style={{ fontSize: 13, color: 'var(--color-text1)', fontWeight: 600 }}>{p.charname}</span>

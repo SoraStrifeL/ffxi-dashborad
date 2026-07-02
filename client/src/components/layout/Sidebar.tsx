@@ -27,7 +27,7 @@ export function Sidebar() {
   const stats  = useStore((s) => s.stats);
   const logout = useStore((s) => s.logout);
 
-  const online = stats?.online ?? 0;
+  const online = stats?.online_players ?? 0;
 
   return (
     <aside style={{

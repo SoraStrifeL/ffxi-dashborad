@@ -18,6 +18,7 @@ export function Console() {
   const [history,    setHistory]    = useState<string[]>(() => { try { return JSON.parse(localStorage.getItem('luaHistory') || '[]'); } catch { return []; } });
   const histIdx = useRef(-1);
   const players = useStore((s) => s.players);
+  const wsReady = useStore((s) => s.wsReady);
   const { send } = useWS((type, data) => {
     if (type === 'log') {
       const d = data as { file: string; lines: string[] };
@@ -27,11 +28,14 @@ export function Console() {
     }
   });
 
+  // wsReady dependency: subscribe once the socket is up, and re-subscribe
+  // after a reconnect (server-side subscription state is lost on close)
   useEffect(() => {
+    if (!wsReady) return;
     setLines([]);
     send('log_sub', { file: activeFile });
     return () => { send('log_unsub', {}); };
-  }, [activeFile, send]);
+  }, [activeFile, send, wsReady]);
 
   useEffect(() => {
     if (follow) bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -71,12 +75,16 @@ export function Console() {
       let tries = 0;
       const poll = setInterval(async () => {
         tries++;
-        const entry = await api.queueEntry(id);
-        if (entry.status === 'complete' || entry.status === 'failed') {
-          clearInterval(poll); setLuaRunning(false);
-          setLuaOutput(entry.result ?? entry.status);
-        } else if (tries > 30) {
-          clearInterval(poll); setLuaRunning(false); setLuaOutput('timeout');
+        try {
+          const entry = await api.queueEntry(id);
+          if (entry.status === 'complete' || entry.status === 'failed') {
+            clearInterval(poll); setLuaRunning(false);
+            setLuaOutput(entry.result ?? entry.status);
+          } else if (tries > 30) {
+            clearInterval(poll); setLuaRunning(false); setLuaOutput('timeout');
+          }
+        } catch (err) {
+          clearInterval(poll); setLuaRunning(false); setLuaOutput((err as Error).message);
         }
       }, 500);
     } catch (e) { setLuaRunning(false); setLuaOutput((e as Error).message); }

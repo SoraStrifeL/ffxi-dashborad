@@ -64,13 +64,17 @@ export function Scripts() {
       let tries = 0;
       const poll = setInterval(async () => {
         tries++;
-        const entry = await api.queueEntry(id);
-        if (entry.status === 'complete') {
-          clearInterval(poll); setRunning(false);
-          setOutput(entry.result ?? '(no output)');
-        } else if (entry.status === 'failed' || tries > 30) {
-          clearInterval(poll); setRunning(false);
-          setOutput(entry.result ?? entry.status);
+        try {
+          const entry = await api.queueEntry(id);
+          if (entry.status === 'complete') {
+            clearInterval(poll); setRunning(false);
+            setOutput(entry.result ?? '(no output)');
+          } else if (entry.status === 'failed' || tries > 30) {
+            clearInterval(poll); setRunning(false);
+            setOutput(entry.result ?? entry.status);
+          }
+        } catch (err) {
+          clearInterval(poll); setRunning(false); setOutput((err as Error).message);
         }
       }, 500);
     } catch (e) { setRunning(false); setOutput((e as Error).message); }

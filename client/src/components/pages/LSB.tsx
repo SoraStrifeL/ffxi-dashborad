@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../api';
 
+type LsbCommit = { sha: string; message: string; author: string; date: string };
 interface LsbStatus {
-  fork?: { branch?: string; sha?: string; shortSha?: string; date?: string; message?: string };
+  fork?: { branch?: string; sha?: string; shortSha?: string; date?: string; message?: string; error?: string };
   upstream?: { sha?: string; shortSha?: string; date?: string; message?: string };
-  comparison?: { status?: string; behindBy?: number; aheadBy?: number; commits?: { sha: string; message: string; author: string; date: string }[] };
+  forkVsUpstream?: { status?: string; behindBy?: number; aheadBy?: number };
+  forkMissingCommits?: LsbCommit[];
+  localVsRef?: { status?: string; behindBy?: number; aheadBy?: number; comparedTo?: string };
+  localMissingCommits?: LsbCommit[];
   error?: string;
 }
 interface LsbCfg { serverPath?: string; forkRepo?: string; upstreamRepo?: string; upstreamBranch?: string; githubToken?: string }
@@ -37,7 +41,9 @@ export function LSB() {
     setSavingCfg(false);
   }
 
-  const cmp = status?.comparison;
+  // Prefer the fork↔upstream comparison; fall back to local↔ref when no fork configured
+  const cmp = status?.forkVsUpstream ?? status?.localVsRef;
+  const commits = (status?.forkVsUpstream ? status?.forkMissingCommits : status?.localMissingCommits) ?? [];
   const behind = cmp?.behindBy ?? 0;
 
   return (
@@ -112,10 +118,10 @@ export function LSB() {
                 {(cmp.aheadBy ?? 0) > 0 && <span style={{ fontSize: 13, color: 'var(--color-gold)' }}>{cmp.aheadBy} ahead</span>}
                 {behind === 0 && <span style={{ fontSize: 13, color: 'var(--color-teal)' }}>Up to date</span>}
               </div>
-              {(cmp.commits ?? []).length > 0 && (
+              {commits.length > 0 && (
                 <div>
                   <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--color-text3)', marginBottom: 6 }}>Upstream commits ahead</div>
-                  {(cmp.commits ?? []).map(c => (
+                  {commits.map(c => (
                     <div key={c.sha} style={{ display: 'flex', gap: 10, padding: '5px 0', borderBottom: '1px solid rgba(42,42,61,.3)', fontSize: 12 }}>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--color-accent)', flexShrink: 0, width: 54 }}>{c.sha}</span>
                       <span style={{ flex: 1, color: 'var(--color-text1)' }}>{c.message}</span>
