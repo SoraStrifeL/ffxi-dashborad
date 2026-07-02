@@ -121,6 +121,8 @@ export function Database() {
   const [hasMore, setHasMore] = useState(false);
   const [page, setPage]   = useState(0);
   const [search, setSearch] = useState(navState?.search ?? '');
+  const [sortKey, setSortKey] = useState('');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [zoneFilter, setZoneFilter] = useState('');
   const [jobFilter, setJobFilter] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<number | null>(null);
@@ -148,6 +150,7 @@ export function Database() {
     const p = reset ? 0 : page + 1;
     if (reset) setRows([]);
     const params: Record<string, string | number> = { page: p, q: search, zone: zoneFilter };
+    if (sortKey && !NON_PAGED.includes(cat)) { params.sort = sortKey; params.dir = sortDir; }
     if (cat === 'abilities' && jobFilter !== null) params.job = jobFilter;
     if (cat === 'items' && typeFilter !== null) params.type = typeFilter;
     if (cat === 'quests' && questLogFilter !== null) params.log = questLogFilter;
@@ -178,14 +181,36 @@ export function Database() {
       }
     } catch (_) {}
     setLoading(false);
-  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, questLogFilter]);
+  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir]);
 
-  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, questLogFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); load(true); };
 
   const cols = getColumns(cat);
   const paged = !NON_PAGED.includes(cat);
+
+  function onSort(key: string) {
+    if (sortKey === key) {
+      if (sortDir === 'asc') setSortDir('desc');
+      else { setSortKey(''); setSortDir('asc'); } // third click clears the sort
+    } else { setSortKey(key); setSortDir('asc'); }
+  }
+
+  // Non-paged categories hold the full result set, so sort them client-side;
+  // paged categories are sorted server-side via the sort/dir params.
+  const displayRows = React.useMemo(() => {
+    if (!sortKey || paged) return rows;
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...rows].sort((ra, rb) => {
+      const av = (ra as Record<string, unknown>)[sortKey], bv = (rb as Record<string, unknown>)[sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+      return String(av).localeCompare(String(bv)) * dir;
+    });
+  }, [rows, sortKey, sortDir, paged]);
   const hasZoneFilter     = cat === 'npcs' || cat === 'mobs';
   const hasJobFilter      = cat === 'abilities';
   const hasTypeFilter     = cat === 'items';
@@ -257,7 +282,7 @@ export function Database() {
       <div style={{ width: 160, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)', padding: '12px 8px', flexShrink: 0, overflowY: 'auto' }}>
         <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--color-text3)', padding: '4px 8px 10px' }}>Database</div>
         {CATS.map(({ key, label }) => (
-          <button key={key} onClick={() => { setCat(key); setSearch(''); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setQuestLogFilter(null); setDetailRow(null); setDetailData(null); }}
+          <button key={key} onClick={() => { setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setQuestLogFilter(null); setDetailRow(null); setDetailData(null); }}
             style={{
               display: 'block', width: '100%', textAlign: 'left',
               padding: '8px 10px', borderRadius: 7, border: 'none', fontSize: 13,
@@ -313,10 +338,15 @@ export function Database() {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <table>
             <thead>
-              <tr>{cols.map((c) => <th key={c.key}>{c.label}</th>)}</tr>
+              <tr>{cols.map((c) => (
+                <th key={c.key} onClick={() => onSort(c.key)} title="Click to sort"
+                  style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', color: sortKey === c.key ? 'var(--color-accent)' : undefined }}>
+                  {c.label}{sortKey === c.key ? (sortDir === 'asc' ? ' ▲' : ' ▼') : ''}
+                </th>
+              ))}</tr>
             </thead>
             <tbody>
-              {rows.map((row, i) => (
+              {displayRows.map((row, i) => (
                 <tr key={i} onClick={isClickable ? () => openDetail(row as Record<string, unknown>) : undefined}
                   style={isClickable ? { cursor: 'pointer' } : undefined}>
                   {cols.map((c) => (
@@ -672,7 +702,7 @@ const ACTION_TYPE: Record<number, string> = { 3: 'Ranged', 6: 'JA', 13: 'Pet' };
 
 function getColumns(cat: Category): ColDef[] {
   switch (cat) {
-    case 'items':    return [{ key: 'itemid', label: 'ID', color: 'var(--color-text3)' }, { key: 'name', label: 'Name', color: 'var(--color-text1)', render: fmtName }, { key: 'type', label: 'Type' }, { key: 'stackSize', label: 'Stack' }];
+    case 'items':    return [{ key: 'itemid', label: 'ID', color: 'var(--color-text3)' }, { key: 'name', label: 'Name', color: 'var(--color-text1)', render: fmtName }, { key: 'type', label: 'Type' }, { key: 'stackSize', label: 'Stack' }, { key: 'level', label: 'Lv' }, { key: 'BaseSell', label: 'Sell', render: (v) => v != null && Number(v) > 0 ? Number(v).toLocaleString() : '—' }];
     case 'npcs':     return [{ key: 'npcid', label: 'ID', color: 'var(--color-text3)' }, { key: 'name', label: 'Name', color: 'var(--color-text1)', render: fmtName }, { key: 'zone', label: 'Zone', render: fmtName }, { key: 'x', label: 'X', render: (v) => v != null ? Number(v).toFixed(1) : '—' }, { key: 'z', label: 'Z', render: (v) => v != null ? Number(v).toFixed(1) : '—' }];
     case 'mobs':     return [{ key: 'name', label: 'Name', color: 'var(--color-text1)', render: fmtName }, { key: 'zone', label: 'Zone', render: fmtName }, { key: 'min_lvl', label: 'Min Lv' }, { key: 'max_lvl', label: 'Max Lv' }, { key: 'family', label: 'Family', render: fmtName }, { key: 'aggro', label: 'Aggro', render: (v) => v ? <span style={{ color: 'var(--color-red)' }}>✓</span> : <span style={{ color: 'var(--color-text3)' }}>—</span> }];
     case 'zones':    return [{ key: 'zoneid', label: 'ID', color: 'var(--color-text3)' }, { key: 'name', label: 'Name', color: 'var(--color-text1)', render: fmtName }, { key: 'npc_count', label: 'NPCs' }, { key: 'mob_count', label: 'Mobs' }];

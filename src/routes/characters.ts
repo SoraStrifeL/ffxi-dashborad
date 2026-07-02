@@ -305,7 +305,7 @@ export function createCharactersRouter(pool: Pool): Router {
       if (req.user!.tier !== 'admin' && !(await userOwnsChar(pool, req.user!.accid, charid)))
         { res.status(403).json({ error: 'not your character' }); return; }
       const [rows] = await pool.execute<RowDataPacket[]>(
-        `SELECT ci.slot, ci.itemId, ci.quantity, ci.bazaar, CONVERT(ib.name USING utf8) AS name
+        `SELECT ci.location, ci.slot, ci.itemId, ci.quantity, ci.bazaar, CONVERT(ib.name USING utf8) AS name
         FROM char_inventory ci LEFT JOIN item_basic ib ON ci.itemId = ib.itemid
         WHERE ci.charid = ? AND ci.location = 0 AND ci.itemId != 65535 ORDER BY ci.slot`, [charid]);
       res.json(rows);

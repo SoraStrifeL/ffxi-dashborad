@@ -20,8 +20,20 @@ export function createDbRouter(pool: Pool): Router {
     .map(([id, name]: [string, string]) => ({ id: Number(id), name }));
 
   const ITEM_NUMERIC_COLS: Record<string, string> = {
-    level: 'ie.level', ilevel: 'ie.ilevel', dmg: 'iw.dmg', sell: 'ib.BaseSell',
+    level: 'ie.level', ilevel: 'ie.ilevel', dmg: 'iw.dmg', sell: 'ib.BaseSell', BaseSell: 'ib.BaseSell',
   };
+
+  // Generic comparator for in-memory catalogs: numbers numerically, strings via
+  // localeCompare, null/undefined always last regardless of direction.
+  const cmpBy = (key: string, dir: 1 | -1) => (a: Record<string, unknown>, b: Record<string, unknown>) => {
+    const av = a[key], bv = b[key];
+    if (av == null && bv == null) return 0;
+    if (av == null) return 1;
+    if (bv == null) return -1;
+    if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir;
+    return String(av).localeCompare(String(bv)) * dir;
+  };
+  const sortDir = (req: { query: Record<string, unknown> }): 1 | -1 => (req.query.dir as string) === 'desc' ? -1 : 1;
 
   router.get('/api/db/items', requireAuth, async (req, res) => {
     try {
@@ -36,10 +48,17 @@ export function createDbRouter(pool: Pool): Router {
       const skill = req.query.skill !== undefined && req.query.skill !== '' ? parseInt(req.query.skill as string) : null;
       const slotBit = req.query.slot ? parseInt(req.query.slot as string) : null;
       const page = Math.max(0, parseInt((req.query.page as string) || '0'));
-      const sortMap: Record<string, string> = { level: 'ie.level DESC, ib.itemid', ilevel: 'ie.ilevel DESC, ib.itemid', sell: 'ib.BaseSell DESC, ib.itemid', dmg: 'iw.dmg DESC, ib.itemid', name: 'ib.name ASC' };
-      // numeric sorts only apply when a filter value is active; without one, fall back to ID
-      // so items with no equipment row (NULL level/dmg etc.) remain on page 0
-      const orderBy = (qNumVal !== null && numCol) ? sortMap[sort] : (numCol ? 'ib.itemid' : sortMap[sort] || 'ib.itemid');
+      const SORT_COLS: Record<string, string> = {
+        itemid: 'ib.itemid', name: 'ib.name', type: 'ib.type', stackSize: 'ib.stackSize',
+        sell: 'ib.BaseSell', BaseSell: 'ib.BaseSell', level: 'ie.level', ilevel: 'ie.ilevel', dmg: 'iw.dmg',
+      };
+      const dirRaw = (req.query.dir as string) || '';
+      let orderBy = 'ib.itemid ASC';
+      if (SORT_COLS[sort]) {
+        // default: names ascend, numeric stats descend; NULLs (no equipment row) always last
+        const d = dirRaw === 'asc' ? 'ASC' : dirRaw === 'desc' ? 'DESC' : (sort === 'name' ? 'ASC' : 'DESC');
+        orderBy = `(${SORT_COLS[sort]} IS NULL), ${SORT_COLS[sort]} ${d}, ib.itemid ASC`;
+      }
       const params: (string | number | null)[] = [];
       const extra: string[] = [];
       if (qNumVal !== null) {
@@ -185,8 +204,8 @@ export function createDbRouter(pool: Pool): Router {
     if (q)      rows = rows.filter(r => (r.name as string).toLowerCase().includes(q));
     if (zone)   rows = rows.filter(r => r.zone && (r.zone as string).toLowerCase().includes(zone));
     if (region) rows = rows.filter(r => _mobRegionMatch((r.zone as string) || '', region));
-    if (sort === 'zone') rows = [...rows].sort((a, b) => ((a.zone as string) || '').localeCompare((b.zone as string) || '') || (a.name as string).localeCompare(b.name as string));
-    else if (sort === 'name') rows = [...rows].sort((a, b) => (a.name as string).localeCompare(b.name as string));
+    const NPC_SORT = new Set(['npcid', 'name', 'zone', 'x', 'z']);
+    if (NPC_SORT.has(sort)) rows = [...rows].sort(cmpBy(sort, sortDir(req)));
     res.json(rows.slice(page * DB_PAGE, page * DB_PAGE + DB_PAGE).map(r => ({ ...r, _total: undefined })));
   });
 
@@ -202,10 +221,9 @@ export function createDbRouter(pool: Pool): Router {
     if (zone)      rows = rows.filter(r => r.zone && (r.zone as string).toLowerCase().includes(zone));
     if (region)    rows = rows.filter(r => _mobRegionMatch((r.zone as string) || '', region));
     if (ecosystem) rows = rows.filter(r => r.ecosystem === ecosystem);
-    if (sort === 'zone')    rows = [...rows].sort((a, b) => ((a.zone as string) || '').localeCompare((b.zone as string) || '') || (a.name as string).localeCompare(b.name as string));
-    else if (sort === 'level')  rows = [...rows].sort((a, b) => ((b.max_lvl as number) || 0) - ((a.max_lvl as number) || 0) || (a.name as string).localeCompare(b.name as string));
-    else if (sort === 'spawns') rows = [...rows].sort((a, b) => ((b.spawns as number) || 0) - ((a.spawns as number) || 0) || (a.name as string).localeCompare(b.name as string));
-    else if (sort === 'family') rows = [...rows].sort((a, b) => ((a.family as string) || '').localeCompare((b.family as string) || '') || (a.name as string).localeCompare(b.name as string));
+    const MOB_SORT = new Set(['name', 'zone', 'min_lvl', 'max_lvl', 'family', 'aggro', 'spawns', 'ecosystem']);
+    if (sort === 'level') rows = [...rows].sort(cmpBy('max_lvl', sortDir(req)));
+    else if (MOB_SORT.has(sort)) rows = [...rows].sort(cmpBy(sort, sortDir(req)));
     res.json(rows.slice(page * DB_PAGE, page * DB_PAGE + DB_PAGE));
   });
 
@@ -341,17 +359,20 @@ export function createDbRouter(pool: Pool): Router {
           result.push({ logId, logName: QUEST_LOG_NAMES[logId], questId, name, reward: QUEST_REWARDS[logId]?.[questId] || null });
         }
       }
-      res.json(result.slice(page * DB_PAGE, (page + 1) * DB_PAGE));
+      const sort = (req.query.sort as string) || '';
+      const QUEST_SORT = new Set(['questId', 'name', 'logName', 'logId']);
+      const sorted = QUEST_SORT.has(sort) ? [...result].sort(cmpBy(sort, sortDir(req))) : result;
+      res.json(sorted.slice(page * DB_PAGE, (page + 1) * DB_PAGE));
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
   router.get('/api/db/keyitems', requireAuth, (req, res) => {
     const q = ((req.query.q as string) || '').toLowerCase().trim();
     const page = Math.max(0, parseInt(req.query.page as string) || 0);
-    const entries = KEY_ITEM_SORTED
-      .filter(e => !q || e.name.toLowerCase().includes(q))
-      .slice(page * DB_PAGE, (page + 1) * DB_PAGE);
-    res.json(entries);
+    const sort = (req.query.sort as string) || '';
+    let entries: Record<string, unknown>[] = KEY_ITEM_SORTED.filter(e => !q || e.name.toLowerCase().includes(q));
+    if (sort === 'id' || sort === 'name') entries = [...entries].sort(cmpBy(sort, sortDir(req)));
+    res.json(entries.slice(page * DB_PAGE, (page + 1) * DB_PAGE));
   });
 
   router.get('/api/db/skills', requireAuth, async (req, res) => {
@@ -421,13 +442,17 @@ export function createDbRouter(pool: Pool): Router {
       const q = `%${((req.query.q as string) || '').trim()}%`;
       const job = req.query.job !== undefined ? parseInt(req.query.job as string) : null;
       const page = Math.max(0, parseInt((req.query.page as string) || '0'));
+      const sort = (req.query.sort as string) || '';
+      const ABILITY_SORT: Record<string, string> = { name: 'a.name', job: 'a.job', level: 'a.level', actionType: 'a.actionType' };
+      const d = (req.query.dir as string) === 'desc' ? 'DESC' : 'ASC';
+      const orderBy = ABILITY_SORT[sort] ? `${ABILITY_SORT[sort]} ${d}, a.abilityId ASC` : 'a.job, a.level, a.abilityId';
       const params: (string | number)[] = [q];
       let where = 'WHERE a.name IS NOT NULL AND a.name != \'\' AND a.name LIKE ?';
       if (job !== null && !isNaN(job)) { where += ' AND a.job = ?'; params.push(job); }
       params.push(DB_PAGE, page * DB_PAGE);
       const [rows] = await pool.execute<RowDataPacket[]>(
         `SELECT a.abilityId, a.name, a.job, a.level, a.recastTime, a.castTime, a.actionType, a.range, a.isAOE
-         FROM abilities a ${where} ORDER BY a.job, a.level, a.abilityId LIMIT ? OFFSET ?`,
+         FROM abilities a ${where} ORDER BY ${orderBy} LIMIT ? OFFSET ?`,
         params
       );
       res.json(rows);
