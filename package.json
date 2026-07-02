@@ -38,7 +38,6 @@
     "@types/supertest": "^7.2.0",
     "@types/ws": "^8.5.14",
     "@vitest/coverage-v8": "^4.1.9",
-    "playwright": "^1.61.1",
     "supertest": "^7.2.2",
     "typescript": "^5.8.3",
     "vitest": "^4.1.9"

@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { Pool, RowDataPacket } from 'mysql2/promise';
+import { requireAuth } from '../auth';
 import { WINDOWER_API_KEY, windowerPositions, windowerZoneEntities, calStore, saveCalStore } from '../catalog';
 import { broadcast, broadcastToZone } from '../ws';
 import type { WindowerPosition, ZoneEntity } from '../types';
@@ -154,8 +155,8 @@ export function createWindowerRouter(pool: Pool): Router {
     res.json({ ok: true, count: record.entities.length });
   });
 
-  router.get('/api/windower/zone_entities/:zoneId', (req, res) => {
-    const zoneId = parseInt(req.params.zoneId);
+  router.get('/api/windower/zone_entities/:zoneId', requireAuth, (req, res) => {
+    const zoneId = parseInt(req.params.zoneId as string);
     const record = windowerZoneEntities.get(zoneId);
     if (!record) return void res.status(404).json({ error: 'no entity data for this zone' });
     res.json({ zoneId, ...record });
@@ -171,8 +172,8 @@ export function createWindowerRouter(pool: Pool): Router {
     const { message, system, model, max_tokens } = (req.body as any) || {};
     if (!message) return void res.status(400).json({ error: 'message required' });
 
-    const ALLOWED_MODELS = new Set(['claude-haiku-4-5-20251001', 'claude-sonnet-4-6']);
-    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-4-6';
+    const ALLOWED_MODELS = new Set(['claude-haiku-4-5-20251001', 'claude-sonnet-5', 'claude-opus-4-8']);
+    const safeModel = ALLOWED_MODELS.has(model) ? model : 'claude-sonnet-5';
     const safeMaxTokens = Math.min(Math.max(1, parseInt(max_tokens) || 1024), 2048);
 
     try {

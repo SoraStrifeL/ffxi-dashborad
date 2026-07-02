@@ -399,12 +399,15 @@ export function createDbRouter(pool: Pool): Router {
 
   router.get('/api/db/jobs', requireAuth, async (_req, res) => {
     try {
-      const sel = JOBS_LIST.map(j => `cj.${j}`).join(', ');
-      const [rows] = await pool.execute<RowDataPacket[]>(`SELECT ${sel} FROM chars c JOIN char_jobs cj ON cj.charid = c.charid`);
-      const stats = JOBS_LIST.map(job => {
-        const leveled = rows.filter(r => (r[job] as number) > 1);
-        return { job, max: leveled.length ? Math.max(...leveled.map(r => r[job] as number)) : 0, count: leveled.length };
-      });
+      // Aggregate in SQL instead of pulling every char_jobs row into Node.
+      // "leveled" = above the level-1 default; MAX over only those rows.
+      const sel = JOBS_LIST.map(j =>
+        `MAX(CASE WHEN cj.${j} > 1 THEN cj.${j} ELSE 0 END) AS ${j}_max, SUM(cj.${j} > 1) AS ${j}_count`).join(', ');
+      const [[r]] = await pool.execute<RowDataPacket[]>(
+        `SELECT ${sel} FROM chars c JOIN char_jobs cj ON cj.charid = c.charid`);
+      const stats = JOBS_LIST.map(job => ({
+        job, max: Number(r?.[`${job}_max`] ?? 0), count: Number(r?.[`${job}_count`] ?? 0),
+      }));
       res.json(stats);
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });

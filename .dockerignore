@@ -4,3 +4,15 @@ dist
 public/assets
 .git
 *.log
+
+# Map images (1.1 GB) are volume-mounted at runtime (docker-compose.yml) —
+# never bake them into the image or ship them in the build context
+public/maps
+public/uploads
+map_download
+
+# Not needed to build or run the image
+tests
+addons
+.env
+data

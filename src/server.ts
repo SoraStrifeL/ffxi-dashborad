@@ -101,6 +101,17 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 initWebSocket(wss, pool);
 setInterval(() => pollAndBroadcast(pool), 3000);
 
+// ── Graceful shutdown ─────────────────────────────────────────────────────────
+// Without this, docker stop waits its full 10 s kill timeout on every deploy.
+process.on('SIGTERM', () => {
+  console.log('[shutdown] SIGTERM — closing server');
+  wss.clients.forEach(c => c.terminate()); // WS sockets would hold server.close() open
+  server.close(() => {
+    pool.end().catch(() => {}).finally(() => process.exit(0));
+  });
+  setTimeout(() => process.exit(0), 5000).unref(); // don't hang on stray sockets
+});
+
 // ── Startup sequence ──────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT || '3000');
 

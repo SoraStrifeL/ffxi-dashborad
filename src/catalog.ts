@@ -110,15 +110,17 @@ export async function buildZoneMaps(pool: Pool): Promise<void> {
 
 // ── Shared queries ─────────────────────────────────────────────────────────────
 export async function queryStats(pool: Pool): Promise<Record<string, number>> {
-  const [[r1]] = await pool.execute<RowDataPacket[]>('SELECT COUNT(*) AS total_players  FROM chars');
-  const [[r2]] = await pool.execute<RowDataPacket[]>('SELECT COUNT(*) AS total_accounts FROM accounts');
-  const [[r3]] = await pool.execute<RowDataPacket[]>('SELECT COUNT(*) AS online_players FROM accounts_sessions');
-  const [[r4]] = await pool.execute<RowDataPacket[]>('SELECT COUNT(*) AS total_zones    FROM zone_settings');
+  // Single round-trip — this runs on the 3 s broadcast poll
+  const [[r]] = await pool.execute<RowDataPacket[]>(`
+    SELECT (SELECT COUNT(*) FROM chars)             AS total_players,
+           (SELECT COUNT(*) FROM accounts)          AS total_accounts,
+           (SELECT COUNT(*) FROM accounts_sessions) AS online_players,
+           (SELECT COUNT(*) FROM zone_settings)     AS total_zones`);
   return {
-    total_players:  r1.total_players  as number,
-    total_accounts: r2.total_accounts as number,
-    online_players: r3.online_players as number,
-    total_zones:    r4.total_zones    as number,
+    total_players:  Number(r.total_players),
+    total_accounts: Number(r.total_accounts),
+    online_players: Number(r.online_players),
+    total_zones:    Number(r.total_zones),
   };
 }
 

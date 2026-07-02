@@ -43,6 +43,7 @@ export function createSettingsRouter(pool: Pool): Router {
         return void res.status(400).json({ error: 'value must be a number' });
       const updated  = writeRate(content, key!, writeVal, entry.type);
       if (updated === content) return void res.status(400).json({ error: 'key not found in file' });
+      fs.copyFileSync(filePath, `${filePath}.bak`); // last-known-good before every write
       fs.writeFileSync(filePath, updated, 'utf8');
       audit(req.user!.login, 'settings.rate', key!, { value: writeVal, file: entry.file });
       res.json({ ok: true });
@@ -76,6 +77,7 @@ export function createSettingsRouter(pool: Pool): Router {
         updated = writeRate(content, key!, writeVal);
       }
       if (updated === content) return void res.status(400).json({ error: 'key not found in file' });
+      fs.copyFileSync(filePath, `${filePath}.bak`); // last-known-good before every write
       fs.writeFileSync(filePath, updated, 'utf8');
       audit(req.user!.login, 'settings.scan', `${file}:${key}`, { value: writeVal });
       res.json({ ok: true });
