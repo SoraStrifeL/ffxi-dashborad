@@ -289,11 +289,11 @@ export function createCharactersRouter(pool: Pool): Router {
                CONVERT(ib.name USING utf8) AS name
         FROM char_inventory ci
         LEFT JOIN item_basic ib ON ci.itemId = ib.itemid
-        WHERE ci.charid = ? AND ci.location NOT IN (0,2,3,17) AND ci.itemId != 0
+        WHERE ci.charid = ? AND ci.location NOT IN (0,3,17) AND ci.itemId != 0
         ORDER BY ci.location, ci.slot
       `, [charid]);
       const [[storage]] = await pool.execute<RowDataPacket[]>(
-        `SELECT safe,locker,satchel,\`case\`,wardrobe,wardrobe2,wardrobe3,wardrobe4,
+        `SELECT safe,locker,satchel,sack,\`case\`,wardrobe,wardrobe2,wardrobe3,wardrobe4,
                 wardrobe5,wardrobe6,wardrobe7,wardrobe8 FROM char_storage WHERE charid=?`, [charid]);
       res.json({ items, storage: storage || null });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }

@@ -7,8 +7,10 @@ import type { Player, CharBasic, CharExtended, Skill } from '../../types';
 const JOB  = ['','WAR','MNK','WHM','BLM','RDM','THF','PLD','DRK','BST','BRD','RNG','SAM','NIN','DRG','SMN','BLU','COR','PUP','DNC','SCH','GEO','RUN'];
 const RACE = ['','Hume (M)','Hume (F)','Elvaan (M)','Elvaan (F)','Tarutaru (M)','Tarutaru (F)','Mithra','Galka'];
 const SLOT: Record<number, string> = {0:'Main',1:'Sub',2:'Range',3:'Ammo',4:'Head',5:'Body',6:'Hands',7:'Legs',8:'Feet',9:'Neck',10:'Waist',11:'L.Ear',12:'R.Ear',13:'L.Ring',14:'R.Ring',15:'Back'};
-const BAGS: Record<number, string> = {0:'Inventory',1:'Safe',2:'Storage',3:'Locker',4:'Satchel',5:'Sack',6:'Case',7:'Wardrobe',8:'Wardrobe 2',9:'Wardrobe 3',10:'Wardrobe 4'};
-const BAG_MAX: Record<number, number> = {0:80,1:60,2:80,3:80,4:80,5:80,6:80,7:80};
+// LSB CONTAINER_ID values (char_inventory.location)
+const BAGS: Record<number, string> = {0:'Inventory',1:'Mog Safe',2:'Storage',3:'Temp Items',4:'Mog Locker',5:'Satchel',6:'Sack',7:'Case',8:'Wardrobe',9:'Mog Safe 2',10:'Wardrobe 2',11:'Wardrobe 3',12:'Wardrobe 4',13:'Wardrobe 5',14:'Wardrobe 6',15:'Wardrobe 7',16:'Wardrobe 8',17:'Recycle Bin'};
+// location → char_storage capacity column
+const LOC_STORAGE_KEY: Record<number, string> = {0:'inventory',1:'safe',4:'locker',5:'satchel',6:'sack',7:'case',8:'wardrobe',10:'wardrobe2',11:'wardrobe3',12:'wardrobe4'};
 
 function fmtRelTime(ts: number) {
   const secs = Math.floor((Date.now() / 1000) - ts);
@@ -214,7 +216,7 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
       <Panel title="Stats">
         <Row k="HP"    v={String(totalHp)} />
         <Row k="MP"    v={String(totalMp)} />
-        <Row k="Nation" v={['None','San d\'Oria','Bastok','Windurst'][char.nation] ?? '?'} />
+        <Row k="Nation" v={['San d\'Oria','Bastok','Windurst','Other'][char.nation] ?? '?'} />
         <Row k="Rank points" v={String(p.rank_points ?? '—')} />
         <Row k="Fame (Sandy)" v={String(p.fame_sandoria ?? '—')} />
         {char.zone_name && (
@@ -229,7 +231,7 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
       </Panel>
       <Panel title="Inventory">
         {bagCounts.map((b) => {
-          const max = (storage as Record<string, number>)[Object.keys(storage)[b.location]] ?? BAG_MAX[b.location] ?? 80;
+          const max = (storage as Record<string, number>)[LOC_STORAGE_KEY[b.location]] ?? 80;
           return (
             <div key={b.location} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12 }}>
               <span style={{ color: 'var(--color-text3)', width: 90, flexShrink: 0 }}>{BAGS[b.location] ?? `Bag ${b.location}`}</span>
@@ -392,8 +394,8 @@ function CharBags({ charId }: { charId: number }) {
   const bagIds = Object.keys(byBag).map(Number).filter(n => !isNaN(n)).sort((a, b) => a - b);
 
   const STORAGE_KEYS: Record<string, number> = {
-    safe: 1, locker: 3, satchel: 4, case: 6, wardrobe: 7,
-    wardrobe2: 8, wardrobe3: 9, wardrobe4: 10,
+    safe: 1, locker: 4, satchel: 5, sack: 6, case: 7, wardrobe: 8,
+    wardrobe2: 10, wardrobe3: 11, wardrobe4: 12,
   };
   const capacities = data.storage ?? {};
 
@@ -661,9 +663,13 @@ function CharAdmin({ char }: { char: CharBasic }) {
       let tries = 0;
       const poll = setInterval(async () => {
         tries++;
-        const e = await api.queueEntry(id);
-        if (e.status === 'complete' || e.status === 'failed' || tries > 30) {
-          clearInterval(poll); setBusy(false); setOut(e.result ?? e.status);
+        try {
+          const e = await api.queueEntry(id);
+          if (e.status === 'complete' || e.status === 'failed' || tries > 30) {
+            clearInterval(poll); setBusy(false); setOut(e.result ?? e.status);
+          }
+        } catch (err) {
+          clearInterval(poll); setBusy(false); setOut((err as Error).message);
         }
       }, 500);
     } catch (e) { setBusy(false); setOut((e as Error).message); }

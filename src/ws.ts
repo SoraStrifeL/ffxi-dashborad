@@ -268,7 +268,11 @@ export function initWebSocket(wss: WebSocket.Server, pool: Pool): void {
           return;
         }
         const state = clients.get(ws)!;
-        if (type === 'watch_zone') state.watchZone = Number(data.zoneId);
+        if (type === 'watch_zone') {
+          const z = Number(data?.zoneId);
+          state.watchZone = Number.isFinite(z) ? z : null;
+        }
+        if (type === 'unwatch_zone') state.watchZone = null;
         if (type === 'pong') wsAlive.set(ws, true);
         if (type === 'log_sub' && hasPermission(state.user.tier, 'run:console', state.user.accid))
           subscribeLog(ws, data.file as string);

@@ -107,6 +107,7 @@ export function MapPage() {
   const mapUploadRef = useRef<HTMLInputElement>(null);
   const user = useStore((s) => s.user);
   const allPlayers = useStore((s) => s.players);
+  const wsReady = useStore((s) => s.wsReady);
   const [entitySearch, setEntitySearch] = useState('');
   const entitySearchRef = useRef('');
   const [zoneSearch, setZoneSearch] = useState('');
@@ -679,9 +680,13 @@ export function MapPage() {
 
   const { send } = useWS(wsHandler);
 
+  // Re-send on wsReady so the watch survives WebSocket reconnects; unwatch on
+  // zone change/unmount so the server resumes the global position feed.
   useEffect(() => {
-    if (zone !== null) send('watch_zone', { zoneId: zone });
-  }, [zone, send]);
+    if (zone === null || !wsReady) return;
+    send('watch_zone', { zoneId: zone });
+    return () => send('unwatch_zone', {});
+  }, [zone, send, wsReady]);
 
   // Layer toggle helper
   const toggleLayer = (key: keyof Layers) => setLayers((l) => ({ ...l, [key]: !l[key] }));

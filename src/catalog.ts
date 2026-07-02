@@ -127,11 +127,12 @@ export async function queryPlayers(pool: Pool): Promise<RowDataPacket[]> {
     SELECT c.charid, c.charname, c.pos_x, c.pos_y, c.pos_z, c.pos_zone,
            c.gmlevel, c.nation, c.playtime, c.timecreated, c.last_logout,
            z.name AS zone_name,
-           cs.mjob, cs.mlvl, cs.sjob, cs.slvl, cs.hp, cs.mp,
+           cs.mjob, cs.mlvl, cs.sjob, cs.slvl, cs.hp, cs.mp, cl.race,
            CASE WHEN ses.charid IS NOT NULL THEN 1 ELSE 0 END AS online
     FROM chars c
     LEFT JOIN zone_settings   z   ON c.pos_zone = z.zoneid
     LEFT JOIN char_stats      cs  ON c.charid   = cs.charid
+    LEFT JOIN char_look       cl  ON c.charid   = cl.charid
     LEFT JOIN accounts_sessions ses ON c.charid = ses.charid
     ORDER BY c.charname
   `);

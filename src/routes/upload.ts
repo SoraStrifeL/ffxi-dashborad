@@ -89,6 +89,7 @@ export function createUploadRouter(pool: Pool): Router {
     req._uploadFilename = `${zoneName}.${ext}`;
     makeUploader(MAPS_DIR)(req, res, (err: any) => {
       if (err) return void res.status(400).json({ error: err.message });
+      if (!req.file) return void res.status(400).json({ error: 'image file required' });
       audit(req.user!.login, 'upload.map', `zone:${zoneid}`, { file: req.file.filename });
       buildZoneMaps(pool);
       res.json({ ok: true, file: req.file.filename, url: `/maps/${req.file.filename}` });
@@ -101,6 +102,7 @@ export function createUploadRouter(pool: Pool): Router {
     req._uploadFilename = `${itemid}.png`;
     makeUploader(path.join(UPLOADS_DIR, 'items'))(req, res, (err: any) => {
       if (err) return void res.status(400).json({ error: err.message });
+      if (!req.file) return void res.status(400).json({ error: 'image file required' });
       const ext = MIME_EXT[req.file.mimetype] || 'png';
       const newName = `${itemid}.${ext}`;
       if (newName !== req.file.filename) {
@@ -117,6 +119,7 @@ export function createUploadRouter(pool: Pool): Router {
     req._uploadFilename = `${npcid}.png`;
     makeUploader(path.join(UPLOADS_DIR, 'npcs'))(req, res, (err: any) => {
       if (err) return void res.status(400).json({ error: err.message });
+      if (!req.file) return void res.status(400).json({ error: 'image file required' });
       const ext = MIME_EXT[req.file.mimetype] || 'png';
       const newName = `${npcid}.${ext}`;
       if (newName !== req.file.filename) {
@@ -134,6 +137,7 @@ export function createUploadRouter(pool: Pool): Router {
     req._uploadFilename = `${key}.png`;
     makeUploader(path.join(UPLOADS_DIR, 'mobs'))(req, res, (err: any) => {
       if (err) return void res.status(400).json({ error: err.message });
+      if (!req.file) return void res.status(400).json({ error: 'image file required' });
       const ext = MIME_EXT[req.file.mimetype] || 'png';
       const newName = `${key}.${ext}`;
       if (newName !== req.file.filename) {

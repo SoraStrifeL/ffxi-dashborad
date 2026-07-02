@@ -222,11 +222,12 @@ async function queryPlayers() {
     SELECT c.charid, c.charname, c.pos_x, c.pos_y, c.pos_z, c.pos_zone,
            c.gmlevel, c.nation, c.playtime, c.timecreated, c.last_logout,
            z.name AS zone_name,
-           cs.mjob, cs.mlvl, cs.sjob, cs.slvl, cs.hp, cs.mp,
+           cs.mjob, cs.mlvl, cs.sjob, cs.slvl, cs.hp, cs.mp, cl.race,
            CASE WHEN ses.charid IS NOT NULL THEN 1 ELSE 0 END AS online
     FROM chars c
     LEFT JOIN zone_settings   z   ON c.pos_zone = z.zoneid
     LEFT JOIN char_stats      cs  ON c.charid   = cs.charid
+    LEFT JOIN char_look       cl  ON c.charid   = cl.charid
     LEFT JOIN accounts_sessions ses ON c.charid = ses.charid
     ORDER BY c.charname
   `);
@@ -2083,11 +2084,11 @@ app.get('/api/character/:charid/bags', auth.requireAuth, async (req, res) => {
              CONVERT(ib.name USING utf8) AS name
       FROM char_inventory ci
       LEFT JOIN item_basic ib ON ci.itemId = ib.itemid
-      WHERE ci.charid = ? AND ci.location NOT IN (0,2,3,17) AND ci.itemId != 0
+      WHERE ci.charid = ? AND ci.location NOT IN (0,3,17) AND ci.itemId != 0
       ORDER BY ci.location, ci.slot
     `, [charid]);
     const [[storage]] = await pool.execute(
-      `SELECT safe,locker,satchel,\`case\`,wardrobe,wardrobe2,wardrobe3,wardrobe4,
+      `SELECT safe,locker,satchel,sack,\`case\`,wardrobe,wardrobe2,wardrobe3,wardrobe4,
               wardrobe5,wardrobe6,wardrobe7,wardrobe8 FROM char_storage WHERE charid=?`, [charid]
     );
     res.json({ items, storage: storage || null });
