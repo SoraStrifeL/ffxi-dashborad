@@ -18,12 +18,14 @@ export function createMapRouter(pool: Pool): Router {
     catch (err) { res.status(500).json({ error: (err as Error).message }); }
   });
 
-  // Returns { zoneId: floorCount } for all zones with at least one map file on disk
+  // Returns { zoneId: filenames[] } for all zones with at least one map file on
+  // disk — the client uses the list length as the floor count and the names to
+  // label the image picker for multi-image zones
   router.get('/api/maps', (_req, res) => {
-    const result: Record<number, number> = {};
+    const result: Record<number, string[]> = {};
     Object.entries(ZONE_MAPS).forEach(([zoneId, files]) => {
       const available = files.filter(f => fs.existsSync(path.join(MAPS_DIR, f)));
-      if (available.length) result[Number(zoneId)] = available.length;
+      if (available.length) result[Number(zoneId)] = available;
     });
     res.json(result);
   });

@@ -452,12 +452,12 @@ app.get('/api/players', auth.requireAuth, async (_req, res) => {
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-// Returns { zoneId: floorCount } for all zones with at least one map file on disk
+// Returns { zoneId: filenames[] } for all zones with at least one map file on disk
 app.get('/api/maps', (_req, res) => {
   const result = {};
   Object.entries(ZONE_MAPS).forEach(([zoneId, files]) => {
     const available = files.filter(f => fs.existsSync(path.join(MAPS_DIR, f)));
-    if (available.length) result[zoneId] = available.length;
+    if (available.length) result[zoneId] = available;
   });
   res.json(result);
 });

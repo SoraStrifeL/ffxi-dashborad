@@ -34,7 +34,7 @@ export const api = {
   charExtended: (id: number) => req<import('./types').CharExtended>(`/api/character/${id}/extended`),
   charEquipment: (id: number) => req<{ slot: number; itemId: number; name: string }[]>(`/api/character/${id}/equipment`),
 
-  maps:         ()          => req<Record<number, number>>('/api/maps'),
+  maps:         ()          => req<Record<number, string[]>>('/api/maps'),
   mapImage:     (z: number, floor = 0) => `/api/map/${z}?floor=${floor}`,
   npcs:         (z: number) => req<import('./types').NpcEntry[]>(`/api/npcs/${z}`),
   mobs:         (z: number) => req<import('./types').MobEntry[]>(`/api/mobs/${z}`),

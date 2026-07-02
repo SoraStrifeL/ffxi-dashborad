@@ -81,7 +81,7 @@ export function MapPage() {
   const [floor, setFloor] = useState(0);
   const floorRef = useRef(0);
   const [floorCount, setFloorCount] = useState(1);
-  const [mapsAvail, setMapsAvail]   = useState<Record<number, number>>({});
+  const [mapsAvail, setMapsAvail]   = useState<Record<number, string[]>>({});
   const [bounds, setBounds]  = useState<Record<number, CalibrationBounds>>({});
   const [dbMobs, setDbMobs]  = useState<MobEntry[]>([]);
   const [dbNpcs, setDbNpcs]  = useState<NpcEntry[]>([]);
@@ -190,7 +190,7 @@ export function MapPage() {
     setCalAnchorA(null); setCalAnchorB(null); setCalCapture(null);
     setShowOrigin(false); showOriginRef.current = false;
 
-    const fc = mapsAvail[zone] ?? 1;
+    const fc = mapsAvail[zone]?.length ?? 1;
     setFloorCount(fc);
     setFloor(0);
 
@@ -965,13 +965,29 @@ export function MapPage() {
               ))}
             </select>
             {floorCount > 1 && (
-              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
-                {Array.from({ length: floorCount }, (_, i) => (
-                  <button key={i} onClick={() => setFloor(i)} className={`btn btn-ghost btn-xs ${floor === i ? 'btn-primary' : ''}`}
-                    style={floor === i ? { background: 'var(--color-accent)', color: '#fff' } : {}}>
-                    {i + 1}
-                  </button>
-                ))}
+              <div style={{ marginTop: 6 }}>
+                <div style={{ fontSize: 9, color: 'var(--color-text3)', marginBottom: 2 }}>
+                  Map image ({floor + 1}/{floorCount})
+                </div>
+                <select
+                  value={floor}
+                  onChange={(e) => setFloor(Number(e.target.value))}
+                  style={{ width: '100%', background: 'var(--color-surface2)', border: '1px solid var(--color-border)', color: 'var(--color-text1)', padding: '5px 8px', borderRadius: 6, fontSize: 11, fontFamily: 'var(--font-mono)' }}
+                >
+                  {(mapsAvail[zone!] ?? []).map((f, i) => (
+                    <option key={f} value={i}>{f.replace(/\.png$/, '')}</option>
+                  ))}
+                </select>
+                {floorCount <= 8 && (
+                  <div style={{ display: 'flex', gap: 4, marginTop: 4 }}>
+                    {Array.from({ length: floorCount }, (_, i) => (
+                      <button key={i} onClick={() => setFloor(i)} className={`btn btn-ghost btn-xs ${floor === i ? 'btn-primary' : ''}`}
+                        style={floor === i ? { background: 'var(--color-accent)', color: '#fff' } : {}}>
+                        {i + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </SideSection>
