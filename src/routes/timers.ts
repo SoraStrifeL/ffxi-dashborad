@@ -122,9 +122,9 @@ export function createTimersRouter(pool: Pool): Router {
     res.json({ ok: true });
   });
 
-  router.post('/api/nm/checkall', requireAuth, async (req, res) => {
+  router.post('/api/nm/checkall', requireAuth, requirePermission('manage:timers'), async (req, res) => {
     try {
-      const items = (req.body as Array<{ groupId: number; nmName: string }>) || [];
+      const items = ((req.body as Array<{ groupId: number; nmName: string }>) || []).slice(0, 100);
       if (!items.length) { res.json({ queued: false }); return; }
       const mobIdsByItem = await Promise.all(items.map(async item => {
         const [rows] = await pool.execute<RowDataPacket[]>(
@@ -147,7 +147,7 @@ export function createTimersRouter(pool: Pool): Router {
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
-  router.post('/api/nm/check', requireAuth, async (req, res) => {
+  router.post('/api/nm/check', requireAuth, requirePermission('manage:timers'), async (req, res) => {
     try {
       const { groupId, nmName } = (req.body as { groupId?: string | number; nmName?: string }) || {};
       if (!groupId || !nmName) { res.status(400).json({ error: 'groupId and nmName required' }); return; }
@@ -183,11 +183,13 @@ export function createTimersRouter(pool: Pool): Router {
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
-  router.get('/api/nm/result/:id', requireAuth, async (req, res) => {
+  router.get('/api/nm/result/:id', requireAuth, requirePermission('manage:timers'), async (req, res) => {
     try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
       const [[row]] = await pool.execute<RowDataPacket[]>(
         'SELECT status, result FROM dashboard_queue WHERE id=? AND action="luaexec" AND requested_by="dashboard"',
-        [parseInt(req.params.id as string)]);
+        [id]);
       if (!row) { res.status(404).json({ error: 'not found' }); return; }
       res.json(row);
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }

@@ -50,11 +50,19 @@ export function createQueueRouter(pool: Pool): Router {
 
   router.get('/api/queue/:id', requireAuth, requirePermission('view:queue'), async (req, res) => {
     try {
+      const id = parseInt(req.params.id as string);
+      if (isNaN(id)) { res.status(400).json({ error: 'invalid id' }); return; }
       const [[row]] = await pool.execute<RowDataPacket[]>(
-        'SELECT id, action, status, result, created_at, processed_at FROM dashboard_queue WHERE id = ?',
-        [parseInt(req.params.id as string)]);
+        'SELECT id, charid, action, status, result, requested_by, created_at, processed_at FROM dashboard_queue WHERE id = ?',
+        [id]);
       if (!row) { res.status(404).json({ error: 'not found' }); return; }
-      res.json(row);
+      // Non-admins may only read entries they submitted or that target their own characters
+      if (req.user!.tier !== 'admin' && row.requested_by !== req.user!.login
+          && !(await userOwnsChar(pool, req.user!.accid, row.charid as number))) {
+        res.status(403).json({ error: 'not your queue entry' }); return;
+      }
+      res.json({ id: row.id, action: row.action, status: row.status, result: row.result,
+                 created_at: row.created_at, processed_at: row.processed_at });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 

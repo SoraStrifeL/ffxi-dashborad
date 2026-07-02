@@ -61,8 +61,10 @@ function startHeartbeat(wss: WebSocket.Server): void {
 let lastOnlineIds: Set<number> | null = null;
 
 // ── Queue update polling ───────────────────────────────────────────────────────
-const sentQueueIds = new Set<number>();
-let lastQueueIdClean = Date.now();
+// Keyed by id:status (a deferred row that later completes must broadcast again);
+// entries are pruned by age, not cleared wholesale, so rows still inside the 20 s
+// query window can't be re-sent as duplicates.
+const sentQueueKeys = new Map<string, number>();
 
 async function pollQueueUpdates(pool: Pool): Promise<void> {
   if (clients.size === 0) return;
@@ -75,9 +77,9 @@ async function pollQueueUpdates(pool: Pool): Promise<void> {
        ORDER BY id ASC LIMIT 30`
     );
     for (const row of rows) {
-      const id = row.id as number;
-      if (sentQueueIds.has(id)) continue;
-      sentQueueIds.add(id);
+      const key = `${row.id}:${row.status}`;
+      if (sentQueueKeys.has(key)) continue;
+      sentQueueKeys.set(key, Date.now());
       const login = row.requested_by as string;
       const msg = JSON.stringify({ type: 'queue_update', data: row, ts: Date.now() });
       clients.forEach((state, ws) => {
@@ -86,11 +88,9 @@ async function pollQueueUpdates(pool: Pool): Promise<void> {
           ws.send(msg);
       });
     }
-    // Prune stale IDs every 2 minutes
-    if (Date.now() - lastQueueIdClean > 120_000) {
-      sentQueueIds.clear();
-      lastQueueIdClean = Date.now();
-    }
+    // Prune keys older than 60 s — their rows have left the 20 s query window
+    const cutoff = Date.now() - 60_000;
+    sentQueueKeys.forEach((t, k) => { if (t < cutoff) sentQueueKeys.delete(k); });
   } catch (_) {}
 }
 

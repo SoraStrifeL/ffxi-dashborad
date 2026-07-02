@@ -6,7 +6,10 @@ type MsgHandler = (type: string, data: unknown) => void;
 let globalWs: WebSocket | null = null;
 const handlers = new Set<MsgHandler>();
 
-function connect(token: string, onReady: (r: boolean) => void) {
+function connect(onReady: (r: boolean) => void) {
+  // Read the token fresh each attempt so reconnects after logout stop cleanly
+  const token = localStorage.getItem('token');
+  if (!token) return;
   if (globalWs && globalWs.readyState < 2) return;
 
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -25,9 +28,13 @@ function connect(token: string, onReady: (r: boolean) => void) {
     } catch (_) { /* ignore */ }
   };
 
-  ws.onclose = () => {
+  ws.onclose = (e) => {
     onReady(false);
-    setTimeout(() => connect(token, onReady), 3000);
+    if (globalWs === ws) globalWs = null;
+    // 1008 = server rejected auth (expired/invalid token) — retrying won't help;
+    // a fresh login re-triggers connect via the useWS effect
+    if (e.code === 1008) return;
+    setTimeout(() => connect(onReady), 3000);
   };
 
   ws.onerror = () => ws.close();
@@ -51,9 +58,14 @@ export function useWS(onMessage?: MsgHandler) {
   }, [onMessage]);
 
   useEffect(() => {
-    if (!token) return;
+    if (!token) {
+      // Logged out — close the shared socket so the server drops the session
+      globalWs?.close();
+      globalWs = null;
+      return;
+    }
     handlers.add(globalHandler);
-    connect(token, setWsReady);
+    connect(setWsReady);
     return () => { handlers.delete(globalHandler); };
   }, [token, globalHandler, setWsReady]);
 

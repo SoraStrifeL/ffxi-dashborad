@@ -2788,7 +2788,7 @@ app.post('/api/timers/:id/reset', auth.requireAuth, auth.requireAdmin, (req, res
 
 // Batch check — one luaexec for all tracked NMs
 // mob zone formula: (mobid >> 12) - 4096 = zoneid  (same offset as NPCs per CLAUDE.md)
-app.post('/api/nm/checkall', auth.requireAuth, async (req, res) => {
+app.post('/api/nm/checkall', auth.requireAuth, auth.requireAdmin, async (req, res) => {
   try {
     const items = req.body || []; // [{groupId, nmName}, ...]
     if (!items.length) return res.json({ queued: false });
@@ -2816,7 +2816,7 @@ app.post('/api/nm/checkall', auth.requireAuth, async (req, res) => {
 });
 
 // Live NM status check — queries all spawn slots for a group, matches by NM name
-app.post('/api/nm/check', auth.requireAuth, async (req, res) => {
+app.post('/api/nm/check', auth.requireAuth, auth.requireAdmin, async (req, res) => {
   try {
     const { groupId, nmName } = req.body || {};
     if (!groupId || !nmName) return res.status(400).json({ error: 'groupId and nmName required' });
@@ -2855,7 +2855,7 @@ app.get('/api/nm/spawnpoint', auth.requireAuth, auth.requireAdmin, async (req, r
 });
 
 // Poll result for NM checks — scoped to dashboard luaexec rows, no admin required
-app.get('/api/nm/result/:id', auth.requireAuth, async (req, res) => {
+app.get('/api/nm/result/:id', auth.requireAuth, auth.requireAdmin, async (req, res) => {
   try {
     const [[row]] = await pool.execute(
       'SELECT status, result FROM dashboard_queue WHERE id=? AND action="luaexec" AND requested_by="dashboard"',
