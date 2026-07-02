@@ -220,7 +220,9 @@ async function queryStats() {
 async function queryPlayers() {
   const [rows] = await pool.execute(`
     SELECT c.charid, c.charname, c.pos_x, c.pos_y, c.pos_z, c.pos_zone,
-           c.gmlevel, c.nation, c.playtime, c.timecreated, c.last_logout,
+           c.gmlevel, c.nation, c.playtime,
+           UNIX_TIMESTAMP(c.timecreated) AS timecreated,
+           UNIX_TIMESTAMP(c.last_logout) AS last_logout,
            z.name AS zone_name,
            cs.mjob, cs.mlvl, cs.sjob, cs.slvl, cs.hp, cs.mp, cl.race,
            CASE WHEN ses.charid IS NOT NULL THEN 1 ELSE 0 END AS online
@@ -725,7 +727,9 @@ app.get('/api/character/:charid', auth.requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'not your character' });
     const [[c]] = await pool.execute(`
       SELECT c.charid, c.charname, c.pos_zone, c.pos_x, c.pos_y, c.pos_z,
-             c.gmlevel, c.nation, c.playtime, c.timecreated, c.last_logout, c.accid,
+             c.gmlevel, c.nation, c.playtime, c.accid,
+             UNIX_TIMESTAMP(c.timecreated) AS timecreated,
+             UNIX_TIMESTAMP(c.last_logout) AS last_logout,
              c.home_zone, c.home_x, c.home_y, c.home_z,
              c.pos_prevzone, c.mentor, c.job_master, c.moghancement,
              z.name  AS zone_name,

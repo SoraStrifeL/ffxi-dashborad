@@ -127,7 +127,9 @@ export async function queryStats(pool: Pool): Promise<Record<string, number>> {
 export async function queryPlayers(pool: Pool): Promise<RowDataPacket[]> {
   const [rows] = await pool.execute<RowDataPacket[]>(`
     SELECT c.charid, c.charname, c.pos_x, c.pos_y, c.pos_z, c.pos_zone,
-           c.gmlevel, c.nation, c.playtime, c.timecreated, c.last_logout,
+           c.gmlevel, c.nation, c.playtime,
+           UNIX_TIMESTAMP(c.timecreated) AS timecreated,
+           UNIX_TIMESTAMP(c.last_logout) AS last_logout,
            z.name AS zone_name,
            cs.mjob, cs.mlvl, cs.sjob, cs.slvl, cs.hp, cs.mp, cl.race,
            CASE WHEN ses.charid IS NOT NULL THEN 1 ELSE 0 END AS online

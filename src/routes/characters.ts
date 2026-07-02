@@ -57,7 +57,9 @@ export function createCharactersRouter(pool: Pool): Router {
         { res.status(403).json({ error: 'not your character' }); return; }
       const [[c]] = await pool.execute<RowDataPacket[]>(`
         SELECT c.charid, c.charname, c.pos_zone, c.pos_x, c.pos_y, c.pos_z,
-               c.gmlevel, c.nation, c.playtime, c.timecreated, c.last_logout, c.accid,
+               c.gmlevel, c.nation, c.playtime, c.accid,
+               UNIX_TIMESTAMP(c.timecreated) AS timecreated,
+               UNIX_TIMESTAMP(c.last_logout) AS last_logout,
                c.home_zone, c.home_x, c.home_y, c.home_z,
                c.pos_prevzone, c.mentor, c.job_master, c.moghancement,
                z.name  AS zone_name,

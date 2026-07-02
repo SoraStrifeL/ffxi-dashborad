@@ -12,8 +12,11 @@ const BAGS: Record<number, string> = {0:'Inventory',1:'Mog Safe',2:'Storage',3:'
 // location → char_storage capacity column
 const LOC_STORAGE_KEY: Record<number, string> = {0:'inventory',1:'safe',4:'locker',5:'satchel',6:'sack',7:'case',8:'wardrobe',10:'wardrobe2',11:'wardrobe3',12:'wardrobe4'};
 
-function fmtRelTime(ts: number) {
-  const secs = Math.floor((Date.now() / 1000) - ts);
+function fmtRelTime(ts: number | string) {
+  // unix seconds from the API; tolerate a datetime string from older payloads
+  const t = typeof ts === 'number' ? ts : Date.parse(ts) / 1000;
+  if (!Number.isFinite(t)) return null;
+  const secs = Math.floor((Date.now() / 1000) - t);
   if (secs < 120)  return 'just now';
   if (secs < 3600) return `${Math.floor(secs / 60)}m ago`;
   if (secs < 86400) return `${Math.floor(secs / 3600)}h ago`;
