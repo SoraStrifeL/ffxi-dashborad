@@ -319,6 +319,12 @@ for (const [id, name] of Object.entries(KEY_ITEM_NAMES)) {
     MOGHANCEMENT_NAMES[Number(id)] = prettyEnumName(name.slice('MOGHANCEMENT_'.length));
   }
 }
+// Polished display names for the few enum constants that abbreviate poorly.
+Object.assign(MOGHANCEMENT_NAMES, {
+  535: "San d'Oria Conquest",
+  536: 'Bastok Conquest',
+  537: 'Windurst Conquest',
+});
 console.log(`[enum] ${Object.keys(MOGHANCEMENT_NAMES).length} moghancements`);
 
 // ── RoE Records ────────────────────────────────────────────────────────────────
