@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import type { User, ServerStats, Player } from './types';
+import { api, clearTokens } from './api';
 
 interface AppStore {
   token: string | null;
@@ -33,7 +34,8 @@ export const useStore = create<AppStore>((set) => ({
   setPlayers: (players) => set({ players }),
   setWsReady: (wsReady) => set({ wsReady }),
   logout: () => {
-    localStorage.removeItem('token');
+    api.logout();          // best-effort: revoke the refresh token server-side
+    clearTokens();         // clear both access + refresh tokens
     set({ token: null, user: null, permissions: [], stats: null, players: [], wsReady: false });
   },
 }));

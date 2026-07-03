@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../../api';
+import { api, setTokens } from '../../api';
 import { useStore } from '../../store';
 
 export function Login() {
@@ -16,8 +16,9 @@ export function Login() {
     if (!username || !password) return;
     setLoading(true); setError('');
     try {
-      const { token } = await api.login(username, password);
-      setToken(token);
+      const { token, refreshToken } = await api.login(username, password);
+      setTokens(token, refreshToken);  // persist both (access + rotating refresh)
+      setToken(token);                 // update store state
       navigate('/', { replace: true });
     } catch (err) {
       setError((err as Error).message || 'Login failed');

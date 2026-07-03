@@ -11,10 +11,12 @@
 // ════════════════════════════════════════════════════════════════════
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { RequestHandler } from 'express';
 import { Pool, RowDataPacket } from 'mysql2/promise';
 import { AuthUser } from './types';
 import { loadDashboardSettings } from './settings';
+import { cacheGetJSON, cacheSetJSON, cacheDel } from './cache';
 
 export const ADMIN_GM_LEVEL = 1; // kept for server.js compat; auth.ts reads from settings
 
@@ -85,11 +87,55 @@ export async function authenticate(
 
 export function issueToken(identity: { accid: number; tier: string; login: string }): string {
   const ds = loadDashboardSettings();
-  const ttl = `${Math.max(1, Math.min(720, ds.tokenTtlHours ?? 24))}h`;
+  // Short-lived access token. accessTtlMinutes drives it; fall back to the
+  // legacy tokenTtlHours only if accessTtlMinutes is unset.
+  const mins = ds.accessTtlMinutes ?? (ds.tokenTtlHours ?? 1) * 60;
+  const ttl = `${Math.max(1, Math.min(1440, mins))}m`;
   return jwt.sign(
     { accid: identity.accid, tier: identity.tier, login: identity.login },
     SECRET,
-    { expiresIn: ttl as `${number}h`, algorithm: 'HS256' });
+    { expiresIn: ttl as `${number}m`, algorithm: 'HS256' });
+}
+
+// ── Refresh tokens (rotating, single-use, Redis-backed) ──────────────
+// The access token above is short-lived. A refresh token is an opaque
+// random string stored in Redis (key refresh:<token> → {accid, login})
+// with a longer TTL. /api/refresh rotates it: the presented token is
+// deleted and a fresh access+refresh pair is issued, so a captured
+// refresh token is single-use. Revoked/disabled accounts can't refresh.
+interface RefreshRecord { accid: number; login: string }
+const REFRESH_PREFIX = 'refresh:';
+
+export async function issueRefreshToken(identity: { accid: number; login: string }): Promise<string> {
+  const ds = loadDashboardSettings();
+  const ttlSec = Math.max(1, Math.min(90, ds.refreshTtlDays ?? 7)) * 86400;
+  const token = crypto.randomBytes(32).toString('hex');
+  await cacheSetJSON(`${REFRESH_PREFIX}${token}`, { accid: identity.accid, login: identity.login } as RefreshRecord, ttlSec);
+  return token;
+}
+
+export async function revokeRefreshToken(token: string): Promise<void> {
+  if (!token) return;
+  await cacheDel(`${REFRESH_PREFIX}${token}`);
+}
+
+// Rotate: validate + delete the old token, re-check account state, issue a
+// fresh access+refresh pair. Returns null on unknown/expired/revoked.
+export async function rotateRefreshToken(
+  token: string,
+): Promise<{ token: string; refreshToken: string; tier: 'admin' | 'player'; login: string } | null> {
+  if (!token) return null;
+  const rec = await cacheGetJSON<RefreshRecord>(`${REFRESH_PREFIX}${token}`);
+  if (!rec) return null;
+  await cacheDel(`${REFRESH_PREFIX}${token}`); // single-use: consume immediately
+
+  const state = await currentAccountState(rec.accid);
+  if (state && !state.ok) return null;          // account banned/deleted since issue
+  const tier = state ? state.tier : 'player';   // null (no pool/DB error) → conservative
+
+  const access  = issueToken({ accid: rec.accid, tier, login: rec.login });
+  const refresh = await issueRefreshToken({ accid: rec.accid, login: rec.login });
+  return { token: access, refreshToken: refresh, tier, login: rec.login };
 }
 
 // Pin the accepted algorithm on every verify: without this, jwt.verify

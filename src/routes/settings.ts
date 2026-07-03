@@ -104,6 +104,8 @@ export function createSettingsRouter(pool: Pool): Router {
       autologin:         typeof body.autologin         === 'boolean' ? body.autologin                                            : current.autologin,
       allowPlayerLogin:  typeof body.allowPlayerLogin  === 'boolean' ? body.allowPlayerLogin                                     : current.allowPlayerLogin,
       tokenTtlHours:     clampInt(body.tokenTtlHours,     1,   720, current.tokenTtlHours),
+      accessTtlMinutes:  clampInt(body.accessTtlMinutes,  1,  1440, current.accessTtlMinutes),
+      refreshTtlDays:    clampInt(body.refreshTtlDays,    1,    90, current.refreshTtlDays),
       adminGmLevel:      clampInt(body.adminGmLevel,      1,    10, current.adminGmLevel),
       loginRateLimitMax: clampInt(body.loginRateLimitMax, 1,   100, current.loginRateLimitMax),
     };

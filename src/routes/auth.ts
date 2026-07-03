@@ -44,10 +44,28 @@ export function createAuthRouter(pool: Pool): Router {
       const { id, login } = rows[0];
       const identity = { accid: id as number, tier: 'admin' as const, login: login as string };
       audit(identity.login, 'auth.autologin', undefined, { ip });
-      res.json({ token: auth.issueToken(identity), tier: identity.tier, login: identity.login });
+      const refreshToken = await auth.issueRefreshToken(identity);
+      res.json({ token: auth.issueToken(identity), refreshToken, tier: identity.tier, login: identity.login });
     } catch (e) {
       res.status(500).json({ error: 'Internal server error' });
     }
+  });
+
+  // Rotate a refresh token → fresh access+refresh pair (single-use).
+  const refreshSchema = z.object({ refreshToken: z.string().min(1).max(256) }).strict();
+  router.post('/api/refresh', validateBody(refreshSchema), async (req, res) => {
+    const { refreshToken } = req.body as { refreshToken: string };
+    const rotated = await auth.rotateRefreshToken(refreshToken);
+    if (!rotated) { res.status(401).json({ error: 'invalid refresh token' }); return; }
+    res.json(rotated);
+  });
+
+  // Revoke a refresh token (logout). Body optional so a token-less call is a no-op 200.
+  const logoutSchema = z.object({ refreshToken: z.string().max(256).optional() }).strip();
+  router.post('/api/logout', validateBody(logoutSchema), async (req, res) => {
+    const { refreshToken } = req.body as { refreshToken?: string };
+    if (refreshToken) await auth.revokeRefreshToken(refreshToken);
+    res.json({ ok: true });
   });
 
   router.post('/api/login', validateBody(loginSchema), async (req, res) => {
@@ -79,7 +97,8 @@ export function createAuthRouter(pool: Pool): Router {
       loginAttempts.delete(`ip:${ip}`);
       loginAttempts.delete(`acct:${String(login).toLowerCase()}`);
       audit(identity.login, 'auth.login.success', undefined, { ip, tier: identity.tier });
-      res.json({ token: auth.issueToken(identity), tier: identity.tier, login: identity.login });
+      const refreshToken = await auth.issueRefreshToken(identity);
+      res.json({ token: auth.issueToken(identity), refreshToken, tier: identity.tier, login: identity.login });
     } catch (e) {
       console.error('Login error:', e);
       res.status(500).json({ error: 'Internal server error' });

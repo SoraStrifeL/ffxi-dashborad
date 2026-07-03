@@ -1,6 +1,42 @@
+// ── Token helpers + refresh ──────────────────────────────────────────
+// Access token is short-lived; a refresh token (rotating, single-use) is
+// exchanged at /api/refresh for a fresh pair. getToken() is the single
+// source read everywhere (req, uploads, WS).
+export function getToken(): string | null { return localStorage.getItem('token'); }
+export function getRefreshToken(): string | null { return localStorage.getItem('refreshToken'); }
+export function setTokens(token: string, refreshToken?: string): void {
+  localStorage.setItem('token', token);
+  if (refreshToken) localStorage.setItem('refreshToken', refreshToken);
+}
+export function clearTokens(): void {
+  localStorage.removeItem('token');
+  localStorage.removeItem('refreshToken');
+}
+
+// Single-flight refresh: concurrent 401s share one /api/refresh call.
+let refreshInFlight: Promise<string | null> | null = null;
+export function refreshAccessToken(): Promise<string | null> {
+  if (refreshInFlight) return refreshInFlight;
+  const rt = getRefreshToken();
+  if (!rt) return Promise.resolve(null);
+  refreshInFlight = fetch('/api/refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ refreshToken: rt }),
+  })
+    .then(async (r) => {
+      if (!r.ok) { clearTokens(); return null; }
+      const body = await r.json() as { token: string; refreshToken: string };
+      setTokens(body.token, body.refreshToken);
+      return body.token;
+    })
+    .catch(() => null)
+    .finally(() => { refreshInFlight = null; });
+  return refreshInFlight;
+}
+
 async function req<T>(path: string, opts?: RequestInit): Promise<T> {
-  const token = localStorage.getItem('token');
-  const res = await fetch(path, {
+  const doFetch = (token: string | null) => fetch(path, {
     ...opts,
     headers: {
       'Content-Type': 'application/json',
@@ -8,6 +44,12 @@ async function req<T>(path: string, opts?: RequestInit): Promise<T> {
       ...(opts?.headers ?? {}),
     },
   });
+  let res = await doFetch(getToken());
+  // Access token expired/revoked → refresh once and retry.
+  if (res.status === 401 && getRefreshToken()) {
+    const fresh = await refreshAccessToken();
+    if (fresh) res = await doFetch(fresh);
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({})) as { error?: string };
     throw new Error(body.error ?? `HTTP ${res.status}`);
@@ -17,10 +59,20 @@ async function req<T>(path: string, opts?: RequestInit): Promise<T> {
 
 export const api = {
   login: (username: string, password: string) =>
-    req<{ token: string }>('/api/login', {
+    req<{ token: string; refreshToken: string }>('/api/login', {
       method: 'POST',
       body: JSON.stringify({ login: username, password }),
     }),
+
+  // Revoke the refresh token server-side (best-effort; fire-and-forget on logout).
+  logout: () => {
+    const refreshToken = getRefreshToken();
+    return fetch('/api/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refreshToken }),
+    }).catch(() => {});
+  },
 
   me: () => req<{ login: string; tier: 'admin' | 'player'; accid: number }>('/api/me'),
   mePermissions: () => req<{ login: string; tier: string; permissions: string[] }>('/api/me/permissions'),
@@ -70,7 +122,7 @@ export const api = {
   deleteScript: (id: string) => req<{ ok: boolean }>(`/api/scripts/${id}`, { method: 'DELETE' }),
   scriptBrowse: (p: string) => req<{ name: string; type: string }[]>(`/api/scriptbrowser?path=${encodeURIComponent(p)}`),
   scriptFileText: async (p: string): Promise<string> => {
-    const token = localStorage.getItem('token');
+    const token = getToken();
     const r = await fetch(`/api/scriptbrowser/file?path=${encodeURIComponent(p)}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
     if (!r.ok) throw new Error(`HTTP ${r.status}`);
     return r.text();
@@ -151,10 +203,10 @@ export const api = {
   dbZoneWiki:  (name: string) => req<{ description?: string; wikiUrl?: string; notFound?: boolean }>(`/api/db/zones/wiki?name=${encodeURIComponent(name)}`),
 
   // Image uploads (multipart form data)
-  uploadMapImage:  (zoneId: number, file: File) => { const f = new FormData(); f.append('image', file); const token = localStorage.getItem('token'); return fetch(`/api/upload/map/${zoneId}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
-  uploadItemImage: (itemId: number, file: File) => { const f = new FormData(); f.append('image', file); const token = localStorage.getItem('token'); return fetch(`/api/upload/item/${itemId}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
-  uploadNpcImage:  (npcId: number, file: File) => { const f = new FormData(); f.append('image', file); const token = localStorage.getItem('token'); return fetch(`/api/upload/npc/${npcId}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
-  uploadMobImage:  (name: string, file: File) => { const f = new FormData(); f.append('image', file); const token = localStorage.getItem('token'); return fetch(`/api/upload/mob?name=${encodeURIComponent(name)}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
+  uploadMapImage:  (zoneId: number, file: File) => { const f = new FormData(); f.append('image', file); const token = getToken(); return fetch(`/api/upload/map/${zoneId}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
+  uploadItemImage: (itemId: number, file: File) => { const f = new FormData(); f.append('image', file); const token = getToken(); return fetch(`/api/upload/item/${itemId}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
+  uploadNpcImage:  (npcId: number, file: File) => { const f = new FormData(); f.append('image', file); const token = getToken(); return fetch(`/api/upload/npc/${npcId}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
+  uploadMobImage:  (name: string, file: File) => { const f = new FormData(); f.append('image', file); const token = getToken(); return fetch(`/api/upload/mob?name=${encodeURIComponent(name)}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
   uploadCheck: (type: 'item'|'npc'|'mob', id?: number, name?: string) =>
     req<{ exists: boolean; url: string | null }>(`/api/upload/check/${type}?${id != null ? `id=${id}` : `name=${encodeURIComponent(name ?? '')}`}`),
 

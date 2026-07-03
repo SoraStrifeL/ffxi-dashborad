@@ -116,7 +116,9 @@ export interface DashboardSettings {
   motd: string;
   autoSwitchZone: boolean;
   autologin: boolean;
-  tokenTtlHours: number;
+  tokenTtlHours: number;       // legacy fallback for accessTtlMinutes
+  accessTtlMinutes: number;    // short-lived access token lifetime
+  refreshTtlDays: number;      // refresh token lifetime
   adminGmLevel: number;
   loginRateLimitMax: number;
   allowPlayerLogin: boolean;
@@ -128,6 +130,8 @@ const DASHBOARD_DEFAULTS: DashboardSettings = {
   autoSwitchZone: true,
   autologin: process.env.AUTOLOGIN === 'true',
   tokenTtlHours: 24,
+  accessTtlMinutes: 60,
+  refreshTtlDays: 7,
   adminGmLevel: 1,
   loginRateLimitMax: 10,
   allowPlayerLogin: true,
