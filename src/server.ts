@@ -123,13 +123,28 @@ process.on('SIGTERM', () => {
 // ── Startup sequence ──────────────────────────────────────────────────────────
 const PORT = parseInt(process.env.PORT || '3000');
 
-buildZoneMaps(pool)
-  .then(() => loadExpTable(pool))
-  .then(async () => {
-    startPosWatcher();
-    await Promise.all([loadMobCatalog(pool), loadNpcCatalog(pool), loadZoneCache(pool)]);
-    setInterval(() => loadZoneCache(pool), 30_000);
-    setInterval(() => { loadMobCatalog(pool); loadNpcCatalog(pool); }, 5 * 60_000);
-    server.listen(PORT, () => console.log(`FFXI Dashboard running on port ${PORT}`));
-  })
-  .catch(e => { console.error('Startup failed:', e); process.exit(1); });
+// Listen immediately so the dashboard is reachable even when the DB (or its
+// catalogs) isn't ready yet — bare-metal with no running LSB DB, or a DB
+// container still starting. Catalogs load in the background and retry on
+// failure instead of crashing the process.
+startPosWatcher();
+server.listen(PORT, () => console.log(`FFXI Dashboard running on port ${PORT}`));
+
+async function loadCatalogs(): Promise<void> {
+  await buildZoneMaps(pool);
+  await loadExpTable(pool);
+  await Promise.all([loadMobCatalog(pool), loadNpcCatalog(pool), loadZoneCache(pool)]);
+}
+
+(function loadCatalogsWithRetry() {
+  loadCatalogs()
+    .then(() => console.log('[startup] catalogs loaded'))
+    .catch((e: Error) => {
+      console.warn('[startup] catalog load failed (DB unreachable?); retrying in 15s:', e.message);
+      setTimeout(loadCatalogsWithRetry, 15_000);
+    });
+})();
+
+// Periodic refreshes — guarded so a transient DB outage can't crash the process.
+setInterval(() => loadZoneCache(pool).catch(() => {}), 30_000);
+setInterval(() => { loadMobCatalog(pool).catch(() => {}); loadNpcCatalog(pool).catch(() => {}); }, 5 * 60_000);

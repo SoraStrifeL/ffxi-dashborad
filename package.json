@@ -2,13 +2,15 @@
   "name": "ffxi-dashboard",
   "version": "1.0.0",
   "description": "",
-  "main": "server.js",
+  "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
     "build:client": "npm run build --prefix client",
     "build:all": "tsc && npm run build --prefix client",
-    "start": "node server.js",
+    "start": "node dist/server.js",
+    "serve": "npm run build:all && node dist/server.js",
     "dev": "npx ts-node src/server.ts",
+    "start:legacy": "node server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

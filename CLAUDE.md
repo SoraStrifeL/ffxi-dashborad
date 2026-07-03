@@ -12,21 +12,34 @@ docker compose logs -f                      # tail logs
 ```
 Use `docker compose up -d --force-recreate` after every build to swap to the new image.
 
-**Bare-metal — Linux/macOS (dev/test):**
+**Bare-metal (non-Docker) — Linux/macOS/Windows:**
+Runs the **same `src/` code as Docker** — build once, then run the compiled output.
 ```bash
 npm install
-DASHBOARD_JWT_SECRET=$(openssl rand -hex 32) node server.js
+npm run build:all                                   # compile backend (tsc) + client (Vite)
+DASHBOARD_JWT_SECRET=$(openssl rand -hex 32) npm start   # → node dist/server.js
 ```
+- `npm run serve` does `build:all` + start in one step.
+- `npm run dev` runs `src/server.ts` directly via ts-node (no build; iterative dev).
+- Windows: `set DASHBOARD_JWT_SECRET=<random-string>` then `npm start`.
+- Load `.env` on any platform: `npx dotenv -e .env -- npm start`.
 
-**Bare-metal — Windows:**
-```cmd
-npm install
-set DASHBOARD_JWT_SECRET=<random-string>
-node server.js
-```
-Load all vars from `.env` on any platform: `npx dotenv -e .env -- node server.js`
+**Redis is optional bare-metal.** With no `REDIS_URL` set, the server uses an
+in-memory cache (wiki cache, rate-limit state, refresh tokens) — fine for a
+single instance. Set `REDIS_URL` (or `USE_REDIS=1`) to use Redis; it falls back
+to memory automatically if Redis is unreachable. See `src/cache.ts`.
 
-> **Important:** Bare-metal dev uses the root `server.js` (legacy single-file Express server). Docker compiles `src/` via `tsc` and runs `dist/server.js`. **Backend fixes must be applied to `src/routes/*.ts`, not root `server.js`, or they will not appear in Docker.**
+**Bare-metal needs no `/ffxi-*` mounts** — absent Lua catalogs, logs, and
+settings dirs degrade gracefully (empty catalogs, no live positions). Point
+`LSB_SCRIPTS_DIR` / `LSB_SETTINGS_DIR` / `LSB_LOG_DIR` at a local LSB checkout
+to enable those features (see `.env.example`).
+
+> **Important:** `src/` is the single source of truth for both Docker and
+> bare-metal. **All backend fixes go in `src/routes/*.ts` / `src/*.ts`.** The
+> root `server.js` is a **deprecated** legacy monolith kept only behind
+> `npm run start:legacy`; it is heavily out of date (missing token
+> revocation, refresh tokens, input validation, the dashboard console, etc.)
+> and should not be used or extended.
 
 **First-time DB setup:** apply `sql/dashboard_queue.sql` against the LSB `xidb` database once:
 ```bash
