@@ -308,7 +308,14 @@ export function createCharactersRouter(pool: Pool): Router {
       const [zoneRows] = await pool.execute<RowDataPacket[]>('SELECT zoneid, name FROM zone_settings');
       const zoneNameMap: Record<number, string> = {};
       // zone_settings.name uses underscores (Southern_San_dOria) — space them.
-      zoneRows.forEach(z => { zoneNameMap[z.zoneid as number] = String(z.name).replace(/_/g, ' '); });
+      // A few ids (e.g. 286) are unused in the game data and stored as a numeric
+      // placeholder; label those "Zone <id>" rather than showing a bare number.
+      zoneRows.forEach(z => {
+        const raw = String(z.name ?? '');
+        zoneNameMap[z.zoneid as number] = (!raw || /^\d+$/.test(raw))
+          ? `Zone ${z.zoneid}`
+          : raw.replace(/_/g, ' ');
+      });
       const keyitems  = decodeKeyItems(row.keyitems  as Buffer | null, KEY_ITEM_NAMES);
       const titles    = decodeBitfield(row.titles    as Buffer | null, TITLE_NAMES);
       const zones     = decodeBitfield(row.zones     as Buffer | null, zoneNameMap);
