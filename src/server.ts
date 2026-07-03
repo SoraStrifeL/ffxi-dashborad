@@ -10,6 +10,7 @@ installCrashHandlers();
 
 import { pool } from './db';
 import { initRedis } from './cache';
+import { initAuthPool } from './auth';
 import { buildZoneMaps, loadMobCatalog, loadNpcCatalog, loadZoneCache, loadExpTable } from './catalog';
 import { initWebSocket, startPosWatcher, pollAndBroadcast } from './ws';
 
@@ -34,6 +35,7 @@ import { createHealthRouter }    from './routes/health';
 import { loadPlugins }           from './plugin';
 
 initRedis();
+initAuthPool(pool);
 
 const app = express();
 app.set('trust proxy', 1);

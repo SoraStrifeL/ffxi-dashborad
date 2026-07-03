@@ -92,17 +92,77 @@ export function issueToken(identity: { accid: number; tier: string; login: strin
     { expiresIn: ttl as `${number}h` });
 }
 
-// Express middleware: verifies the Bearer token, attaches req.user.
-export const requireAuth: RequestHandler = (req, res, next) => {
+// ── Per-request account-state revocation ─────────────────────────────
+// A JWT is a bearer credential valid until it expires (tokenTtlHours,
+// default 24h). Verifying only the signature means a banned account or a
+// demoted admin keeps access until the token expires. requireAuth calls
+// currentAccountState() to re-check the live account on each request:
+// banned/deleted accounts are rejected, and the tier is refreshed so a
+// demoted admin loses admin mid-session. Results are cached briefly to
+// avoid a DB round-trip on every API call.
+let _authPool: Pool | null = null;
+export function initAuthPool(pool: Pool): void { _authPool = pool; }
+
+interface AccountState { ok: boolean; tier: 'admin' | 'player' }
+const _stateCache = new Map<number, { state: AccountState | null; exp: number }>();
+const STATE_TTL_MS = 15_000;
+
+// Returns the live account state for `accid`, or null to signal "skip the
+// check" — when no pool is wired (unit/integration tests) or the DB errors
+// (fail-open; the signature was already verified). ok=false means the
+// account is missing, banned (status!=1), or blocked by allowPlayerLogin.
+async function currentAccountState(accid: number): Promise<AccountState | null> {
+  if (!_authPool) return null;
+  const now = Date.now();
+  const hit = _stateCache.get(accid);
+  if (hit && hit.exp > now) return hit.state;
+
+  let state: AccountState | null;
+  try {
+    const [rows] = await _authPool.execute<RowDataPacket[]>(
+      `SELECT a.status, MAX(c.gmlevel) AS maxgm
+         FROM accounts a LEFT JOIN chars c ON c.accid = a.id
+        WHERE a.id = ? GROUP BY a.id`, [accid]);
+    if (rows.length === 0 || Number(rows[0].status) !== 1) {
+      state = { ok: false, tier: 'player' };
+    } else {
+      const ds = loadDashboardSettings();
+      const adminLevel = ds.adminGmLevel ?? 1;
+      const maxGm = Number(rows[0].maxgm || 0);
+      if (ds.allowPlayerLogin === false && maxGm < adminLevel) {
+        state = { ok: false, tier: 'player' };
+      } else {
+        state = { ok: true, tier: maxGm >= adminLevel ? 'admin' : 'player' };
+      }
+    }
+  } catch (_e) {
+    state = null; // fail-open on DB error — don't lock everyone out
+  }
+  _stateCache.set(accid, { state, exp: now + STATE_TTL_MS });
+  return state;
+}
+
+// Express middleware: verifies the Bearer token, re-checks the live account
+// state, and attaches req.user (with a refreshed tier).
+export const requireAuth: RequestHandler = async (req, res, next) => {
   const hdr = req.headers.authorization || '';
   const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : null;
   if (!token) { res.status(401).json({ error: 'no token' }); return; }
+  let user: AuthUser;
   try {
-    req.user = jwt.verify(token, SECRET) as AuthUser;
-    next();
+    user = jwt.verify(token, SECRET) as AuthUser;
   } catch (_e) {
     res.status(401).json({ error: 'invalid or expired token' });
+    return;
   }
+  const state = await currentAccountState(user.accid);
+  if (state && !state.ok) {
+    res.status(401).json({ error: 'account disabled' });
+    return;
+  }
+  if (state) user.tier = state.tier; // refresh tier (demotion takes effect)
+  req.user = user;
+  next();
 };
 
 // Express middleware: requires admin tier.

@@ -119,6 +119,7 @@ const pool = mysql.createPool({
   enableKeepAlive:    true,
   keepAliveInitialDelay: 0,
 });
+auth.initAuthPool(pool);   // enable per-request account-state revocation
 
 const MAPS_DIR    = path.join(__dirname, 'public', 'maps');
 const UPLOADS_DIR = path.join(__dirname, 'public', 'uploads');

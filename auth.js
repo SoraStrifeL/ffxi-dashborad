@@ -91,17 +91,60 @@ function issueToken(identity) {
     { expiresIn: TOKEN_TTL });
 }
 
-// Express middleware: verifies the Bearer token, attaches req.user.
-function requireAuth(req, res, next) {
+// ── Per-request account-state revocation ─────────────────────────────
+// A JWT stays valid until it expires (24h). Re-check the live account on
+// each request so banned/deleted accounts are rejected and a demoted admin
+// loses admin mid-session. Cached briefly to avoid a per-request DB hit.
+let _authPool = null;
+function initAuthPool(pool) { _authPool = pool; }
+
+const _stateCache = new Map();   // accid -> { state, exp }
+const STATE_TTL_MS = 15000;
+
+// Returns { ok, tier } for the live account, or null to skip the check
+// (no pool wired, or DB error → fail-open; signature already verified).
+async function currentAccountState(accid) {
+  if (!_authPool) return null;
+  const now = Date.now();
+  const hit = _stateCache.get(accid);
+  if (hit && hit.exp > now) return hit.state;
+
+  let state;
+  try {
+    const [rows] = await _authPool.execute(
+      `SELECT a.status, MAX(c.gmlevel) AS maxgm
+         FROM accounts a LEFT JOIN chars c ON c.accid = a.id
+        WHERE a.id = ? GROUP BY a.id`, [accid]);
+    if (rows.length === 0 || Number(rows[0].status) !== 1) {
+      state = { ok: false, tier: 'player' };
+    } else {
+      const maxGm = Number(rows[0].maxgm || 0);
+      state = { ok: true, tier: maxGm >= ADMIN_GM_LEVEL ? 'admin' : 'player' };
+    }
+  } catch (e) {
+    state = null; // fail-open on DB error
+  }
+  _stateCache.set(accid, { state, exp: now + STATE_TTL_MS });
+  return state;
+}
+
+// Express middleware: verifies the Bearer token, re-checks the live account
+// state, and attaches req.user (with a refreshed tier).
+async function requireAuth(req, res, next) {
   const hdr = req.headers.authorization || '';
   const token = hdr.startsWith('Bearer ') ? hdr.slice(7) : null;
   if (!token) return res.status(401).json({ error: 'no token' });
+  let user;
   try {
-    req.user = jwt.verify(token, JWT_SECRET);   // { accid, tier, login, iat, exp }
-    next();
+    user = jwt.verify(token, JWT_SECRET);   // { accid, tier, login, iat, exp }
   } catch (e) {
     return res.status(401).json({ error: 'invalid or expired token' });
   }
+  const state = await currentAccountState(user.accid);
+  if (state && !state.ok) return res.status(401).json({ error: 'account disabled' });
+  if (state) user.tier = state.tier;
+  req.user = user;
+  next();
 }
 
 // Express middleware: requires admin tier.
@@ -126,6 +169,6 @@ function verifyToken(token) {
 }
 
 module.exports = {
-  authenticate, issueToken, requireAuth, requireAdmin, userOwnsChar, verifyToken,
+  authenticate, issueToken, requireAuth, requireAdmin, userOwnsChar, verifyToken, initAuthPool,
   ADMIN_GM_LEVEL,
 };
