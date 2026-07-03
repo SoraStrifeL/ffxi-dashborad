@@ -863,6 +863,10 @@ app.get('/api/inventory/:charid', auth.requireAuth, async (req, res) => {
 // player self-service queue entries are desired (e.g. 'requestwarp').
 const PLAYER_ALLOWED_ACTIONS = new Set([]);
 
+// The dashboard_queue ENUM (and the C++ map-server module) use 'done'/'error',
+// but the client expects 'complete'/'failed'. Canonicalize before rows leave the server.
+function canonQueueStatus(s) { return s === 'done' ? 'complete' : s === 'error' ? 'failed' : s; }
+
 app.post('/api/queue', auth.requireAuth, async (req, res) => {
   try {
     const { charid, action, params } = req.body || {};
@@ -883,7 +887,7 @@ app.get('/api/queue/recent/:charid', auth.requireAuth, async (req, res) => {
     if (req.user.tier !== 'admin' && !(await auth.userOwnsChar(pool, req.user.accid, charid)))
       return res.status(403).json({ error: 'not your character' });
     const [rows] = await pool.execute('SELECT id, action, params, status, result, created_at, processed_at FROM dashboard_queue WHERE charid = ? ORDER BY id DESC LIMIT 10', [charid]);
-    res.json(rows);
+    res.json(rows.map(r => ({ ...r, status: canonQueueStatus(r.status) })));
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -894,7 +898,7 @@ app.get('/api/queue/:id', auth.requireAuth, auth.requireAdmin, async (req, res) 
       'SELECT id, action, status, result, created_at, processed_at FROM dashboard_queue WHERE id = ?',
       [parseInt(req.params.id)]);
     if (!row) return res.status(404).json({ error: 'not found' });
-    res.json(row);
+    res.json({ ...row, status: canonQueueStatus(row.status) });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -2876,7 +2880,7 @@ app.get('/api/nm/result/:id', auth.requireAuth, auth.requireAdmin, async (req, r
       'SELECT status, result FROM dashboard_queue WHERE id=? AND action="luaexec" AND requested_by="dashboard"',
       [parseInt(req.params.id)]);
     if (!row) return res.status(404).json({ error: 'not found' });
-    res.json(row);
+    res.json({ status: canonQueueStatus(row.status), result: row.result });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

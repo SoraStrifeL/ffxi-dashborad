@@ -714,5 +714,13 @@ export const PLAYER_ALLOWED_ACTIONS = new Set<string>([]);
 // ── DB page size ───────────────────────────────────────────────────────────────
 export const DB_PAGE = 50;
 
+// ── Queue status canonicalization ──────────────────────────────────────────────
+// The dashboard_queue ENUM (and the C++ map-server module) use 'done'/'error',
+// but the client and WS protocol use 'complete'/'failed'. Every queue row must
+// pass through this before leaving the server.
+export function canonQueueStatus(s: string): string {
+  return s === 'done' ? 'complete' : s === 'error' ? 'failed' : s;
+}
+
 // ── Scripts root ───────────────────────────────────────────────────────────────
 export const SERVER_SCRIPTS_ROOT = process.env.LSB_SERVER_SCRIPTS_DIR || '/ffxi-server-scripts';

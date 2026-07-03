@@ -6,6 +6,7 @@ import { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { requireAuth } from '../auth';
 import { requirePermission } from '../rbac';
 import { audit } from '../audit';
+import { canonQueueStatus } from '../catalog';
 
 export const TIMERS_FILE = path.join(__dirname, '..', '..', 'data', 'timers.json');
 
@@ -191,7 +192,7 @@ export function createTimersRouter(pool: Pool): Router {
         'SELECT status, result FROM dashboard_queue WHERE id=? AND action="luaexec" AND requested_by="dashboard"',
         [id]);
       if (!row) { res.status(404).json({ error: 'not found' }); return; }
-      res.json(row);
+      res.json({ status: canonQueueStatus(row.status as string), result: row.result });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 

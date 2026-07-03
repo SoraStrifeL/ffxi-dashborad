@@ -3,7 +3,7 @@ import { spawn, ChildProcess } from 'child_process';
 import WebSocket from 'ws';
 import { Pool, RowDataPacket } from 'mysql2/promise';
 import { WsClientState } from './types';
-import { queryStats, queryPlayers, LSB_LOG_DIR } from './catalog';
+import { queryStats, queryPlayers, LSB_LOG_DIR, canonQueueStatus } from './catalog';
 import { verifyToken } from './auth';
 import { hasPermission } from './rbac';
 import { setBroadcastAuditEvent } from './audit';
@@ -73,10 +73,11 @@ async function pollQueueUpdates(pool: Pool): Promise<void> {
       `SELECT id, charid, action, status, result, requested_by
        FROM dashboard_queue
        WHERE processed_at >= NOW() - INTERVAL 20 SECOND
-         AND status IN ('complete', 'failed', 'deferred')
+         AND status IN ('done', 'error', 'deferred')
        ORDER BY id ASC LIMIT 30`
     );
     for (const row of rows) {
+      row.status = canonQueueStatus(row.status as string);
       const key = `${row.id}:${row.status}`;
       if (sentQueueKeys.has(key)) continue;
       sentQueueKeys.set(key, Date.now());

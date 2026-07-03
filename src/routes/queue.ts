@@ -3,7 +3,7 @@ import { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
 import { requireAuth, requireAdmin } from '../auth';
 import { requirePermission } from '../rbac';
 import { userOwnsChar } from '../auth';
-import { PLAYER_ALLOWED_ACTIONS } from '../catalog';
+import { PLAYER_ALLOWED_ACTIONS, canonQueueStatus } from '../catalog';
 import { audit } from '../audit';
 
 export function createQueueRouter(pool: Pool): Router {
@@ -17,7 +17,10 @@ export function createQueueRouter(pool: Pool): Router {
       const [rows] = await pool.execute<RowDataPacket[]>(
         `SELECT id, charid, action, params, status, result, requested_by, created_at, processed_at
          FROM dashboard_queue ORDER BY id DESC LIMIT ${PAGE + 1} OFFSET ${page * PAGE}`);
-      res.json({ rows: rows.slice(0, PAGE), hasMore: rows.length > PAGE });
+      res.json({
+        rows: rows.slice(0, PAGE).map(r => ({ ...r, status: canonQueueStatus(r.status as string) })),
+        hasMore: rows.length > PAGE,
+      });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
@@ -44,7 +47,7 @@ export function createQueueRouter(pool: Pool): Router {
         { res.status(403).json({ error: 'not your character' }); return; }
       const [rows] = await pool.execute<RowDataPacket[]>(
         'SELECT id, action, params, status, result, created_at, processed_at FROM dashboard_queue WHERE charid = ? ORDER BY id DESC LIMIT 10', [charid]);
-      res.json(rows);
+      res.json(rows.map(r => ({ ...r, status: canonQueueStatus(r.status as string) })));
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
@@ -61,7 +64,7 @@ export function createQueueRouter(pool: Pool): Router {
           && !(await userOwnsChar(pool, req.user!.accid, row.charid as number))) {
         res.status(403).json({ error: 'not your queue entry' }); return;
       }
-      res.json({ id: row.id, action: row.action, status: row.status, result: row.result,
+      res.json({ id: row.id, action: row.action, status: canonQueueStatus(row.status as string), result: row.result,
                  created_at: row.created_at, processed_at: row.processed_at });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
