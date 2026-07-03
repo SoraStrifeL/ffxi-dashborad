@@ -1663,14 +1663,17 @@ app.get('/api/character/:charid/vars', auth.requireAuth, async (req, res) => {
 app.post('/api/character/:charid/setvar', auth.requireAuth, auth.requireAdmin, async (req, res) => {
   try {
     const charid = parseInt(req.params.charid);
+    if (!Number.isFinite(charid)) return res.status(400).json({ error: 'invalid charid' });
     const { varname, value } = req.body || {};
     if (!varname) return res.status(400).json({ error: 'varname required' });
     if (value === null || value === undefined || value === '') {
       await pool.execute('DELETE FROM char_vars WHERE charid=? AND varname=?', [charid, varname]);
     } else {
+      const numVal = parseInt(value);
+      if (!Number.isFinite(numVal)) return res.status(400).json({ error: 'value must be a number' });
       await pool.execute(
         'INSERT INTO char_vars (charid,varname,value) VALUES (?,?,?) ON DUPLICATE KEY UPDATE value=?',
-        [charid, varname, parseInt(value), parseInt(value)]);
+        [charid, varname, numVal, numVal]);
     }
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -2639,7 +2642,11 @@ app.post('/api/settings/rates', auth.requireAuth, auth.requireAdmin, async (req,
 const SCAN_FILES = ['main.lua', 'map.lua', 'login.lua'];
 const CURATED_KEYS = new Set(RATE_CATALOG.map(e => e.key));
 
-app.get('/api/dashboard/settings', auth.requireAuth, (_req, res) => res.json(loadDashboardSettings()));
+app.get('/api/dashboard/settings', auth.requireAuth, (req, res) => {
+  const s = loadDashboardSettings();
+  if (req.user.tier === 'admin') return res.json(s);
+  res.json({ serverName: s.serverName, motd: s.motd, autoSwitchZone: s.autoSwitchZone });
+});
 
 app.post('/api/dashboard/settings', auth.requireAuth, auth.requireAdmin, (req, res) => {
   const current = loadDashboardSettings();
@@ -2896,9 +2903,11 @@ app.post('/api/settings/variables', auth.requireAuth, auth.requireAdmin, async (
   try {
     const { varname, value } = req.body || {};
     if (!varname) return res.status(400).json({ error: 'varname required' });
+    const numVal = parseInt(value);
+    if (!Number.isFinite(numVal)) return res.status(400).json({ error: 'value must be a number' });
     await pool.execute(
       'INSERT INTO server_variables (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)',
-      [varname, parseInt(value) || 0]);
+      [varname, numVal]);
     res.json({ ok: true });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -3077,9 +3086,9 @@ app.post('/api/upload/map/:zoneid', auth.requireAuth, auth.requireAdmin, async (
     zoneName = normZoneName(row.name);
   } catch (e) { return res.status(500).json({ error: e.message }); }
   req._uploadFilename = `${zoneName}.png`;
-  makeUploader(MAPS_DIR, PNG_ONLY, 'Map images must be PNG')(req, res, err => {
+  makeUploader(MAPS_DIR, PNG_ONLY, 'Map images must be PNG')(req, res, async err => {
     if (err) return res.status(400).json({ error: err.message });
-    buildZoneMaps(); // rebuild mapping
+    await buildZoneMaps(); // rebuild mapping before responding so /api/maps is fresh
     res.json({ ok: true, file: req.file.filename, url: `/maps/${req.file.filename}` });
   });
 });

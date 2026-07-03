@@ -3,7 +3,7 @@ import path from 'path';
 import { Router } from 'express';
 import { Pool, RowDataPacket } from 'mysql2/promise';
 import { requireAuth } from '../auth';
-import { requirePermission } from '../rbac';
+import { requirePermission, hasPermission } from '../rbac';
 import { audit } from '../audit';
 import { SETTINGS_DIR, RATE_CATALOG, readRate, writeRate, SCAN_FILES, scanSettingsFile,
          loadDashboardSettings, saveDashboardSettings, DashboardSettings } from '../settings';
@@ -84,8 +84,12 @@ export function createSettingsRouter(pool: Pool): Router {
     } catch (err) { res.status(500).json({ error: (err as Error).message }); }
   });
 
-  router.get('/api/dashboard/settings', requireAuth, (_req, res) => {
-    res.json(loadDashboardSettings());
+  router.get('/api/dashboard/settings', requireAuth, (req, res) => {
+    const s = loadDashboardSettings();
+    // Full settings (rate-limit budget, admin GM threshold, autologin state)
+    // are for settings managers; everyone else gets the display fields only
+    if (hasPermission(req.user!.tier, 'manage:settings', req.user!.accid)) { res.json(s); return; }
+    res.json({ serverName: s.serverName, motd: s.motd, autoSwitchZone: s.autoSwitchZone });
   });
 
   router.post('/api/dashboard/settings', requireAuth, requirePermission('manage:settings'), (req, res) => {
@@ -201,7 +205,8 @@ export function createSettingsRouter(pool: Pool): Router {
     try {
       const { varname, value } = (req.body as { varname?: string; value?: unknown }) || {};
       if (!varname) return void res.status(400).json({ error: 'varname required' });
-      const numVal = parseInt(String(value)) || 0;
+      const numVal = parseInt(String(value));
+      if (!Number.isFinite(numVal)) return void res.status(400).json({ error: 'value must be a number' });
       await pool.execute(
         'INSERT INTO server_variables (name, value) VALUES (?, ?) ON DUPLICATE KEY UPDATE value = VALUES(value)',
         [varname, numVal]);

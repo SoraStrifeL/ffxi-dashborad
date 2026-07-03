@@ -99,11 +99,12 @@ export function createUploadRouter(pool: Pool): Router {
       zoneName = normZoneName(row.name as string);
     } catch (e) { return void res.status(500).json({ error: (e as Error).message }); }
     req._uploadFilename = `${zoneName}.png`;
-    makeUploader(MAPS_DIR, PNG_ONLY, 'Map images must be PNG')(req, res, (err: any) => {
+    makeUploader(MAPS_DIR, PNG_ONLY, 'Map images must be PNG')(req, res, async (err: any) => {
       if (err) return void res.status(400).json({ error: err.message });
       if (!req.file) return void res.status(400).json({ error: 'image file required' });
       audit(req.user!.login, 'upload.map', `zone:${zoneid}`, { file: req.file.filename });
-      buildZoneMaps(pool);
+      // await so /api/maps already reflects the new file when the client refetches
+      await buildZoneMaps(pool);
       res.json({ ok: true, file: req.file.filename, url: `/maps/${req.file.filename}` });
     });
   });

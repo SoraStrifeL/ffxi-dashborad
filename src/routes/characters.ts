@@ -206,14 +206,19 @@ export function createCharactersRouter(pool: Pool): Router {
   router.post('/api/character/:charid/setvar', requireAuth, requireAdmin, async (req, res) => {
     try {
       const charid = parseInt(req.params.charid as string);
+      if (!Number.isFinite(charid)) { res.status(400).json({ error: 'invalid charid' }); return; }
       const { varname, value } = (req.body as { varname?: string; value?: unknown }) || {};
       if (!varname) { res.status(400).json({ error: 'varname required' }); return; }
       if (value === null || value === undefined || value === '') {
         await pool.execute('DELETE FROM char_vars WHERE charid=? AND varname=?', [charid, varname]);
       } else {
+        const numVal = parseInt(String(value));
+        // reject garbage instead of silently coercing to 0 (char_vars has no FK,
+        // so a bad write would land as a junk row on a possibly-nonexistent char)
+        if (!Number.isFinite(numVal)) { res.status(400).json({ error: 'value must be a number' }); return; }
         await pool.execute(
           'INSERT INTO char_vars (charid,varname,value) VALUES (?,?,?) ON DUPLICATE KEY UPDATE value=?',
-          [charid, varname, parseInt(String(value)), parseInt(String(value))]);
+          [charid, varname, numVal, numVal]);
       }
       res.json({ ok: true });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
