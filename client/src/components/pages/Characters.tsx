@@ -210,6 +210,8 @@ function fmtAgo(unixSecs?: number): string {
   return `${Math.floor(diff / 86400)}d ago`;
 }
 const num = (v?: number) => Number(v ?? 0).toLocaleString();
+// DB zone names use underscores (e.g. Southern_San_dOria) — show them spaced.
+const prettyZone = (z?: string) => (z || '').replace(/_/g, ' ');
 
 function Vital({ label, value, color }: { label: string; value: React.ReactNode; color: string }) {
   return (
@@ -269,12 +271,11 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
           <span style={{ width: 10, height: 10, borderRadius: '50%', background: online ? 'var(--color-teal)' : 'var(--color-text3)', boxShadow: online ? '0 0 8px var(--color-teal)' : 'none', flexShrink: 0 }} />
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: online ? 'var(--color-teal)' : 'var(--color-text2)' }}>{online ? 'Online' : 'Offline'}</div>
-            <div style={{ fontSize: 11, color: 'var(--color-text3)' }}>{online ? `in ${char.zone_name || '—'}` : `last seen ${fmtAgo(char.last_logout)}`}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text3)' }}>{online ? `in ${prettyZone(char.zone_name) || '—'}` : `last seen ${fmtAgo(char.last_logout)}`}</div>
           </div>
         </div>
         <Vital label="HP"       value={char.hp + (char.gear_hp ?? 0)} color="var(--color-teal)" />
         <Vital label="MP"       value={char.mp + (char.gear_mp ?? 0)} color="#6aa0f0" />
-        <Vital label="Gil"      value={char.gil ?? 0}                 color="var(--color-gold)" />
         <Vital label="Playtime" value={`${playHrs}h ${playMins}m`}    color="var(--color-text1)" />
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
           {char.job_master ? <span className="pill pill-gold">Job Master</span> : null}
@@ -315,7 +316,7 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
               <span style={{ color: 'var(--color-text3)' }}>Zone</span>
               <button onClick={() => navigate('/map', { state: { zoneId: char.pos_zone } })}
                 className="btn btn-ghost btn-xs" style={{ padding: '1px 6px', fontSize: 11, color: 'var(--color-accent)', marginLeft: 'auto' }}>
-                {char.zone_name} ↗
+                {prettyZone(char.zone_name)} ↗
               </button>
             </div>
           )}
