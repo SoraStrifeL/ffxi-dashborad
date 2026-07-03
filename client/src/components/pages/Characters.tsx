@@ -163,7 +163,7 @@ export function CharacterDetail() {
       </div>
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
-        {tab === 'overview' && <CharOverview char={char} ext={ext} />}
+        {tab === 'overview' && <CharOverview char={char} ext={ext} setTab={setTab} />}
         {tab === 'gear'     && <CharGear char={char} equip={equip} />}
         {tab === 'progress' && <CharProgress ext={ext} />}
         {tab === 'inventory'&& <CharInventory charId={Number(id)} />}
@@ -226,7 +226,7 @@ function Vital({ label, value, color }: { label: string; value: React.ReactNode;
   );
 }
 
-function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null }) {
+function CharOverview({ char, ext, setTab }: { char: CharBasic; ext: CharExtended | null; setTab: (t: string) => void }) {
   const navigate = useNavigate();
   const p       = (ext?.profile ?? {}) as Record<string, number>;
   const pts     = (ext?.points  ?? {}) as Record<string, number>;
@@ -285,7 +285,6 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
     const g = s.groupName || 'Other'; acc[g] = (acc[g] ?? 0) + 1; return acc;
   }, {});
 
-  const cappedSkills = skills.filter(s => s.cap && s.value >= s.cap).length;
   const knownSkills  = skills.filter(s => s.value > 0).length;
 
   const companions = [
@@ -393,11 +392,16 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
           {HISTORY.map(([key, label]) => <Row key={key} k={label} v={num(hist[key])} />)}
         </Panel>
 
-        <Panel title={`Progression`}>
-          <Row k="Skills known" v={`${knownSkills} (${cappedSkills} capped)`} />
+        <Panel title="Progression">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px solid rgba(42,42,61,.4)', fontSize: 13 }}>
+            <span style={{ color: 'var(--color-text3)' }}>Skills leveled</span>
+            <button onClick={() => setTab('progress')} className="btn btn-ghost btn-xs" style={{ padding: '1px 6px', fontSize: 11, color: 'var(--color-accent)' }}>
+              {knownSkills} ↗
+            </button>
+          </div>
           <Row k="Merits" v={String(merits.length)} />
           <Row k="Spells learned" v={String(spells.length)} />
-          <Row k="JP jobs" v={String(jpJobs.length)} />
+          <Row k="Job-point jobs" v={String(jpJobs.length)} />
         </Panel>
 
         {jpJobs.length > 0 && (
