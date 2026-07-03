@@ -2,15 +2,17 @@ import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useStore } from '../../store';
 
+// perm: required permission from /api/me/permissions; entries without one are
+// visible to everyone (their read endpoints only need auth)
 const NAV = [
   { to: '/',         icon: '⬡',  label: 'Dashboard' },
-  { to: '/chars',    icon: '⚔',  label: 'Characters' },
-  { to: '/map',      icon: '🗺',  label: 'Map' },
-  { to: '/db',       icon: '📚', label: 'Database' },
+  { to: '/chars',    icon: '⚔',  label: 'Characters', perm: 'view:characters' },
+  { to: '/map',      icon: '🗺',  label: 'Map',        perm: 'view:characters' },
+  { to: '/db',       icon: '📚', label: 'Database',   perm: 'view:db' },
   { to: '/timers',   icon: '⏱',  label: 'Timers' },
   { to: '/roe',      icon: '📜', label: 'RoE Records' },
-  { to: '/console',  icon: '⌨',  label: 'Console' },
-  { to: '/settings', icon: '⚙',  label: 'Settings' },
+  { to: '/console',  icon: '⌨',  label: 'Console',    perm: 'run:console' },
+  { to: '/settings', icon: '⚙',  label: 'Settings',   perm: 'manage:settings' },
 ];
 
 const ADMIN_NAV = [
@@ -24,6 +26,7 @@ const ADMIN_NAV = [
 
 export function Sidebar() {
   const user   = useStore((s) => s.user);
+  const perms  = useStore((s) => s.permissions);
   const stats  = useStore((s) => s.stats);
   const logout = useStore((s) => s.logout);
 
@@ -53,8 +56,8 @@ export function Sidebar() {
         <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--color-text3)', padding: '8px 8px 6px' }}>
           General
         </div>
-        {NAV.map((item) => (
-          <SidebarLink key={item.to} {...item} />
+        {NAV.filter((item) => !item.perm || perms.includes(item.perm)).map((item) => (
+          <SidebarLink key={item.to} to={item.to} icon={item.icon} label={item.label} />
         ))}
 
         {user?.tier === 'admin' && (

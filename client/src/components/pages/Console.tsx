@@ -19,6 +19,7 @@ export function Console() {
   const histIdx = useRef(-1);
   const players = useStore((s) => s.players);
   const wsReady = useStore((s) => s.wsReady);
+  const canConsole = useStore((s) => s.permissions.includes('run:console'));
   const { send } = useWS((type, data) => {
     if (type === 'log') {
       const d = data as { file: string; lines: string[] };
@@ -89,6 +90,8 @@ export function Console() {
       }, 500);
     } catch (e) { setLuaRunning(false); setLuaOutput((e as Error).message); }
   }
+
+  if (!canConsole) return <div style={{ padding: 24, color: 'var(--color-text3)' }}>Console access requires the run:console permission.</div>;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>

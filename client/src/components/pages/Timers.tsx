@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api';
+import { useStore } from '../../store';
 
 interface Timer {
   id: string; name: string; zone: string; respawnMin: number; respawnMax: number; notes: string;
@@ -39,6 +40,9 @@ const PH_ORDER: Record<string, number> = { window: 0, overdue: 1, waiting: 2, id
 
 export function Timers() {
   const navigate = useNavigate();
+  // Reading timers only needs auth; every mutation needs manage:timers — hide
+  // those controls rather than letting clicks silently 403
+  const canManage = useStore((s) => s.permissions.includes('manage:timers'));
   const [timers,   setTimers]   = useState<Timer[]>([]);
   const [now,      setNow]      = useState(Date.now());
   const [showAdd,  setShowAdd]  = useState(false);
@@ -173,11 +177,13 @@ export function Timers() {
         <div style={{ padding: '11px 16px', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', display: 'flex', gap: 8, alignItems: 'center', flexShrink: 0 }}>
           <span style={{ fontSize: 14, fontWeight: 700 }}>Timers</span>
           <span className="pill pill-muted" style={{ fontSize: 11 }}>{timers.length}</span>
-          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
-            <button onClick={() => { setShowAdd(!showAdd); setShowImport(false); }} className="btn btn-ghost btn-sm">{showAdd ? 'Cancel' : '+ Add'}</button>
-            <button onClick={() => { setShowImport(!showImport); setShowAdd(false); }} className="btn btn-ghost btn-sm">{showImport ? 'Close' : 'Import NM'}</button>
-            {timers.some(t => t.groupId && t.nmName) && <button onClick={checkAll} disabled={checkAllLoading} className="btn btn-ghost btn-sm">{checkAllLoading ? 'Checking…' : 'Check All'}</button>}
-          </div>
+          {canManage && (
+            <div style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
+              <button onClick={() => { setShowAdd(!showAdd); setShowImport(false); }} className="btn btn-ghost btn-sm">{showAdd ? 'Cancel' : '+ Add'}</button>
+              <button onClick={() => { setShowImport(!showImport); setShowAdd(false); }} className="btn btn-ghost btn-sm">{showImport ? 'Close' : 'Import NM'}</button>
+              {timers.some(t => t.groupId && t.nmName) && <button onClick={checkAll} disabled={checkAllLoading} className="btn btn-ghost btn-sm">{checkAllLoading ? 'Checking…' : 'Check All'}</button>}
+            </div>
+          )}
         </div>
 
         {/* Add form */}
@@ -242,14 +248,16 @@ export function Timers() {
                       : <div style={{ fontSize: 11, color: 'var(--color-text3)', marginTop: 2 }}>No spawn point found</div>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                    <button onClick={() => kill(t.id)} className="btn btn-ghost btn-xs" style={{ color: 'var(--color-red)' }}>Kill</button>
-                    <button onClick={() => reset(t.id)} className="btn btn-ghost btn-xs">Reset</button>
-                    {t.groupId && t.nmName && <button onClick={() => checkHP(t)} className="btn btn-ghost btn-xs">HP?</button>}
-                    {t.groupId && t.nmName && <button onClick={() => lookupSpawn(t)} className="btn btn-ghost btn-xs" title="Lookup spawn coordinates">⊕</button>}
-                    <button onClick={() => editingId === t.id ? setEditingId(null) : startEdit(t)} className="btn btn-ghost btn-xs" title="Edit timer">✎</button>
-                    <button onClick={() => del(t.id)} className="btn btn-ghost btn-xs" style={{ color: 'var(--color-text3)' }}>✕</button>
-                  </div>
+                  {canManage && (
+                    <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                      <button onClick={() => kill(t.id)} className="btn btn-ghost btn-xs" style={{ color: 'var(--color-red)' }}>Kill</button>
+                      <button onClick={() => reset(t.id)} className="btn btn-ghost btn-xs">Reset</button>
+                      {t.groupId && t.nmName && <button onClick={() => checkHP(t)} className="btn btn-ghost btn-xs">HP?</button>}
+                      {t.groupId && t.nmName && <button onClick={() => lookupSpawn(t)} className="btn btn-ghost btn-xs" title="Lookup spawn coordinates">⊕</button>}
+                      <button onClick={() => editingId === t.id ? setEditingId(null) : startEdit(t)} className="btn btn-ghost btn-xs" title="Edit timer">✎</button>
+                      <button onClick={() => del(t.id)} className="btn btn-ghost btn-xs" style={{ color: 'var(--color-text3)' }}>✕</button>
+                    </div>
+                  )}
                 </div>
                 {editingId === t.id && (
                   <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 6 }}>

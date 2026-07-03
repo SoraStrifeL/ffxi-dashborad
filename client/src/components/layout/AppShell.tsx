@@ -8,6 +8,7 @@ import { useWS } from '../../hooks/useWS';
 export function AppShell() {
   const token    = useStore((s) => s.token);
   const setUser  = useStore((s) => s.setUser);
+  const setPermissions = useStore((s) => s.setPermissions);
   const logout   = useStore((s) => s.logout);
   const navigate = useNavigate();
 
@@ -16,7 +17,8 @@ export function AppShell() {
   useEffect(() => {
     if (!token) { navigate('/login', { replace: true }); return; }
     api.me().then(setUser).catch(() => { logout(); navigate('/login', { replace: true }); });
-  }, [token, setUser, logout, navigate]);
+    api.mePermissions().then(r => setPermissions(r.permissions)).catch(() => setPermissions([]));
+  }, [token, setUser, setPermissions, logout, navigate]);
 
   if (!token) return null;
 

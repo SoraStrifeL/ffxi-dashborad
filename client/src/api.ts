@@ -23,6 +23,7 @@ export const api = {
     }),
 
   me: () => req<{ login: string; tier: 'admin' | 'player'; accid: number }>('/api/me'),
+  mePermissions: () => req<{ login: string; tier: string; permissions: string[] }>('/api/me/permissions'),
 
   stats:   () => req<import('./types').ServerStats>('/api/stats'),
   players: () => req<import('./types').Player[]>('/api/players'),

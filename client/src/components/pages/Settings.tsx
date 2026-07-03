@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { api } from '../../api';
+import { useStore } from '../../store';
 
 type RateEntry = { group: string; key: string; label: string; file: string; step?: number; type?: string; value: number | boolean | null };
 type ScanEntry = { key: string; value: unknown; curated: boolean };
@@ -483,6 +484,8 @@ function FsBrowserPanel() {
 
 export function Settings() {
   const [tab, setTab] = useState<Tab>('Rates');
+  const canManage = useStore((s) => s.permissions.includes('manage:settings'));
+  if (!canManage) return <div style={{ padding: 24, color: 'var(--color-text3)' }}>Settings requires the manage:settings permission.</div>;
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ background: 'var(--color-surface)', borderBottom: '1px solid var(--color-border)', padding: '12px 24px 0', flexShrink: 0 }}>
