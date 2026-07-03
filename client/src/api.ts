@@ -74,6 +74,8 @@ export const api = {
     }).catch(() => {});
   },
 
+  version: () => req<{ version: string; commit: string; buildDate: string; node: string; uptime: number }>('/api/version'),
+
   me: () => req<{ login: string; tier: 'admin' | 'player'; accid: number }>('/api/me'),
   mePermissions: () => req<{ login: string; tier: string; permissions: string[] }>('/api/me/permissions'),
 

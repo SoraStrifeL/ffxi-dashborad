@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useStore } from '../../store';
+import { api } from '../../api';
 
 // perm: required permission from /api/me/permissions; entries without one are
 // visible to everyone (their read endpoints only need auth)
@@ -29,6 +30,9 @@ export function Sidebar() {
   const perms  = useStore((s) => s.permissions);
   const stats  = useStore((s) => s.stats);
   const logout = useStore((s) => s.logout);
+
+  const [ver, setVer] = useState<{ version: string; commit: string; buildDate: string } | null>(null);
+  useEffect(() => { api.version().then(setVer).catch(() => {}); }, []);
 
   const online = stats?.online_players ?? 0;
 
@@ -100,6 +104,14 @@ export function Sidebar() {
         >
           Log out
         </button>
+        {ver && (
+          <div
+            title={`build ${ver.buildDate}`}
+            style={{ marginTop: 8, textAlign: 'center', fontSize: 10, color: 'var(--color-text3)', fontFamily: 'var(--font-mono)' }}
+          >
+            v{ver.version} · {ver.commit.slice(0, 7)}
+          </div>
+        )}
       </div>
     </aside>
   );

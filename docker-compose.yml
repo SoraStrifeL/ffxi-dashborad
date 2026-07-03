@@ -8,7 +8,13 @@ services:
       - ffxi_default
 
   dashboard:
-    build: .
+    build:
+      context: .
+      args:
+        # Populate from the shell at build time, e.g.:
+        #   GIT_COMMIT=$(git rev-parse HEAD) BUILD_DATE=$(date -u +%FT%TZ) docker compose build
+        GIT_COMMIT: "${GIT_COMMIT:-unknown}"
+        BUILD_DATE: "${BUILD_DATE:-unknown}"
     image: ffxi-dashboard
     container_name: ffxi-dashboard
     restart: unless-stopped

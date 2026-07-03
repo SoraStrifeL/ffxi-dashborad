@@ -5,6 +5,7 @@ import { requirePermission, ROLE_PERMISSIONS, getAccountOverrides } from '../rba
 import { redisClient } from '../cache';
 import { listPlugins } from '../plugin';
 import { version } from '../../package.json';
+import { VERSION_INFO } from '../version';
 
 const startTime = Date.now();
 
@@ -39,6 +40,11 @@ export function createHealthRouter(pool: Pool): Router {
         rssMb:       +(mem.rss       / 1024 / 1024).toFixed(1),
       },
     });
+  });
+
+  // ── Build/version info (public, for troubleshooting) ───────────────────────
+  router.get('/api/version', (_req, res) => {
+    res.json({ ...VERSION_INFO, uptime: Math.floor((Date.now() - startTime) / 1000) });
   });
 
   // ── Current user's permissions ─────────────────────────────────────────────
