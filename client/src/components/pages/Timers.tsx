@@ -117,7 +117,9 @@ export function Timers() {
             clearInterval(poll);
             const [spawned, hpp] = entry.result.split('|');
             setChecks(p => ({ ...p, [t.id]: spawned === 'spawned' ? `HP ${hpp}%` : 'Not up' }));
-          } else if (entry.status === 'failed' || tries > 20) {
+          } else if (entry.status === 'failed') {
+            clearInterval(poll); setChecks(p => ({ ...p, [t.id]: 'failed' }));
+          } else if (tries > 20) {
             clearInterval(poll); setChecks(p => ({ ...p, [t.id]: 'timeout' }));
           }
         } catch (_) {

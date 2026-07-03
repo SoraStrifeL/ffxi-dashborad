@@ -9,11 +9,13 @@ import { audit } from '../audit';
 import { MAPS_DIR, UPLOADS_DIR, normZoneName, buildZoneMaps } from '../catalog';
 
 const ALLOWED_IMG_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+// buildZoneMaps() and the whole map pipeline are PNG-only — see CLAUDE.md "Map images"
+const PNG_ONLY = new Set(['image/png']);
 const MIME_EXT: Record<string, string> = {
   'image/jpeg': 'jpg', 'image/png': 'png', 'image/gif': 'gif', 'image/webp': 'webp',
 };
 
-function makeUploader(dest: string): ReturnType<ReturnType<typeof multer>['single']> {
+function makeUploader(dest: string, allowedMime: Set<string> = ALLOWED_IMG_MIME, mimeError = 'Only image files are allowed'): ReturnType<ReturnType<typeof multer>['single']> {
   return multer({
     storage: multer.diskStorage({
       destination: (_req, _file, cb) => cb(null, dest),
@@ -21,10 +23,21 @@ function makeUploader(dest: string): ReturnType<ReturnType<typeof multer>['singl
     }),
     limits: { fileSize: 8 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
-      if (ALLOWED_IMG_MIME.has(file.mimetype)) cb(null, true);
-      else cb(new Error('Only image files are allowed'));
+      if (allowedMime.has(file.mimetype)) cb(null, true);
+      else cb(new Error(mimeError));
     },
   }).single('image');
+}
+
+// Re-uploading the same key in a new format must not leave the old-extension
+// file behind — /api/upload/check returns the first extension it finds, so a
+// stale variant would permanently shadow the new image.
+function removeStaleVariants(dir: string, key: string, keepExt: string): void {
+  for (const ext of Object.values(MIME_EXT)) {
+    if (ext === keepExt) continue;
+    const f = path.join(dir, `${key}.${ext}`);
+    try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {}
+  }
 }
 
 export function createUploadRouter(pool: Pool): Router {
@@ -85,9 +98,8 @@ export function createUploadRouter(pool: Pool): Router {
       if (!row) return void res.status(404).json({ error: 'zone not found' });
       zoneName = normZoneName(row.name as string);
     } catch (e) { return void res.status(500).json({ error: (e as Error).message }); }
-    const ext = ((req.query.ext as string) || 'png').replace(/[^a-z]/g, '') || 'png';
-    req._uploadFilename = `${zoneName}.${ext}`;
-    makeUploader(MAPS_DIR)(req, res, (err: any) => {
+    req._uploadFilename = `${zoneName}.png`;
+    makeUploader(MAPS_DIR, PNG_ONLY, 'Map images must be PNG')(req, res, (err: any) => {
       if (err) return void res.status(400).json({ error: err.message });
       if (!req.file) return void res.status(400).json({ error: 'image file required' });
       audit(req.user!.login, 'upload.map', `zone:${zoneid}`, { file: req.file.filename });
@@ -108,6 +120,7 @@ export function createUploadRouter(pool: Pool): Router {
       if (newName !== req.file.filename) {
         fs.renameSync(req.file.path, path.join(UPLOADS_DIR, 'items', newName));
       }
+      removeStaleVariants(path.join(UPLOADS_DIR, 'items'), String(itemid), ext);
       audit(req.user!.login, 'upload.item', `item:${itemid}`);
       res.json({ ok: true, url: `/uploads/items/${newName}` });
     });
@@ -125,6 +138,7 @@ export function createUploadRouter(pool: Pool): Router {
       if (newName !== req.file.filename) {
         fs.renameSync(req.file.path, path.join(UPLOADS_DIR, 'npcs', newName));
       }
+      removeStaleVariants(path.join(UPLOADS_DIR, 'npcs'), String(npcid), ext);
       audit(req.user!.login, 'upload.npc', `npc:${npcid}`);
       res.json({ ok: true, url: `/uploads/npcs/${newName}` });
     });
@@ -143,6 +157,7 @@ export function createUploadRouter(pool: Pool): Router {
       if (newName !== req.file.filename) {
         fs.renameSync(req.file.path, path.join(UPLOADS_DIR, 'mobs', newName));
       }
+      removeStaleVariants(path.join(UPLOADS_DIR, 'mobs'), key, ext);
       audit(req.user!.login, 'upload.mob', `mob:${key}`);
       res.json({ ok: true, url: `/uploads/mobs/${newName}`, key });
     });

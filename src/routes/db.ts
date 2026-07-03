@@ -68,14 +68,14 @@ export function createDbRouter(pool: Pool): Router {
         extra.push('AND CONVERT(ib.name USING utf8) LIKE ?');
         params.push(`%${qRaw}%`);
       }
-      if (typeBit !== null) { extra.push('AND ib.type=?'); params.push(typeBit); }
+      if (typeBit !== null && !isNaN(typeBit)) { extra.push('AND ib.type=?'); params.push(typeBit); }
       if (rareOnly) extra.push('AND (ib.flags & 0x8000) != 0');
       if (flagMask !== null && !isNaN(flagMask)) {
         extra.push(`AND (ib.flags & ?) = ?`);
         params.push(flagMask, isNaN(flagVal as number) ? flagMask : flagVal);
       }
       if (skill !== null && !isNaN(skill)) { extra.push('AND iw.skill=?'); params.push(skill); }
-      if (slotBit !== null) { extra.push('AND (ie.slot & ?) != 0'); params.push(slotBit); }
+      if (slotBit !== null && !isNaN(slotBit)) { extra.push('AND (ie.slot & ?) != 0'); params.push(slotBit); }
       params.push(DB_PAGE, page * DB_PAGE);
       const [rows] = await pool.execute<RowDataPacket[]>(
         `SELECT ib.itemid, CONVERT(ib.name USING utf8) AS name, ib.type, ib.flags, ib.stackSize, ib.BaseSell,
@@ -309,7 +309,9 @@ export function createDbRouter(pool: Pool): Router {
     const cached = await cacheGetJSON(cacheKey);
     if (cached) { res.json(cached); return; }
     try {
-      const slug = questName.replace(/ /g, '_').replace(/'/g, '%27');
+      // encodeURIComponent so names with ? or & don't truncate the path;
+      // it leaves apostrophes alone, which bg-wiki accepts raw
+      const slug = encodeURIComponent(questName.replace(/ /g, '_'));
       const url = `https://www.bg-wiki.com/ffxi/${slug}`;
       const resp = await fetch(url, { headers: { 'User-Agent': 'FFXI-Dashboard/1.0' }, signal: AbortSignal.timeout(6000) });
       if (!resp.ok) { res.json(null); return; }

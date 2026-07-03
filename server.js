@@ -150,7 +150,9 @@ setInterval(() => {
 const windowerZoneEntities = new Map();
 
 const ALLOWED_IMG_MIME = new Set(['image/jpeg','image/png','image/gif','image/webp']);
-function makeUploader(dest) {
+// buildZoneMaps() and the whole map pipeline are PNG-only — see CLAUDE.md "Map images"
+const PNG_ONLY = new Set(['image/png']);
+function makeUploader(dest, allowedMime = ALLOWED_IMG_MIME, mimeError = 'Only image files are allowed') {
   return multer({
     storage: multer.diskStorage({
       destination: (_req, _file, cb) => cb(null, dest),
@@ -158,9 +160,20 @@ function makeUploader(dest) {
     }),
     limits: { fileSize: 8 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
-      cb(ALLOWED_IMG_MIME.has(file.mimetype) ? null : new Error('Only image files are allowed'), ALLOWED_IMG_MIME.has(file.mimetype));
+      cb(allowedMime.has(file.mimetype) ? null : new Error(mimeError), allowedMime.has(file.mimetype));
     },
   }).single('image');
+}
+
+// Re-uploading the same key in a new format must not leave the old-extension
+// file behind — /api/upload/check returns the first extension it finds, so a
+// stale variant would permanently shadow the new image.
+function removeStaleVariants(dir, key, keepExt) {
+  for (const ext of ['png','jpg','gif','webp']) {
+    if (ext === keepExt) continue;
+    const f = path.join(dir, key + '.' + ext);
+    try { if (fs.existsSync(f)) fs.unlinkSync(f); } catch (_) {}
+  }
 }
 
 // ── Zone → map filename(s): built at startup by scanning public/maps/ ─────────
@@ -1697,7 +1710,9 @@ app.get('/api/db/quests/wiki', auth.requireAuth, async (req, res) => {
   const cached = WIKI_CACHE.get(cacheKey);
   if (cached && Date.now() - cached.cachedAt < WIKI_CACHE_TTL) return res.json(cached);
   try {
-    const slug = questName.replace(/ /g,'_').replace(/'/g,'%27');
+    // encodeURIComponent so names with ? or & don't truncate the path;
+    // it leaves apostrophes alone, which bg-wiki accepts raw
+    const slug = encodeURIComponent(questName.replace(/ /g,'_'));
     const url = `https://www.bg-wiki.com/ffxi/${slug}`;
     const resp = await fetch(url, { headers:{ 'User-Agent':'FFXI-Dashboard/1.0' }, signal: AbortSignal.timeout(6000) });
     if (!resp.ok) return res.json(null);
@@ -3057,9 +3072,8 @@ app.post('/api/upload/map/:zoneid', auth.requireAuth, auth.requireAdmin, async (
     if (!row) return res.status(404).json({ error: 'zone not found' });
     zoneName = normZoneName(row.name);
   } catch (e) { return res.status(500).json({ error: e.message }); }
-  const ext = (req.query.ext || 'png').replace(/[^a-z]/g, '') || 'png';
-  req._uploadFilename = `${zoneName}.${ext}`;
-  makeUploader(MAPS_DIR)(req, res, err => {
+  req._uploadFilename = `${zoneName}.png`;
+  makeUploader(MAPS_DIR, PNG_ONLY, 'Map images must be PNG')(req, res, err => {
     if (err) return res.status(400).json({ error: err.message });
     buildZoneMaps(); // rebuild mapping
     res.json({ ok: true, file: req.file.filename, url: `/maps/${req.file.filename}` });
@@ -3080,6 +3094,7 @@ app.post('/api/upload/item/:itemid', auth.requireAuth, auth.requireAdmin, (req, 
     if (newName !== req.file.filename) {
       fs.renameSync(req.file.path, path.join(UPLOADS_DIR, 'items', newName));
     }
+    removeStaleVariants(path.join(UPLOADS_DIR, 'items'), String(itemid), ext);
     res.json({ ok: true, url: `/uploads/items/${newName}` });
   });
 });
@@ -3097,6 +3112,7 @@ app.post('/api/upload/npc/:npcid', auth.requireAuth, auth.requireAdmin, (req, re
     if (newName !== req.file.filename) {
       fs.renameSync(req.file.path, path.join(UPLOADS_DIR, 'npcs', newName));
     }
+    removeStaleVariants(path.join(UPLOADS_DIR, 'npcs'), String(npcid), ext);
     res.json({ ok: true, url: `/uploads/npcs/${newName}` });
   });
 });
@@ -3115,6 +3131,7 @@ app.post('/api/upload/mob', auth.requireAuth, auth.requireAdmin, (req, res) => {
     if (newName !== req.file.filename) {
       fs.renameSync(req.file.path, path.join(UPLOADS_DIR, 'mobs', newName));
     }
+    removeStaleVariants(path.join(UPLOADS_DIR, 'mobs'), String(key), ext);
     res.json({ ok: true, url: `/uploads/mobs/${newName}`, key });
   });
 });

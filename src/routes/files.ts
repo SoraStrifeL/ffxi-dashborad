@@ -118,7 +118,10 @@ export function createFilesRouter(): Router {
     }),
     limits: { fileSize: 10 * 1024 * 1024 },
     fileFilter: (_req, file, cb) => {
-      if (ALLOWED_UPLOAD_MIME.has(file.mimetype)) cb(null, true);
+      // Check the extension too — mimetype is client-supplied, and these dirs are
+      // served statically, so a spoofed .html upload would be stored XSS
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ALLOWED_UPLOAD_MIME.has(file.mimetype) && IMAGE_EXTS.has(ext)) cb(null, true);
       else cb(new Error('Only image files are allowed'));
     },
   }).single('file');
