@@ -88,6 +88,12 @@ export const api = {
   char: (id: number) => req<import('./types').CharBasic>(`/api/character/${id}`),
   charExtended: (id: number) => req<import('./types').CharExtended>(`/api/character/${id}/extended`),
   charEquipment: (id: number) => req<{ slot: number; itemId: number; name: string }[]>(`/api/character/${id}/equipment`),
+  // Aggregate: basic + extended + equipment in one request (character page load)
+  charFull: (id: number) => req<{
+    basic: import('./types').CharBasic;
+    extended: import('./types').CharExtended;
+    equipment: { slot: number; itemId: number; name: string }[];
+  }>(`/api/character/${id}/full`),
 
   maps:         ()          => req<Record<number, string[]>>('/api/maps'),
   mapImage:     (z: number, floor = 0) => `/api/map/${z}?floor=${floor}`,

@@ -16,6 +16,124 @@ import path from 'path';
 export function createCharactersRouter(pool: Pool): Router {
   const router = Router();
 
+  // ── Shared character loaders ───────────────────────────────────────────────
+  // Used by the individual /api/character/:id[...] routes and composed by the
+  // aggregate /api/character/:id/full so the two never drift.
+  async function loadCharBasic(charid: number): Promise<RowDataPacket | null> {
+    const [[c]] = await pool.execute<RowDataPacket[]>(`
+      SELECT c.charid, c.charname, c.pos_zone, c.pos_x, c.pos_y, c.pos_z,
+             c.gmlevel, c.nation, c.playtime, c.accid,
+             UNIX_TIMESTAMP(c.timecreated) AS timecreated,
+             UNIX_TIMESTAMP(c.last_logout) AS last_logout,
+             c.home_zone, c.home_x, c.home_y, c.home_z,
+             c.pos_prevzone, c.mentor, c.job_master, c.moghancement,
+             z.name  AS zone_name,
+             hz.name AS home_zone_name,
+             pz.name AS prev_zone_name,
+             cs.mjob, cs.mlvl, cs.sjob, cs.slvl, cs.hp, cs.mp,
+             cl.race, cl.size AS char_size, cl.face,
+             cj.genkai,
+             cj.war, cj.mnk, cj.whm, cj.blm, cj.rdm, cj.thf,
+             cj.pld, cj.drk, cj.bst, cj.brd, cj.rng, cj.sam,
+             cj.nin, cj.drg, cj.smn, cj.blu, cj.cor, cj.pup,
+             cj.dnc, cj.sch, cj.geo, cj.run,
+             a.login AS account_login, a.status AS account_status, a.priv AS account_priv,
+             CASE WHEN ses.charid IS NOT NULL THEN 1 ELSE 0 END AS online
+      FROM chars c
+      LEFT JOIN zone_settings     z   ON c.pos_zone    = z.zoneid
+      LEFT JOIN zone_settings     hz  ON c.home_zone   = hz.zoneid
+      LEFT JOIN zone_settings     pz  ON c.pos_prevzone= pz.zoneid
+      LEFT JOIN char_stats        cs  ON c.charid      = cs.charid
+      LEFT JOIN char_look         cl  ON c.charid    = cl.charid
+      LEFT JOIN char_jobs         cj  ON c.charid    = cj.charid
+      LEFT JOIN accounts          a   ON c.accid     = a.id
+      LEFT JOIN accounts_sessions ses ON c.charid    = ses.charid
+      WHERE c.charid = ? LIMIT 1`, [charid]);
+    if (!c) return null;
+    const [[gilRow]] = await pool.execute<RowDataPacket[]>('SELECT quantity AS gil FROM char_inventory WHERE charid = ? AND itemId = 65535 LIMIT 1', [charid]);
+    c.gil = gilRow ? gilRow.gil : 0;
+    const [[gearRow]] = await pool.execute<RowDataPacket[]>(`
+      SELECT
+        COALESCE(SUM(CASE WHEN im.modId = 2 THEN im.value ELSE 0 END), 0) AS gear_hp,
+        COALESCE(SUM(CASE WHEN im.modId = 5 THEN im.value ELSE 0 END), 0) AS gear_mp
+      FROM char_equip ce
+      JOIN char_inventory ci
+        ON ce.charid = ci.charid AND ce.containerid = ci.location AND ce.slotid = ci.slot
+      LEFT JOIN item_mods im ON ci.itemId = im.itemId AND im.modId IN (2, 5)
+      WHERE ce.charid = ?
+    `, [charid]);
+    c.gear_hp = gearRow ? Number(gearRow.gear_hp) : 0;
+    c.gear_mp = gearRow ? Number(gearRow.gear_mp) : 0;
+    return c;
+  }
+
+  async function loadCharExtended(charid: number): Promise<object> {
+    const [
+      [exp], [history], [profile], [points], [skills],
+      [flags], [job_points], [merits], [spells],
+      [pet], [chocobo], [unlocks], [storage], [bag_counts], [vars],
+    ] = await Promise.all([
+      pool.execute<RowDataPacket[]>(`SELECT war,mnk,whm,blm,rdm,thf,pld,drk,bst,brd,rng,sam,nin,drg,smn,blu,cor,pup,dnc,sch,geo,run,merits,limits FROM char_exp WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT enemies_defeated,times_knocked_out,battles_fought,spells_cast,abilities_used,ws_used,items_used,npc_interactions,chats_sent,distance_travelled,mh_entrances,joined_parties,joined_alliances,gm_calls FROM char_history WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT rank_points,rank_sandoria,rank_bastok,rank_windurst,fame_sandoria,fame_bastok,fame_windurst,fame_norg,fame_jeuno,fame_adoulin,unity_leader FROM char_profile WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT sandoria_cp,bastok_cp,windurst_cp,spark_of_eminence,shining_star,deeds,bayld,escha_silt,escha_beads,allied_notes,unity_accolades,current_accolades,current_hallmarks,total_hallmarks,gallantry,login_points,fellow_point,imperial_standing,ballista_point,infamy,prestige,domain_points,mog_segments,gallimaufry,kinetic_unit,cruor,traverser_stones,voidstones,resistance_credit,dominion_note,zeni_point,jetton,therion_ichor,leujaoam_assault_point,mamool_assault_point,lebros_assault_point,periqia_assault_point,ilrusi_assault_point,nyzul_isle_assault_point,temenos_units,apollyon_units,beastman_seal,kindred_seal,kindred_crest,high_kindred_crest,sacred_kindred_crest,ancient_beastcoin,valor_point,scyld,research_mark,guild_fishing,guild_woodworking,guild_smithing,guild_goldsmithing,guild_weaving,guild_leathercraft,guild_bonecraft,guild_alchemy,guild_cooking,fire_crystals,ice_crystals,wind_crystals,earth_crystals,lightning_crystals,water_crystals,light_crystals,dark_crystals,daily_tally,chocobuck_sandoria,chocobuck_bastok,chocobuck_windurst FROM char_points WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT cs.skillid, cs.value, cs.rank,
+        CASE cs.rank
+          WHEN 0 THEN sc.r0 WHEN 1 THEN sc.r1 WHEN 2 THEN sc.r2 WHEN 3 THEN sc.r3
+          WHEN 4 THEN sc.r4 WHEN 5 THEN sc.r5 WHEN 6 THEN sc.r6 WHEN 7 THEN sc.r7
+          WHEN 8 THEN sc.r8 WHEN 9 THEN sc.r9 WHEN 10 THEN sc.r10 WHEN 11 THEN sc.r11
+          WHEN 12 THEN sc.r12 WHEN 13 THEN sc.r13
+        END AS cap
+        FROM char_skills cs
+        JOIN char_stats cst ON cst.charid = cs.charid
+        JOIN skill_caps sc ON sc.level = cst.mlvl
+        WHERE cs.charid=? ORDER BY cs.skillid`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT gmModeEnabled, gmHiddenEnabled, muted FROM char_flags WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT jobid, capacity_points, job_points, job_points_spent FROM char_job_points WHERE charid=? ORDER BY jobid`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT meritid, upgrades FROM char_merit WHERE charid=? AND upgrades>0 ORDER BY meritid`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT cs.spellid, sl.name, sl.\`group\` FROM char_spells cs LEFT JOIN spell_list sl ON cs.spellid=sl.spellid WHERE cs.charid=? ORDER BY sl.\`group\`, sl.name`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT wyvernid, automatonid, adventuringfellowid AS fellowid, chocoboid, field_chocobo FROM char_pet WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT first_name, last_name, stage, color, strength, endurance, discernment, receptivity, affection, energy FROM char_chocobos WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT outpost_sandy, outpost_bastok, outpost_windy, mog_locker, runic_portal, maw FROM char_unlocks WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT inventory, safe, locker, satchel, sack, \`case\`, wardrobe FROM char_storage WHERE charid=?`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT location, COUNT(*) AS count FROM char_inventory WHERE charid=? AND NOT (location=0 AND itemId=65535) GROUP BY location ORDER BY location`, [charid]),
+      pool.execute<RowDataPacket[]>(`SELECT varname, value FROM char_vars WHERE charid=? ORDER BY varname LIMIT 200`, [charid]),
+    ]);
+
+    return {
+      exp:        exp[0]      || null,
+      history:    history[0]  || null,
+      profile:    profile[0]  || null,
+      points:     points[0]   || null,
+      skills,
+      flags:      flags[0]    || null,
+      job_points: job_points.map(r => ({ ...r })),
+      merits:     merits.map(r => ({ ...r, name: MERIT_NAMES[r.meritid as number] || `Merit ${r.meritid}` })),
+      spells:     spells.map(r => ({ ...r, groupName: SPELL_GROUPS[r.group as number] || `Group ${r.group}` })),
+      pet:        pet[0]      || null,
+      chocobo:    chocobo[0]  || null,
+      unlocks:    unlocks[0]  || null,
+      storage:    storage[0]  || null,
+      bag_counts,
+      vars,
+      expPerLevel: EXP_PER_LEVEL,
+    };
+  }
+
+  async function loadCharEquipment(charid: number): Promise<RowDataPacket[]> {
+    const [rows] = await pool.execute<RowDataPacket[]>(`
+      SELECT ce.equipslotid AS slot, ci.itemId,
+             CONVERT(ib.name USING utf8) AS name
+      FROM char_equip ce
+      JOIN char_inventory ci
+        ON ce.charid=ci.charid AND ce.containerid=ci.location AND ce.slotid=ci.slot
+      LEFT JOIN item_basic ib ON ci.itemId=ib.itemid
+      WHERE ce.charid=?
+      ORDER BY ce.equipslotid
+    `, [charid]);
+    return rows;
+  }
+
   router.get('/api/me', requireAuth, async (req, res) => {
     try {
       const isAdmin = req.user!.tier === 'admin';
@@ -55,50 +173,8 @@ export function createCharactersRouter(pool: Pool): Router {
       const charid = parseInt(req.params.charid as string);
       if (req.user!.tier !== 'admin' && !(await userOwnsChar(pool, req.user!.accid, charid)))
         { res.status(403).json({ error: 'not your character' }); return; }
-      const [[c]] = await pool.execute<RowDataPacket[]>(`
-        SELECT c.charid, c.charname, c.pos_zone, c.pos_x, c.pos_y, c.pos_z,
-               c.gmlevel, c.nation, c.playtime, c.accid,
-               UNIX_TIMESTAMP(c.timecreated) AS timecreated,
-               UNIX_TIMESTAMP(c.last_logout) AS last_logout,
-               c.home_zone, c.home_x, c.home_y, c.home_z,
-               c.pos_prevzone, c.mentor, c.job_master, c.moghancement,
-               z.name  AS zone_name,
-               hz.name AS home_zone_name,
-               pz.name AS prev_zone_name,
-               cs.mjob, cs.mlvl, cs.sjob, cs.slvl, cs.hp, cs.mp,
-               cl.race, cl.size AS char_size, cl.face,
-               cj.genkai,
-               cj.war, cj.mnk, cj.whm, cj.blm, cj.rdm, cj.thf,
-               cj.pld, cj.drk, cj.bst, cj.brd, cj.rng, cj.sam,
-               cj.nin, cj.drg, cj.smn, cj.blu, cj.cor, cj.pup,
-               cj.dnc, cj.sch, cj.geo, cj.run,
-               a.login AS account_login, a.status AS account_status, a.priv AS account_priv,
-               CASE WHEN ses.charid IS NOT NULL THEN 1 ELSE 0 END AS online
-        FROM chars c
-        LEFT JOIN zone_settings     z   ON c.pos_zone    = z.zoneid
-        LEFT JOIN zone_settings     hz  ON c.home_zone   = hz.zoneid
-        LEFT JOIN zone_settings     pz  ON c.pos_prevzone= pz.zoneid
-        LEFT JOIN char_stats        cs  ON c.charid      = cs.charid
-        LEFT JOIN char_look         cl  ON c.charid    = cl.charid
-        LEFT JOIN char_jobs         cj  ON c.charid    = cj.charid
-        LEFT JOIN accounts          a   ON c.accid     = a.id
-        LEFT JOIN accounts_sessions ses ON c.charid    = ses.charid
-        WHERE c.charid = ? LIMIT 1`, [charid]);
+      const c = await loadCharBasic(charid);
       if (!c) { res.status(404).json({ error: 'character not found' }); return; }
-      const [[gilRow]] = await pool.execute<RowDataPacket[]>('SELECT quantity AS gil FROM char_inventory WHERE charid = ? AND itemId = 65535 LIMIT 1', [charid]);
-      c.gil = gilRow ? gilRow.gil : 0;
-      const [[gearRow]] = await pool.execute<RowDataPacket[]>(`
-        SELECT
-          COALESCE(SUM(CASE WHEN im.modId = 2 THEN im.value ELSE 0 END), 0) AS gear_hp,
-          COALESCE(SUM(CASE WHEN im.modId = 5 THEN im.value ELSE 0 END), 0) AS gear_mp
-        FROM char_equip ce
-        JOIN char_inventory ci
-          ON ce.charid = ci.charid AND ce.containerid = ci.location AND ce.slotid = ci.slot
-        LEFT JOIN item_mods im ON ci.itemId = im.itemId AND im.modId IN (2, 5)
-        WHERE ce.charid = ?
-      `, [charid]);
-      c.gear_hp = gearRow ? Number(gearRow.gear_hp) : 0;
-      c.gear_mp = gearRow ? Number(gearRow.gear_mp) : 0;
       res.json(c);
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
@@ -108,57 +184,23 @@ export function createCharactersRouter(pool: Pool): Router {
       const charid = parseInt(req.params.charid as string);
       if (req.user!.tier !== 'admin' && !(await userOwnsChar(pool, req.user!.accid, charid)))
         { res.status(403).json({ error: 'not your character' }); return; }
+      res.json(await loadCharExtended(charid));
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
+  });
 
-      const [
-        [exp], [history], [profile], [points], [skills],
-        [flags], [job_points], [merits], [spells],
-        [pet], [chocobo], [unlocks], [storage], [bag_counts], [vars],
-      ] = await Promise.all([
-        pool.execute<RowDataPacket[]>(`SELECT war,mnk,whm,blm,rdm,thf,pld,drk,bst,brd,rng,sam,nin,drg,smn,blu,cor,pup,dnc,sch,geo,run,merits,limits FROM char_exp WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT enemies_defeated,times_knocked_out,battles_fought,spells_cast,abilities_used,ws_used,items_used,npc_interactions,chats_sent,distance_travelled,mh_entrances,joined_parties,joined_alliances,gm_calls FROM char_history WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT rank_points,rank_sandoria,rank_bastok,rank_windurst,fame_sandoria,fame_bastok,fame_windurst,fame_norg,fame_jeuno,fame_adoulin,unity_leader FROM char_profile WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT sandoria_cp,bastok_cp,windurst_cp,spark_of_eminence,shining_star,deeds,bayld,escha_silt,escha_beads,allied_notes,unity_accolades,current_accolades,current_hallmarks,total_hallmarks,gallantry,login_points,fellow_point,imperial_standing,ballista_point,infamy,prestige,domain_points,mog_segments,gallimaufry,kinetic_unit,cruor,traverser_stones,voidstones,resistance_credit,dominion_note,zeni_point,jetton,therion_ichor,leujaoam_assault_point,mamool_assault_point,lebros_assault_point,periqia_assault_point,ilrusi_assault_point,nyzul_isle_assault_point,temenos_units,apollyon_units,beastman_seal,kindred_seal,kindred_crest,high_kindred_crest,sacred_kindred_crest,ancient_beastcoin,valor_point,scyld,research_mark,guild_fishing,guild_woodworking,guild_smithing,guild_goldsmithing,guild_weaving,guild_leathercraft,guild_bonecraft,guild_alchemy,guild_cooking,fire_crystals,ice_crystals,wind_crystals,earth_crystals,lightning_crystals,water_crystals,light_crystals,dark_crystals,daily_tally,chocobuck_sandoria,chocobuck_bastok,chocobuck_windurst FROM char_points WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT cs.skillid, cs.value, cs.rank,
-          CASE cs.rank
-            WHEN 0 THEN sc.r0 WHEN 1 THEN sc.r1 WHEN 2 THEN sc.r2 WHEN 3 THEN sc.r3
-            WHEN 4 THEN sc.r4 WHEN 5 THEN sc.r5 WHEN 6 THEN sc.r6 WHEN 7 THEN sc.r7
-            WHEN 8 THEN sc.r8 WHEN 9 THEN sc.r9 WHEN 10 THEN sc.r10 WHEN 11 THEN sc.r11
-            WHEN 12 THEN sc.r12 WHEN 13 THEN sc.r13
-          END AS cap
-          FROM char_skills cs
-          JOIN char_stats cst ON cst.charid = cs.charid
-          JOIN skill_caps sc ON sc.level = cst.mlvl
-          WHERE cs.charid=? ORDER BY cs.skillid`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT gmModeEnabled, gmHiddenEnabled, muted FROM char_flags WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT jobid, capacity_points, job_points, job_points_spent FROM char_job_points WHERE charid=? ORDER BY jobid`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT meritid, upgrades FROM char_merit WHERE charid=? AND upgrades>0 ORDER BY meritid`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT cs.spellid, sl.name, sl.\`group\` FROM char_spells cs LEFT JOIN spell_list sl ON cs.spellid=sl.spellid WHERE cs.charid=? ORDER BY sl.\`group\`, sl.name`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT wyvernid, automatonid, adventuringfellowid AS fellowid, chocoboid, field_chocobo FROM char_pet WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT first_name, last_name, stage, color, strength, endurance, discernment, receptivity, affection, energy FROM char_chocobos WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT outpost_sandy, outpost_bastok, outpost_windy, mog_locker, runic_portal, maw FROM char_unlocks WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT inventory, safe, locker, satchel, sack, \`case\`, wardrobe FROM char_storage WHERE charid=?`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT location, COUNT(*) AS count FROM char_inventory WHERE charid=? AND NOT (location=0 AND itemId=65535) GROUP BY location ORDER BY location`, [charid]),
-        pool.execute<RowDataPacket[]>(`SELECT varname, value FROM char_vars WHERE charid=? ORDER BY varname LIMIT 200`, [charid]),
+  // Aggregate loader for the character page: basic + extended + equipment in
+  // one round trip (replaces three parallel client requests on selection).
+  router.get('/api/character/:charid/full', requireAuth, async (req, res) => {
+    try {
+      const charid = parseInt(req.params.charid as string);
+      if (!Number.isFinite(charid)) { res.status(400).json({ error: 'invalid charid' }); return; }
+      if (req.user!.tier !== 'admin' && !(await userOwnsChar(pool, req.user!.accid, charid)))
+        { res.status(403).json({ error: 'not your character' }); return; }
+      const [basic, extended, equipment] = await Promise.all([
+        loadCharBasic(charid), loadCharExtended(charid), loadCharEquipment(charid),
       ]);
-
-      res.json({
-        exp:        exp[0]      || null,
-        history:    history[0]  || null,
-        profile:    profile[0]  || null,
-        points:     points[0]   || null,
-        skills,
-        flags:      flags[0]    || null,
-        job_points: job_points.map(r => ({ ...r })),
-        merits:     merits.map(r => ({ ...r, name: MERIT_NAMES[r.meritid as number] || `Merit ${r.meritid}` })),
-        spells:     spells.map(r => ({ ...r, groupName: SPELL_GROUPS[r.group as number] || `Group ${r.group}` })),
-        pet:        pet[0]      || null,
-        chocobo:    chocobo[0]  || null,
-        unlocks:    unlocks[0]  || null,
-        storage:    storage[0]  || null,
-        bag_counts,
-        vars,
-        expPerLevel: EXP_PER_LEVEL,
-      });
+      if (!basic) { res.status(404).json({ error: 'character not found' }); return; }
+      res.json({ basic, extended, equipment });
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
@@ -250,17 +292,7 @@ export function createCharactersRouter(pool: Pool): Router {
       const charid = parseInt(req.params.charid as string);
       if (req.user!.tier !== 'admin' && !(await userOwnsChar(pool, req.user!.accid, charid)))
         { res.status(403).json({ error: 'not your character' }); return; }
-      const [rows] = await pool.execute<RowDataPacket[]>(`
-        SELECT ce.equipslotid AS slot, ci.itemId,
-               CONVERT(ib.name USING utf8) AS name
-        FROM char_equip ce
-        JOIN char_inventory ci
-          ON ce.charid=ci.charid AND ce.containerid=ci.location AND ce.slotid=ci.slot
-        LEFT JOIN item_basic ib ON ci.itemId=ib.itemid
-        WHERE ce.charid=?
-        ORDER BY ce.equipslotid
-      `, [charid]);
-      res.json(rows);
+      res.json(await loadCharEquipment(charid));
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 

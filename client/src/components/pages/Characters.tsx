@@ -120,12 +120,11 @@ export function CharacterDetail() {
     if (!id) return;
     const nid = Number(id);
     setLoading(true);
-    Promise.all([
-      api.char(nid),
-      api.charExtended(nid),
-    ]).then(([c, e]) => { setChar(c); setExt(e); }).catch(() => navigate('/chars')).finally(() => setLoading(false));
-    // Load equipment for gear tab separately (non-blocking)
-    api.charEquipment(Number(id)).then(setEquip).catch(() => {});
+    // Single aggregate request: basic + extended + equipment (was 3 requests).
+    api.charFull(nid)
+      .then(({ basic, extended, equipment }) => { setChar(basic); setExt(extended); setEquip(equipment); })
+      .catch(() => navigate('/chars'))
+      .finally(() => setLoading(false));
   }, [id, navigate]);
 
   if (loading) return <div style={{ padding: 24, color: 'var(--color-text3)' }}>Loading…</div>;
