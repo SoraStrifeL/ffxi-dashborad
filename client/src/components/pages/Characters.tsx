@@ -359,7 +359,7 @@ function CharOverview({ char, ext, setTab }: { char: CharBasic; ext: CharExtende
           <Row k="HP" v={`${char.hp} (+${char.gear_hp ?? 0})`} />
           <Row k="MP" v={`${char.mp} (+${char.gear_mp ?? 0})`} />
           <Row k="Nation" v={NATIONS[char.nation] ?? '?'} />
-          <Row k="Genkai" v={String(char.genkai ?? 0)} />
+          <Row k="Level cap" v={`${char.genkai ?? 0}`} />
           <Row k="Rank points" v={String(p.rank_points ?? '—')} />
           {p.unity_leader ? <Row k="Unity" v={String(p.unity_leader)} /> : null}
         </Panel>
