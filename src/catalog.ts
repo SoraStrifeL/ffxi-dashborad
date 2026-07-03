@@ -317,11 +317,14 @@ console.log(`[enum] ${Object.keys(KEY_ITEM_NAMES).length} key items, ${Object.ke
 
 // Moghancements live in key_item.lua as MOGHANCEMENT_* constants. Derive a
 // friendly id→name map from the parsed enum (single source of truth).
+const SMALL_WORDS = new Set(['of', 'the', 'and', 'in', 'to', 'a', 'for', 'on', 'at']);
 function prettyEnumName(constant: string): string {
   return constant
     .replace(/_/g, ' ')
     .toLowerCase()
-    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .split(' ')
+    .map((w, i) => (i > 0 && SMALL_WORDS.has(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+    .join(' ')
     .replace(/\bIi\b/g, 'II').replace(/\bIii\b/g, 'III'); // roman-numeral suffixes
 }
 export const MOGHANCEMENT_NAMES: Record<number, string> = {};
@@ -337,6 +340,12 @@ Object.assign(MOGHANCEMENT_NAMES, {
   537: 'Windurst Conquest',
 });
 console.log(`[enum] ${Object.keys(MOGHANCEMENT_NAMES).length} moghancements`);
+
+// Titles are decoded straight to display; prettify the raw enum constants
+// (FODDERCHIEF_FLAYER → Fodderchief Flayer). Nothing derives from the raw form.
+for (const id of Object.keys(TITLE_NAMES)) {
+  TITLE_NAMES[Number(id)] = prettyEnumName(TITLE_NAMES[Number(id)]);
+}
 
 // ── RoE Records ────────────────────────────────────────────────────────────────
 export function buildRoeRecords(): { names: Record<number, string>; records: Record<number, { id: number; name: string; flags: string[]; goal: number | null }> } {
