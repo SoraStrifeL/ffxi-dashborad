@@ -199,60 +199,165 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
+const NATIONS = ["San d'Oria", 'Bastok', 'Windurst', 'Other'];
+
+function fmtAgo(unixSecs?: number): string {
+  if (!unixSecs) return '—';
+  const diff = Date.now() / 1000 - unixSecs;
+  if (diff < 60)    return 'just now';
+  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
+}
+const num = (v?: number) => Number(v ?? 0).toLocaleString();
+
+function Vital({ label, value, color }: { label: string; value: React.ReactNode; color: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--color-text3)' }}>{label}</div>
+      <div style={{ fontSize: 18, fontWeight: 700, color }}>{typeof value === 'number' ? value.toLocaleString() : value}</div>
+    </div>
+  );
+}
+
 function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null }) {
   const navigate = useNavigate();
-  const p = ext?.profile ?? {};
+  const p    = (ext?.profile ?? {}) as Record<string, number>;
+  const pts  = (ext?.points  ?? {}) as Record<string, number>;
+  const hist = (ext?.history ?? {}) as Record<string, number>;
+  const flags = ext?.flags ?? {};
   const bagCounts = ext?.bag_counts ?? [];
-  const storage   = ext?.storage ?? {};
-  const hist = ext?.history ?? {};
-
-  const totalHp = char.hp + (char.gear_hp ?? 0);
-  const totalMp = char.mp + (char.gear_mp ?? 0);
+  const storage   = (ext?.storage ?? {}) as Record<string, number>;
 
   const playSecs = char.playtime ?? 0;
   const playHrs  = Math.floor(playSecs / 3600);
   const playMins = Math.floor((playSecs % 3600) / 60);
+  const online   = !!char.online;
+
+  // All 22 job levels (JOB[1..22] map to the lowercased field names on char).
+  const jobs = JOB.slice(1).map((abbr, i) => ({
+    id: i + 1, abbr, lvl: (char as unknown as Record<string, number>)[abbr.toLowerCase()] ?? 0,
+  }));
+
+  const ranks = [
+    { n: "San d'Oria", rank: p.rank_sandoria, fame: p.fame_sandoria },
+    { n: 'Bastok',     rank: p.rank_bastok,   fame: p.fame_bastok },
+    { n: 'Windurst',   rank: p.rank_windurst, fame: p.fame_windurst },
+  ];
+  const otherFame = [
+    { n: 'Jeuno',   fame: p.fame_jeuno },
+    { n: 'Norg',    fame: p.fame_norg },
+    { n: 'Adoulin', fame: p.fame_adoulin },
+  ].filter(f => f.fame != null);
+
+  const currencies = [
+    { k: 'Sparks',    v: pts.spark_of_eminence },
+    { k: 'Accolades', v: pts.current_accolades },
+    { k: 'Bayld',     v: pts.bayld },
+    { k: 'Cruor',     v: pts.cruor },
+    { k: 'San CP',    v: pts.sandoria_cp },
+    { k: 'Bas CP',    v: pts.bastok_cp },
+    { k: 'Win CP',    v: pts.windurst_cp },
+    { k: 'Imperial',  v: pts.imperial_standing },
+  ].filter(c => c.v != null);
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 16 }}>
-      <Panel title="Stats">
-        <Row k="HP"    v={String(totalHp)} />
-        <Row k="MP"    v={String(totalMp)} />
-        <Row k="Nation" v={['San d\'Oria','Bastok','Windurst','Other'][char.nation] ?? '?'} />
-        <Row k="Rank points" v={String(p.rank_points ?? '—')} />
-        <Row k="Fame (Sandy)" v={String(p.fame_sandoria ?? '—')} />
-        {char.zone_name && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, fontSize: 12 }}>
-            <span style={{ color: 'var(--color-text3)', width: 90, flexShrink: 0 }}>Zone</span>
-            <button onClick={() => navigate('/map', { state: { zoneId: char.pos_zone } })}
-              className="btn btn-ghost btn-xs" style={{ padding: '1px 6px', fontSize: 11, color: 'var(--color-accent)' }}>
-              {char.zone_name} ↗
-            </button>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Summary banner */}
+      <div className="card" style={{ padding: '16px 20px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 28 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ width: 10, height: 10, borderRadius: '50%', background: online ? 'var(--color-teal)' : 'var(--color-text3)', boxShadow: online ? '0 0 8px var(--color-teal)' : 'none', flexShrink: 0 }} />
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: online ? 'var(--color-teal)' : 'var(--color-text2)' }}>{online ? 'Online' : 'Offline'}</div>
+            <div style={{ fontSize: 11, color: 'var(--color-text3)' }}>{online ? `in ${char.zone_name || '—'}` : `last seen ${fmtAgo(char.last_logout)}`}</div>
           </div>
-        )}
-      </Panel>
-      <Panel title="Inventory">
-        {bagCounts.map((b) => {
-          const max = (storage as Record<string, number>)[LOC_STORAGE_KEY[b.location]] ?? 80;
-          return (
-            <div key={b.location} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12 }}>
-              <span style={{ color: 'var(--color-text3)', width: 90, flexShrink: 0 }}>{BAGS[b.location] ?? `Bag ${b.location}`}</span>
-              <div style={{ flex: 1, height: 5, background: 'var(--color-surface2)', borderRadius: 2, overflow: 'hidden' }}>
-                <div style={{ width: `${max ? b.count / max * 100 : 0}%`, height: '100%', background: 'var(--color-accent)', borderRadius: 2 }} />
-              </div>
-              <span style={{ color: 'var(--color-text2)', fontSize: 11, flexShrink: 0 }}>{b.count}/{max}</span>
+        </div>
+        <Vital label="HP"       value={char.hp + (char.gear_hp ?? 0)} color="var(--color-teal)" />
+        <Vital label="MP"       value={char.mp + (char.gear_mp ?? 0)} color="#6aa0f0" />
+        <Vital label="Gil"      value={char.gil ?? 0}                 color="var(--color-gold)" />
+        <Vital label="Playtime" value={`${playHrs}h ${playMins}m`}    color="var(--color-text1)" />
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {char.job_master ? <span className="pill pill-gold">Job Master</span> : null}
+          {char.mentor     ? <span className="pill pill-accent">Mentor</span>   : null}
+          {flags.muted     ? <span className="pill pill-muted">Muted</span>     : null}
+          <span className="pill pill-muted">Created {new Date((char.timecreated || 0) * 1000).toLocaleDateString()}</span>
+        </div>
+      </div>
+
+      {/* Panels */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 16, alignItems: 'start' }}>
+        <Panel title="Jobs">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(48px, 1fr))', gap: 6 }}>
+            {jobs.map((j) => {
+              const isMain = j.id === char.mjob, isSub = j.id === char.sjob, on = j.lvl > 0;
+              return (
+                <div key={j.id} title={isMain ? 'Main job' : isSub ? 'Sub job' : ''} style={{
+                  textAlign: 'center', padding: '5px 2px', borderRadius: 6,
+                  background: isMain ? 'var(--color-accent)' : on ? 'var(--color-surface2)' : 'transparent',
+                  border: `1px solid ${isSub ? 'var(--color-accent)' : 'var(--color-border)'}`,
+                  opacity: on ? 1 : 0.4,
+                }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: isMain ? '#fff' : on ? 'var(--color-text1)' : 'var(--color-text3)' }}>{j.abbr}</div>
+                  <div style={{ fontSize: 12, color: isMain ? '#fff' : on ? 'var(--color-text2)' : 'var(--color-text3)' }}>{j.lvl || '–'}</div>
+                </div>
+              );
+            })}
+          </div>
+        </Panel>
+
+        <Panel title="Stats">
+          <Row k="HP" v={`${char.hp} (+${char.gear_hp ?? 0})`} />
+          <Row k="MP" v={`${char.mp} (+${char.gear_mp ?? 0})`} />
+          <Row k="Nation" v={NATIONS[char.nation] ?? '?'} />
+          <Row k="Rank points" v={String(p.rank_points ?? '—')} />
+          {char.zone_name && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12 }}>
+              <span style={{ color: 'var(--color-text3)' }}>Zone</span>
+              <button onClick={() => navigate('/map', { state: { zoneId: char.pos_zone } })}
+                className="btn btn-ghost btn-xs" style={{ padding: '1px 6px', fontSize: 11, color: 'var(--color-accent)', marginLeft: 'auto' }}>
+                {char.zone_name} ↗
+              </button>
             </div>
-          );
-        })}
-        {bagCounts.length === 0 && <span style={{ color: 'var(--color-text3)', fontSize: 12 }}>No inventory data</span>}
-      </Panel>
-      <Panel title="Profile">
-        <Row k="Play time" v={`${playHrs}h ${playMins}m`} />
-        <Row k="Kills"     v={Number(hist.enemies_defeated ?? 0).toLocaleString()} />
-        <Row k="Deaths"    v={Number(hist.times_knocked_out ?? 0).toLocaleString()} />
-        <Row k="WS used"   v={Number(hist.ws_used ?? 0).toLocaleString()} />
-        <Row k="Spells"    v={Number(hist.spells_cast ?? 0).toLocaleString()} />
-      </Panel>
+          )}
+        </Panel>
+
+        <Panel title="Reputation">
+          {ranks.map((r) => <Row key={r.n} k={r.n} v={`Rank ${r.rank ?? '—'} · Fame ${r.fame ?? '—'}`} />)}
+          {otherFame.map((f) => <Row key={f.n} k={`${f.n} fame`} v={String(f.fame)} />)}
+        </Panel>
+
+        <Panel title="Activity">
+          <Row k="Kills"    v={num(hist.enemies_defeated)} />
+          <Row k="Deaths"   v={num(hist.times_knocked_out)} />
+          <Row k="Battles"  v={num(hist.battles_fought)} />
+          <Row k="WS used"  v={num(hist.ws_used)} />
+          <Row k="Spells"   v={num(hist.spells_cast)} />
+          <Row k="Distance" v={num(hist.distance_travelled)} />
+        </Panel>
+
+        {currencies.length > 0 && (
+          <Panel title="Currencies">
+            {currencies.map((c) => <Row key={c.k} k={c.k} v={num(c.v)} />)}
+          </Panel>
+        )}
+
+        <Panel title="Inventory">
+          {bagCounts.map((b) => {
+            const max = storage[LOC_STORAGE_KEY[b.location]] ?? 80;
+            const full = max ? b.count / max : 0;
+            return (
+              <div key={b.location} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, fontSize: 12 }}>
+                <span style={{ color: 'var(--color-text3)', width: 74, flexShrink: 0 }}>{BAGS[b.location] ?? `Bag ${b.location}`}</span>
+                <div style={{ flex: 1, height: 5, background: 'var(--color-surface2)', borderRadius: 2, overflow: 'hidden' }}>
+                  <div style={{ width: `${full * 100}%`, height: '100%', background: full > 0.9 ? 'var(--color-red)' : 'var(--color-accent)', borderRadius: 2 }} />
+                </div>
+                <span style={{ color: 'var(--color-text2)', fontSize: 11, flexShrink: 0 }}>{b.count}/{max}</span>
+              </div>
+            );
+          })}
+          {bagCounts.length === 0 && <span style={{ color: 'var(--color-text3)', fontSize: 12 }}>No inventory data</span>}
+        </Panel>
+      </div>
     </div>
   );
 }
