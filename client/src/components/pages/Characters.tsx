@@ -224,6 +224,8 @@ const num = (v?: number) => Number(v ?? 0).toLocaleString();
 // DB zone names use underscores (e.g. Southern_San_dOria) — show them spaced.
 const prettyZone = (z?: string) => (z || '').replace(/_/g, ' ');
 const titleCase = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+// Face byte (0–15) encodes face pattern 1–8 + hairstyle A/B (LSB: face/2+1, face%2).
+const faceLabel = (f?: number) => `${Math.floor((f ?? 0) / 2) + 1}${(f ?? 0) % 2 === 0 ? 'A' : 'B'}`;
 const yn = (v: unknown) => (v ? '✓' : '—');
 const coords = (x?: number, y?: number, z?: number) =>
   `${(x ?? 0).toFixed(0)}, ${(y ?? 0).toFixed(0)}, ${(z ?? 0).toFixed(0)}`;
@@ -375,7 +377,7 @@ function CharOverview({ char, ext, setTab }: { char: CharBasic; ext: CharExtende
 
         <Panel title="Identity">
           <Row k="Race" v={RACE[char.race] ?? '?'} />
-          <Row k="Face" v={String(char.face ?? 0)} />
+          <Row k="Face" v={faceLabel(char.face)} />
           <Row k="Size" v={['Small', 'Medium', 'Large'][char.char_size] ?? String(char.char_size)} />
           <Row k="Moghancement" v={char.moghancement ? (MOGHANCEMENT[char.moghancement] ?? `#${char.moghancement}`) : '—'} />
         </Panel>
