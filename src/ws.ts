@@ -4,7 +4,7 @@ import WebSocket from 'ws';
 import { Pool, RowDataPacket } from 'mysql2/promise';
 import { WsClientState } from './types';
 import { queryStats, queryPlayers, LSB_LOG_DIR, canonQueueStatus } from './catalog';
-import { verifyToken } from './auth';
+import { verifyToken, currentAccountState } from './auth';
 import { hasPermission } from './rbac';
 import { setBroadcastAuditEvent } from './audit';
 
@@ -55,6 +55,29 @@ function startHeartbeat(wss: WebSocket.Server): void {
       ws.ping();
     });
   }, 30_000);
+}
+
+// Has the client's token expired? (exp is unix seconds on the JWT.)
+function tokenExpired(state: WsClientState): boolean {
+  return typeof state.user.exp === 'number' && state.user.exp * 1000 <= Date.now();
+}
+
+// ── Periodic re-auth sweep ─────────────────────────────────────────────────────
+// A WebSocket is long-lived; authing only at handshake means an open socket
+// keeps receiving pushes after its token expires or its account is revoked.
+// Every 20s: drop sockets whose token expired, drop revoked/disabled accounts,
+// and refresh tier so a demoted admin stops receiving admin broadcasts.
+function startReauthSweep(): void {
+  setInterval(() => {
+    clients.forEach((state, ws) => {
+      if (tokenExpired(state)) { ws.close(1008, 'token expired'); return; }
+      currentAccountState(state.user.accid).then(acc => {
+        if (!acc) return;                       // pool unwired / DB error → keep
+        if (!acc.ok) { ws.close(1008, 'account revoked'); return; }
+        state.user.tier = acc.tier;             // demotion takes effect on pushes
+      }).catch(() => {});
+    });
+  }, 20_000);
 }
 
 // ── Player login/logout detection ──────────────────────────────────────────────
@@ -231,6 +254,7 @@ export function startPosWatcher(): void {
 // ── WebSocket connection handler ───────────────────────────────────────────────
 export function initWebSocket(wss: WebSocket.Server, pool: Pool): void {
   startHeartbeat(wss);
+  startReauthSweep();
 
   // Wire audit broadcast so every audit() call also pushes to admin WS clients
   setBroadcastAuditEvent(entry => broadcastToAdmins('audit_event', entry));
@@ -269,6 +293,8 @@ export function initWebSocket(wss: WebSocket.Server, pool: Pool): void {
           return;
         }
         const state = clients.get(ws)!;
+        // Reject any action on an expired token (revocation is handled by the sweep).
+        if (tokenExpired(state)) { ws.close(1008, 'token expired'); return; }
         if (type === 'watch_zone') {
           const z = Number(data?.zoneId);
           state.watchZone = Number.isFinite(z) ? z : null;

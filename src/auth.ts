@@ -116,7 +116,7 @@ const STATE_TTL_MS = 15_000;
 // check" — when no pool is wired (unit/integration tests) or the DB errors
 // (fail-open; the signature was already verified). ok=false means the
 // account is missing, banned (status!=1), or blocked by allowPlayerLogin.
-async function currentAccountState(accid: number): Promise<AccountState | null> {
+export async function currentAccountState(accid: number): Promise<AccountState | null> {
   if (!_authPool) return null;
   const now = Date.now();
   const hit = _stateCache.get(accid);
