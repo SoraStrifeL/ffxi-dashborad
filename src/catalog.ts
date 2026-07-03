@@ -282,6 +282,17 @@ export function buildMeritNames(): Record<number, string> {
   return names;
 }
 export const MERIT_NAMES = buildMeritNames();
+// Polished display names for merits the enum abbreviates (great weapons) or
+// that need a possessive apostrophe the auto-titlecase can't infer.
+Object.assign(MERIT_NAMES, {
+  192:  'Hand-to-Hand',
+  198:  'Great Sword',
+  202:  'Great Axe',
+  210:  'Great Katana',
+  2048: "Warrior's Charge",
+  2368: "Assassin's Charge",
+  2630: "Adventurer's Dirge",
+});
 
 export const SPELL_GROUPS: Record<number, string> = {
   1: 'Song', 2: 'Black Magic', 3: 'Blue Magic', 4: 'Ninjutsu',
