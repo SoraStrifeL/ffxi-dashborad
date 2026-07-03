@@ -97,9 +97,10 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 // Express 5 passes async errors here automatically; no need for try/catch wrapping.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
-  console.error('[api error]', err.message);
+  console.error('[api error]', err.stack || err.message);
+  // Don't leak internal error text (DB/driver messages, file paths) to clients.
   const status = (err as NodeJS.ErrnoException).code === 'ENOENT' ? 404 : 500;
-  res.status(status).json({ error: err.message || 'Internal server error' });
+  res.status(status).json({ error: status === 404 ? 'not found' : 'Internal server error' });
 });
 
 // ── WebSocket + poller ────────────────────────────────────────────────────────
