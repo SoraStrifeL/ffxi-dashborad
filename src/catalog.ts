@@ -347,6 +347,13 @@ for (const id of Object.keys(TITLE_NAMES)) {
   TITLE_NAMES[Number(id)] = prettyEnumName(TITLE_NAMES[Number(id)]);
 }
 
+// Key items likewise render as raw constants in the Blobs and Database tabs.
+// Prettify AFTER the MOGHANCEMENT_* derivation above (which needs the raw
+// prefix); KEY_ITEM_SORTED in routes/db.ts reads this later, so it benefits too.
+for (const id of Object.keys(KEY_ITEM_NAMES)) {
+  KEY_ITEM_NAMES[Number(id)] = prettyEnumName(KEY_ITEM_NAMES[Number(id)]);
+}
+
 // ── RoE Records ────────────────────────────────────────────────────────────────
 export function buildRoeRecords(): { names: Record<number, string>; records: Record<number, { id: number; name: string; flags: string[]; goal: number | null }> } {
   const names: Record<number, string> = {};

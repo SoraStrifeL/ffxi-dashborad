@@ -307,7 +307,8 @@ export function createCharactersRouter(pool: Pool): Router {
       if (!row) { res.status(404).json({ error: 'character not found' }); return; }
       const [zoneRows] = await pool.execute<RowDataPacket[]>('SELECT zoneid, name FROM zone_settings');
       const zoneNameMap: Record<number, string> = {};
-      zoneRows.forEach(z => { zoneNameMap[z.zoneid as number] = z.name as string; });
+      // zone_settings.name uses underscores (Southern_San_dOria) — space them.
+      zoneRows.forEach(z => { zoneNameMap[z.zoneid as number] = String(z.name).replace(/_/g, ' '); });
       const keyitems  = decodeKeyItems(row.keyitems  as Buffer | null, KEY_ITEM_NAMES);
       const titles    = decodeBitfield(row.titles    as Buffer | null, TITLE_NAMES);
       const zones     = decodeBitfield(row.zones     as Buffer | null, zoneNameMap);
