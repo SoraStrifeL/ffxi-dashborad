@@ -4,7 +4,7 @@ import { requireAuth, requireAdmin, userOwnsChar } from '../auth';
 import {
   MERIT_NAMES, SPELL_GROUPS, EXP_PER_LEVEL,
   QUEST_CATALOG, QUEST_REWARDS, QUEST_LOG_NAMES,
-  KEY_ITEM_NAMES, TITLE_NAMES, ROE_NAMES,
+  KEY_ITEM_NAMES, TITLE_NAMES, ROE_NAMES, MOGHANCEMENT_NAMES,
   EFFECT_NAMES, DEBUFF_IDS,
   decodeKeyItems, decodeBitfield, decodeEminence,
   decodeMissions, decodeAssault, decodeCampaign,
@@ -64,6 +64,7 @@ export function createCharactersRouter(pool: Pool): Router {
     `, [charid]);
     c.gear_hp = gearRow ? Number(gearRow.gear_hp) : 0;
     c.gear_mp = gearRow ? Number(gearRow.gear_mp) : 0;
+    c.moghancement_name = MOGHANCEMENT_NAMES[c.moghancement as number] ?? null;
     return c;
   }
 

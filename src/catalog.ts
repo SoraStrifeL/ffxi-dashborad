@@ -304,6 +304,23 @@ export const KEY_ITEM_NAMES = buildLuaEnum(`${LSB_SCRIPTS_DIR}/key_item.lua`);
 export const TITLE_NAMES    = buildLuaEnum(`${LSB_SCRIPTS_DIR}/title.lua`);
 console.log(`[enum] ${Object.keys(KEY_ITEM_NAMES).length} key items, ${Object.keys(TITLE_NAMES).length} titles`);
 
+// Moghancements live in key_item.lua as MOGHANCEMENT_* constants. Derive a
+// friendly id→name map from the parsed enum (single source of truth).
+function prettyEnumName(constant: string): string {
+  return constant
+    .replace(/_/g, ' ')
+    .toLowerCase()
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .replace(/\bIi\b/g, 'II').replace(/\bIii\b/g, 'III'); // roman-numeral suffixes
+}
+export const MOGHANCEMENT_NAMES: Record<number, string> = {};
+for (const [id, name] of Object.entries(KEY_ITEM_NAMES)) {
+  if (name.startsWith('MOGHANCEMENT_')) {
+    MOGHANCEMENT_NAMES[Number(id)] = prettyEnumName(name.slice('MOGHANCEMENT_'.length));
+  }
+}
+console.log(`[enum] ${Object.keys(MOGHANCEMENT_NAMES).length} moghancements`);
+
 // ── RoE Records ────────────────────────────────────────────────────────────────
 export function buildRoeRecords(): { names: Record<number, string>; records: Record<number, { id: number; name: string; flags: string[]; goal: number | null }> } {
   const names: Record<number, string> = {};

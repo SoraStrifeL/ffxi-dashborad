@@ -203,17 +203,6 @@ const NATIONS = ["San d'Oria", 'Bastok', 'Windurst', 'Other'];
 // char_look.size → model build (size is race-determined in FFXI).
 const SIZE_LABELS = ['Tarutaru-build (Small)', 'Hume-build (Medium)', 'Galka-build (Large)'];
 
-// Moghancement id → name (from scripts/enum/key_item.lua MOGHANCEMENT_*).
-const MOGHANCEMENT: Record<number, string> = {
-  512: 'Fire', 513: 'Ice', 514: 'Wind', 515: 'Earth', 516: 'Lightning', 517: 'Water', 518: 'Light', 519: 'Dark',
-  520: 'Experience', 521: 'Gardening', 522: 'Desynthesis', 523: 'Fishing',
-  524: 'Woodworking', 525: 'Smithing', 526: 'Goldsmithing', 527: 'Clothcraft', 528: 'Leathercraft',
-  529: 'Bonecraft', 530: 'Alchemy', 531: 'Cooking',
-  532: 'Conquest', 533: 'Region', 534: 'Fishing Items', 535: "San d'Oria Conquest", 536: 'Bastok Conquest',
-  537: 'Windurst Conquest', 538: 'Money', 539: 'Campaign', 540: 'Money II', 541: 'Skill Gains',
-  542: 'Bounty', 543: 'Mandragora Mania',
-};
-
 function fmtAgo(unixSecs?: number): string {
   if (!unixSecs) return '—';
   const diff = Date.now() / 1000 - unixSecs;
@@ -381,7 +370,7 @@ function CharOverview({ char, ext, setTab }: { char: CharBasic; ext: CharExtende
           <Row k="Race" v={RACE[char.race] ?? '?'} />
           <Row k="Face" v={faceLabel(char.face)} />
           <Row k="Size" v={SIZE_LABELS[char.char_size] ?? String(char.char_size)} />
-          <Row k="Moghancement" v={char.moghancement ? (MOGHANCEMENT[char.moghancement] ?? `#${char.moghancement}`) : '—'} />
+          <Row k="Moghancement" v={char.moghancement ? (char.moghancement_name ?? `#${char.moghancement}`) : '—'} />
         </Panel>
 
         <Panel title="Location">

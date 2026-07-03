@@ -60,6 +60,7 @@ export interface CharBasic {
   mentor: number;
   job_master: number;
   moghancement: number;
+  moghancement_name: string | null;
   mjob: number;
   mlvl: number;
   sjob: number;
