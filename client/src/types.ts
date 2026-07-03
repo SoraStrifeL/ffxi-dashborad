@@ -51,6 +51,9 @@ export interface CharBasic {
   last_logout: number;
   accid: number;
   home_zone: number;
+  home_x: number;
+  home_y: number;
+  home_z: number;
   zone_name: string;
   home_zone_name: string;
   prev_zone_name: string;

@@ -212,6 +212,10 @@ function fmtAgo(unixSecs?: number): string {
 const num = (v?: number) => Number(v ?? 0).toLocaleString();
 // DB zone names use underscores (e.g. Southern_San_dOria) — show them spaced.
 const prettyZone = (z?: string) => (z || '').replace(/_/g, ' ');
+const titleCase = (k: string) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+const yn = (v: unknown) => (v ? '✓' : '—');
+const coords = (x?: number, y?: number, z?: number) =>
+  `${(x ?? 0).toFixed(0)}, ${(y ?? 0).toFixed(0)}, ${(z ?? 0).toFixed(0)}`;
 
 function Vital({ label, value, color }: { label: string; value: React.ReactNode; color: string }) {
   return (
@@ -224,10 +228,17 @@ function Vital({ label, value, color }: { label: string; value: React.ReactNode;
 
 function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null }) {
   const navigate = useNavigate();
-  const p    = (ext?.profile ?? {}) as Record<string, number>;
-  const pts  = (ext?.points  ?? {}) as Record<string, number>;
-  const hist = (ext?.history ?? {}) as Record<string, number>;
-  const flags = ext?.flags ?? {};
+  const p       = (ext?.profile ?? {}) as Record<string, number>;
+  const pts     = (ext?.points  ?? {}) as Record<string, number>;
+  const hist    = (ext?.history ?? {}) as Record<string, number>;
+  const flags   = ext?.flags ?? {};
+  const unlocks = (ext?.unlocks ?? {}) as Record<string, number>;
+  const pet     = (ext?.pet ?? {}) as Record<string, number>;
+  const chocobo = (ext?.chocobo ?? {}) as Record<string, unknown>;
+  const jobPoints = ext?.job_points ?? [];
+  const merits    = ext?.merits ?? [];
+  const spells    = ext?.spells ?? [];
+  const skills    = ext?.skills ?? [];
   const bagCounts = ext?.bag_counts ?? [];
   const storage   = (ext?.storage ?? {}) as Record<string, number>;
 
@@ -252,16 +263,44 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
     { n: 'Adoulin', fame: p.fame_adoulin },
   ].filter(f => f.fame != null);
 
-  const currencies = [
-    { k: 'Sparks',    v: pts.spark_of_eminence },
-    { k: 'Accolades', v: pts.current_accolades },
-    { k: 'Bayld',     v: pts.bayld },
-    { k: 'Cruor',     v: pts.cruor },
-    { k: 'San CP',    v: pts.sandoria_cp },
-    { k: 'Bas CP',    v: pts.bastok_cp },
-    { k: 'Win CP',    v: pts.windurst_cp },
-    { k: 'Imperial',  v: pts.imperial_standing },
-  ].filter(c => c.v != null);
+  // Every non-zero currency from char_points, biggest first.
+  const currencies = Object.entries(pts)
+    .filter(([, v]) => Number(v) > 0)
+    .sort((a, b) => Number(b[1]) - Number(a[1]));
+
+  // Full lifetime history, every column.
+  const HISTORY: [string, string][] = [
+    ['enemies_defeated', 'Kills'], ['times_knocked_out', 'Deaths'], ['battles_fought', 'Battles'],
+    ['ws_used', 'Weapon skills'], ['abilities_used', 'Abilities'], ['spells_cast', 'Spells cast'],
+    ['items_used', 'Items used'], ['npc_interactions', 'NPC talks'], ['chats_sent', 'Chats sent'],
+    ['distance_travelled', 'Distance'], ['mh_entrances', 'MH entrances'], ['joined_parties', 'Parties'],
+    ['joined_alliances', 'Alliances'], ['gm_calls', 'GM calls'],
+  ];
+
+  // Jobs that have earned job points.
+  const jpJobs = jobPoints.filter(j => (j.job_points ?? 0) + (j.job_points_spent ?? 0) > 0);
+
+  // Spell counts grouped by school.
+  const spellGroups = spells.reduce<Record<string, number>>((acc, s) => {
+    const g = s.groupName || 'Other'; acc[g] = (acc[g] ?? 0) + 1; return acc;
+  }, {});
+
+  const cappedSkills = skills.filter(s => s.cap && s.value >= s.cap).length;
+  const knownSkills  = skills.filter(s => s.value > 0).length;
+
+  const companions = [
+    pet.wyvernid    ? 'Wyvern'      : null,
+    pet.automatonid ? 'Automaton'   : null,
+    (pet as Record<string, number>).fellowid ? 'Adv. Fellow' : null,
+    pet.chocoboid   ? 'Chocobo'     : null,
+  ].filter(Boolean) as string[];
+  const hasChocobo = !!(chocobo.first_name || chocobo.stage);
+
+  const UNLOCKS: [string, string][] = [
+    ['outpost_sandy', 'Outpost San d\'Oria'], ['outpost_bastok', 'Outpost Bastok'],
+    ['outpost_windy', 'Outpost Windurst'], ['mog_locker', 'Mog Locker'],
+    ['runic_portal', 'Runic Portal'], ['maw', 'The Maw'],
+  ];
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -310,16 +349,39 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
           <Row k="HP" v={`${char.hp} (+${char.gear_hp ?? 0})`} />
           <Row k="MP" v={`${char.mp} (+${char.gear_mp ?? 0})`} />
           <Row k="Nation" v={NATIONS[char.nation] ?? '?'} />
+          <Row k="Genkai" v={String(char.genkai ?? 0)} />
           <Row k="Rank points" v={String(p.rank_points ?? '—')} />
-          {char.zone_name && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontSize: 12 }}>
-              <span style={{ color: 'var(--color-text3)' }}>Zone</span>
-              <button onClick={() => navigate('/map', { state: { zoneId: char.pos_zone } })}
-                className="btn btn-ghost btn-xs" style={{ padding: '1px 6px', fontSize: 11, color: 'var(--color-accent)', marginLeft: 'auto' }}>
-                {prettyZone(char.zone_name)} ↗
-              </button>
-            </div>
-          )}
+          {p.unity_leader ? <Row k="Unity" v={String(p.unity_leader)} /> : null}
+        </Panel>
+
+        <Panel title="Account">
+          <Row k="Login" v={char.account_login ?? '—'} />
+          <Row k="Character ID" v={String(char.charid)} />
+          <Row k="Account ID" v={String(char.accid)} />
+          <Row k="Privilege" v={String(char.account_priv ?? 0)} />
+          <Row k="Status" v={char.account_status === 1 ? 'Active' : `Inactive (${char.account_status})`} />
+          {char.gmlevel > 0 ? <Row k="GM level" v={String(char.gmlevel)} /> : null}
+        </Panel>
+
+        <Panel title="Identity">
+          <Row k="Race" v={RACE[char.race] ?? '?'} />
+          <Row k="Face" v={String(char.face ?? 0)} />
+          <Row k="Size" v={['Small', 'Medium', 'Large'][char.char_size] ?? String(char.char_size)} />
+          <Row k="Moghancement" v={char.moghancement ? String(char.moghancement) : '—'} />
+        </Panel>
+
+        <Panel title="Location">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, padding: '5px 0', borderBottom: '1px solid rgba(42,42,61,.4)' }}>
+            <span style={{ color: 'var(--color-text3)' }}>Zone</span>
+            <button onClick={() => navigate('/map', { state: { zoneId: char.pos_zone } })}
+              className="btn btn-ghost btn-xs" style={{ padding: '1px 6px', fontSize: 11, color: 'var(--color-accent)', marginLeft: 'auto' }}>
+              {prettyZone(char.zone_name) || `Zone ${char.pos_zone}`} ↗
+            </button>
+          </div>
+          <Row k="Position" v={coords(char.pos_x, char.pos_y, char.pos_z)} />
+          <Row k="Home point" v={prettyZone(char.home_zone_name) || `Zone ${char.home_zone}`} />
+          <Row k="Home pos" v={coords(char.home_x, char.home_y, char.home_z)} />
+          {char.prev_zone_name ? <Row k="Previous" v={prettyZone(char.prev_zone_name)} /> : null}
         </Panel>
 
         <Panel title="Reputation">
@@ -328,17 +390,51 @@ function CharOverview({ char, ext }: { char: CharBasic; ext: CharExtended | null
         </Panel>
 
         <Panel title="Activity">
-          <Row k="Kills"    v={num(hist.enemies_defeated)} />
-          <Row k="Deaths"   v={num(hist.times_knocked_out)} />
-          <Row k="Battles"  v={num(hist.battles_fought)} />
-          <Row k="WS used"  v={num(hist.ws_used)} />
-          <Row k="Spells"   v={num(hist.spells_cast)} />
-          <Row k="Distance" v={num(hist.distance_travelled)} />
+          {HISTORY.map(([key, label]) => <Row key={key} k={label} v={num(hist[key])} />)}
         </Panel>
 
+        <Panel title={`Progression`}>
+          <Row k="Skills known" v={`${knownSkills} (${cappedSkills} capped)`} />
+          <Row k="Merits" v={String(merits.length)} />
+          <Row k="Spells learned" v={String(spells.length)} />
+          <Row k="JP jobs" v={String(jpJobs.length)} />
+        </Panel>
+
+        {jpJobs.length > 0 && (
+          <Panel title="Job Points">
+            {jpJobs.map((j) => (
+              <Row key={j.jobid} k={JOB[j.jobid] ?? `Job ${j.jobid}`} v={`${num(j.job_points)} JP · ${num(j.job_points_spent)} spent`} />
+            ))}
+          </Panel>
+        )}
+
+        {merits.length > 0 && (
+          <Panel title={`Merits (${merits.length})`}>
+            {merits.map((m) => <Row key={m.meritid} k={m.name} v={`×${m.upgrades}`} />)}
+          </Panel>
+        )}
+
+        {spells.length > 0 && (
+          <Panel title={`Spells (${spells.length})`}>
+            {Object.entries(spellGroups).sort((a, b) => b[1] - a[1]).map(([g, n]) => <Row key={g} k={g} v={String(n)} />)}
+          </Panel>
+        )}
+
+        <Panel title="Unlocks">
+          {UNLOCKS.map(([key, label]) => <Row key={key} k={label} v={yn(unlocks[key])} />)}
+        </Panel>
+
+        {(companions.length > 0 || hasChocobo) && (
+          <Panel title="Companions">
+            {companions.map((c) => <Row key={c} k={c} v="✓" />)}
+            {hasChocobo && chocobo.stage != null ? <Row k="Chocobo stage" v={String(chocobo.stage)} /> : null}
+            {hasChocobo && chocobo.color != null ? <Row k="Chocobo color" v={String(chocobo.color)} /> : null}
+          </Panel>
+        )}
+
         {currencies.length > 0 && (
-          <Panel title="Currencies">
-            {currencies.map((c) => <Row key={c.k} k={c.k} v={num(c.v)} />)}
+          <Panel title={`Currencies (${currencies.length})`}>
+            {currencies.map(([k, v]) => <Row key={k} k={titleCase(k)} v={num(Number(v))} />)}
           </Panel>
         )}
 
