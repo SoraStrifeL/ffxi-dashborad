@@ -3,7 +3,7 @@ import { useWS } from '../../hooks/useWS';
 import { useStore } from '../../store';
 import { api } from '../../api';
 
-const FILES = ['map', 'world', 'connect', 'search'] as const;
+const FILES = ['map', 'world', 'connect', 'search', 'dashboard'] as const;
 type FileKey = typeof FILES[number];
 
 export function Console() {

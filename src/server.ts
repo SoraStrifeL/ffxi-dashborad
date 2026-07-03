@@ -5,6 +5,8 @@ import http from 'http';
 import WebSocket from 'ws';
 import { rateLimit } from 'express-rate-limit';
 
+import { installServerLog } from './serverlog';
+installServerLog();   // mirror console output to the in-memory ring for the Console 'dashboard' tab
 import { installCrashHandlers } from './crashlog';
 installCrashHandlers();
 

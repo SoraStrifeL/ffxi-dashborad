@@ -7,6 +7,7 @@ import { queryStats, queryPlayers, LSB_LOG_DIR, canonQueueStatus } from './catal
 import { verifyToken, currentAccountState } from './auth';
 import { hasPermission } from './rbac';
 import { setBroadcastAuditEvent } from './audit';
+import { recentServerLog, onServerLog, offServerLog } from './serverlog';
 
 type PosEntry = { i: number; n: string; x: number; y: number; z: number; z_id: number };
 
@@ -175,6 +176,30 @@ export const LOG_FILES: Record<string, string> = {
 };
 export const logTails = new Map<string, { proc: ChildProcess; subs: Set<WebSocket> }>();
 
+// The 'dashboard' source is the dashboard's own console output, streamed
+// from serverlog.ts (not a tailed file). Track each subscriber's listener
+// so it can be detached on unsubscribe/disconnect.
+const DASHBOARD_LOG_KEY = 'dashboard';
+const dashboardLogSubs = new Map<WebSocket, (lines: string[]) => void>();
+
+function subscribeDashboardLog(ws: WebSocket): void {
+  const listener = (lines: string[]) => {
+    if (ws.readyState === WebSocket.OPEN)
+      ws.send(JSON.stringify({ type: 'log', data: { file: DASHBOARD_LOG_KEY, lines }, ts: Date.now() }));
+  };
+  dashboardLogSubs.set(ws, listener);
+  onServerLog(listener);
+  // Send the recent backlog so the tab isn't empty on open.
+  const backlog = recentServerLog();
+  if (backlog.length && ws.readyState === WebSocket.OPEN)
+    ws.send(JSON.stringify({ type: 'log', data: { file: DASHBOARD_LOG_KEY, lines: backlog }, ts: Date.now() }));
+}
+
+function unsubscribeDashboardLog(ws: WebSocket): void {
+  const listener = dashboardLogSubs.get(ws);
+  if (listener) { offServerLog(listener); dashboardLogSubs.delete(ws); }
+}
+
 export function ensureLogTail(fileKey: string): void {
   if (logTails.has(fileKey)) return;
   const proc = spawn('tail', ['-n', '100', '-f', `${LOG_DIR}/${LOG_FILES[fileKey]}`]);
@@ -190,23 +215,31 @@ export function ensureLogTail(fileKey: string): void {
 }
 
 export function subscribeLog(ws: WebSocket, fileKey: string): void {
-  if (!LOG_FILES[fileKey]) return;
+  if (fileKey !== DASHBOARD_LOG_KEY && !LOG_FILES[fileKey]) return;
   const state = clients.get(ws);
   if (!state) return;
   if (state.logSub === fileKey) return;
   if (state.logSub) unsubscribeLog(ws);
   state.logSub = fileKey;
-  ensureLogTail(fileKey);
-  logTails.get(fileKey)!.subs.add(ws);
+  if (fileKey === DASHBOARD_LOG_KEY) {
+    subscribeDashboardLog(ws);
+  } else {
+    ensureLogTail(fileKey);
+    logTails.get(fileKey)!.subs.add(ws);
+  }
 }
 
 export function unsubscribeLog(ws: WebSocket): void {
   const state = clients.get(ws);
   if (!state?.logSub) return;
-  const entry = logTails.get(state.logSub);
-  if (entry) {
-    entry.subs.delete(ws);
-    if (entry.subs.size === 0) { entry.proc.kill(); logTails.delete(state.logSub); }
+  if (state.logSub === DASHBOARD_LOG_KEY) {
+    unsubscribeDashboardLog(ws);
+  } else {
+    const entry = logTails.get(state.logSub);
+    if (entry) {
+      entry.subs.delete(ws);
+      if (entry.subs.size === 0) { entry.proc.kill(); logTails.delete(state.logSub); }
+    }
   }
   state.logSub = null;
 }
