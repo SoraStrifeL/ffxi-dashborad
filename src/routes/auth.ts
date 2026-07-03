@@ -1,8 +1,17 @@
 import { Router } from 'express';
 import { Pool } from 'mysql2/promise';
+import { z } from 'zod';
 import * as auth from '../auth';
 import { audit } from '../audit';
 import { loadDashboardSettings } from '../settings';
+import { validateBody } from '../validate';
+
+// Generous bounds — blocks non-string / array-injection / oversized bodies.
+// The game's real 16/32 limits are enforced inside auth.authenticate().
+const loginSchema = z.object({
+  login:    z.string().min(1).max(64),
+  password: z.string().min(1).max(256),
+}).strict();
 
 export function createAuthRouter(pool: Pool): Router {
   const router = Router();
@@ -41,7 +50,7 @@ export function createAuthRouter(pool: Pool): Router {
     }
   });
 
-  router.post('/api/login', async (req, res) => {
+  router.post('/api/login', validateBody(loginSchema), async (req, res) => {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     const { login, password } = (req.body as { login?: string; password?: string }) || {};
     if (checkLoginRateLimit(`ip:${ip}`) || (login && checkLoginRateLimit(`acct:${String(login).toLowerCase()}`))) {

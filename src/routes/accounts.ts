@@ -1,8 +1,15 @@
 import { Router } from 'express';
 import { Pool, RowDataPacket } from 'mysql2/promise';
+import { z } from 'zod';
 import { requireAuth } from '../auth';
 import { requirePermission, getAccountOverrides, setAccountOverrides, ALL_PERMISSIONS, type Permission } from '../rbac';
 import { audit } from '../audit';
+import { validateBody, validateParams } from '../validate';
+
+const idParam       = z.object({ id: z.coerce.number().int().positive() });
+const statusSchema  = z.object({ status: z.union([z.literal(0), z.literal(1)]) }).strict();
+const privSchema    = z.object({ priv: z.coerce.number().int().min(0).max(5) }).strict();
+const permsSchema   = z.object({ permissions: z.array(z.string()).max(64) }).strict();
 
 export function createAccountsRouter(pool: Pool): Router {
   const router = Router();
@@ -18,41 +25,35 @@ export function createAccountsRouter(pool: Pool): Router {
     } catch (err) { res.status(500).json({ error: (err as Error).message }); }
   });
 
-  router.post('/api/accounts/:id/status', requireAuth, requirePermission('manage:accounts'), async (req, res) => {
+  router.post('/api/accounts/:id/status', requireAuth, requirePermission('manage:accounts'), validateParams(idParam), validateBody(statusSchema), async (req, res) => {
     try {
-      const id = parseInt(req.params.id as string);
-      const { status } = (req.body as { status?: number }) || {};
-      if (status !== 0 && status !== 1) { res.status(400).json({ error: 'status must be 0 or 1' }); return; }
+      const id = Number(req.params.id);
+      const { status } = req.body as { status: 0 | 1 };
       await pool.execute('UPDATE accounts SET status = ? WHERE id = ?', [status, id]);
       audit(req.user!.login, 'account.status', `account:${id}`, { status });
       res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: (err as Error).message }); }
   });
 
-  router.post('/api/accounts/:id/priv', requireAuth, requirePermission('manage:accounts'), async (req, res) => {
+  router.post('/api/accounts/:id/priv', requireAuth, requirePermission('manage:accounts'), validateParams(idParam), validateBody(privSchema), async (req, res) => {
     try {
-      const id = parseInt(req.params.id as string);
-      const { priv } = (req.body as { priv?: unknown }) || {};
-      const privNum = parseInt(String(priv));
-      if (isNaN(privNum) || privNum < 0 || privNum > 5) { res.status(400).json({ error: 'priv must be 0–5' }); return; }
+      const id = Number(req.params.id);
+      const privNum = Number(req.body.priv);
       await pool.execute('UPDATE accounts SET priv = ? WHERE id = ?', [privNum, id]);
       audit(req.user!.login, 'account.priv', `account:${id}`, { priv: privNum });
       res.json({ ok: true });
     } catch (err) { res.status(500).json({ error: (err as Error).message }); }
   });
 
-  router.get('/api/accounts/:id/permissions', requireAuth, requirePermission('manage:accounts'), (req, res) => {
-    const accid = parseInt(req.params.id as string);
-    if (isNaN(accid)) { res.status(400).json({ error: 'invalid id' }); return; }
+  router.get('/api/accounts/:id/permissions', requireAuth, requirePermission('manage:accounts'), validateParams(idParam), (req, res) => {
+    const accid = Number(req.params.id);
     res.json({ accid, overrides: getAccountOverrides(accid) });
   });
 
-  router.post('/api/accounts/:id/permissions', requireAuth, requirePermission('manage:accounts'), (req, res) => {
-    const accid = parseInt(req.params.id as string);
-    if (isNaN(accid)) { res.status(400).json({ error: 'invalid id' }); return; }
-    const { permissions } = (req.body as { permissions?: unknown }) || {};
-    if (!Array.isArray(permissions)) { res.status(400).json({ error: 'permissions must be an array' }); return; }
-    const valid = (permissions as string[]).filter(p => ALL_PERMISSIONS.includes(p as Permission)) as Permission[];
+  router.post('/api/accounts/:id/permissions', requireAuth, requirePermission('manage:accounts'), validateParams(idParam), validateBody(permsSchema), (req, res) => {
+    const accid = Number(req.params.id);
+    const { permissions } = req.body as { permissions: string[] };
+    const valid = permissions.filter(p => ALL_PERMISSIONS.includes(p as Permission)) as Permission[];
     setAccountOverrides(accid, valid);
     audit(req.user!.login, 'account.permissions', `account:${accid}`, { permissions: valid });
     res.json({ ok: true, overrides: valid });

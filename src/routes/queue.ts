@@ -1,10 +1,26 @@
 import { Router } from 'express';
 import { Pool, RowDataPacket, ResultSetHeader } from 'mysql2/promise';
+import { z } from 'zod';
 import { requireAuth, requireAdmin } from '../auth';
 import { requirePermission } from '../rbac';
 import { userOwnsChar } from '../auth';
 import { PLAYER_ALLOWED_ACTIONS, canonQueueStatus } from '../catalog';
 import { audit } from '../audit';
+import { validateBody } from '../validate';
+
+// Supported queue actions, mirroring the C++ map-server module.
+const QUEUE_ACTIONS = ['additem', 'delitem', 'setgil', 'addgil', 'setskill', 'luaexec'] as const;
+
+const queueSchema = z.object({
+  charid: z.number().int().min(0),
+  action: z.enum(QUEUE_ACTIONS),
+  // params shape varies per action; accept a string or a JSON object, default {}
+  params: z.union([z.string().max(100_000), z.record(z.string(), z.unknown())]).optional(),
+}).strict();
+
+const consoleSchema = z.object({
+  cmd: z.string().min(1).max(100_000),
+}).strict();
 
 export function createQueueRouter(pool: Pool): Router {
   const router = Router();
@@ -24,11 +40,11 @@ export function createQueueRouter(pool: Pool): Router {
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
-  router.post('/api/queue', requireAuth, requirePermission('submit:queue'), async (req, res) => {
+  router.post('/api/queue', requireAuth, requirePermission('submit:queue'), validateBody(queueSchema), async (req, res) => {
     try {
-      const { charid, action, params } = (req.body as { charid?: number; action?: string; params?: unknown }) || {};
+      const { charid, action, params } = req.body as { charid: number; action: typeof QUEUE_ACTIONS[number]; params?: unknown };
       // charid 0 is only meaningful for global luaexec (map-server VM)
-      if (charid === undefined || !action || (!charid && action !== 'luaexec')) { res.status(400).json({ error: 'charid and action required' }); return; }
+      if (!charid && action !== 'luaexec') { res.status(400).json({ error: 'charid required for this action' }); return; }
       if (req.user!.tier !== 'admin') {
         if (!(await userOwnsChar(pool, req.user!.accid, charid))) { res.status(403).json({ error: 'not your character' }); return; }
         if (!PLAYER_ALLOWED_ACTIONS.has(action)) { res.status(403).json({ error: 'action not allowed for players' }); return; }
@@ -69,10 +85,9 @@ export function createQueueRouter(pool: Pool): Router {
     } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
-  router.post('/api/console', requireAuth, requirePermission('run:console'), async (req, res) => {
+  router.post('/api/console', requireAuth, requirePermission('run:console'), validateBody(consoleSchema), async (req, res) => {
     try {
-      const { cmd } = (req.body as { cmd?: string }) || {};
-      if (!cmd || typeof cmd !== 'string') { res.status(400).json({ error: 'cmd required' }); return; }
+      const { cmd } = req.body as { cmd: string };
       const [result] = await pool.execute<ResultSetHeader>(
         'INSERT INTO dashboard_queue (charid, action, params, requested_by) VALUES (0, "luaexec", ?, ?)',
         [cmd, req.user!.login]);
