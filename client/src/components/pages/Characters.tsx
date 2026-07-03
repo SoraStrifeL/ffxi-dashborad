@@ -200,6 +200,8 @@ function Row({ k, v }: { k: string; v: React.ReactNode }) {
 }
 
 const NATIONS = ["San d'Oria", 'Bastok', 'Windurst', 'Other'];
+// char_look.size → model build (size is race-determined in FFXI).
+const SIZE_LABELS = ['Tarutaru-build (Small)', 'Hume-build (Medium)', 'Galka-build (Large)'];
 
 // Moghancement id → name (from scripts/enum/key_item.lua MOGHANCEMENT_*).
 const MOGHANCEMENT: Record<number, string> = {
@@ -378,7 +380,7 @@ function CharOverview({ char, ext, setTab }: { char: CharBasic; ext: CharExtende
         <Panel title="Identity">
           <Row k="Race" v={RACE[char.race] ?? '?'} />
           <Row k="Face" v={faceLabel(char.face)} />
-          <Row k="Size" v={['Small', 'Medium', 'Large'][char.char_size] ?? String(char.char_size)} />
+          <Row k="Size" v={SIZE_LABELS[char.char_size] ?? String(char.char_size)} />
           <Row k="Moghancement" v={char.moghancement ? (MOGHANCEMENT[char.moghancement] ?? `#${char.moghancement}`) : '—'} />
         </Panel>
 
