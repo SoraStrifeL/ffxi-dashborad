@@ -350,8 +350,13 @@ for (const id of Object.keys(TITLE_NAMES)) {
 // Key items likewise render as raw constants in the Blobs and Database tabs.
 // Prettify AFTER the MOGHANCEMENT_* derivation above (which needs the raw
 // prefix); KEY_ITEM_SORTED in routes/db.ts reads this later, so it benefits too.
+// Moghancement key items reuse the polished MOGHANCEMENT_NAMES (with the
+// in-game "Moghancement:" prefix) so they match the character Overview.
 for (const id of Object.keys(KEY_ITEM_NAMES)) {
-  KEY_ITEM_NAMES[Number(id)] = prettyEnumName(KEY_ITEM_NAMES[Number(id)]);
+  const n = Number(id);
+  KEY_ITEM_NAMES[n] = MOGHANCEMENT_NAMES[n]
+    ? `Moghancement: ${MOGHANCEMENT_NAMES[n]}`
+    : prettyEnumName(KEY_ITEM_NAMES[n]);
 }
 
 // ── RoE Records ────────────────────────────────────────────────────────────────
