@@ -45,6 +45,9 @@ function isBcryptHash(h) {
 // consistent and prevent username enumeration via timing.
 const DUMMY_HASH = '$2b$12$aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 
+// Pin the accepted JWT algorithm on every verify (block alg:none / key confusion).
+const VERIFY_OPTS = { algorithms: ['HS256'] };
+
 // Returns { accid, tier, login } on success, or null on any failure.
 // `pool` is the shared mysql2/promise pool from server.js.
 async function authenticate(pool, login, password) {
@@ -88,7 +91,7 @@ function issueToken(identity) {
   return jwt.sign(
     { accid: identity.accid, tier: identity.tier, login: identity.login },
     JWT_SECRET,
-    { expiresIn: TOKEN_TTL });
+    { expiresIn: TOKEN_TTL, algorithm: 'HS256' });
 }
 
 // ── Per-request account-state revocation ─────────────────────────────
@@ -136,7 +139,7 @@ async function requireAuth(req, res, next) {
   if (!token) return res.status(401).json({ error: 'no token' });
   let user;
   try {
-    user = jwt.verify(token, JWT_SECRET);   // { accid, tier, login, iat, exp }
+    user = jwt.verify(token, JWT_SECRET, VERIFY_OPTS);   // { accid, tier, login, iat, exp }
   } catch (e) {
     return res.status(401).json({ error: 'invalid or expired token' });
   }
@@ -165,7 +168,7 @@ async function userOwnsChar(pool, accid, charid) {
 
 // Verifies a raw JWT string; throws on invalid/expired.
 function verifyToken(token) {
-  return jwt.verify(token, JWT_SECRET);
+  return jwt.verify(token, JWT_SECRET, VERIFY_OPTS);
 }
 
 module.exports = {

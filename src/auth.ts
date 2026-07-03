@@ -89,8 +89,13 @@ export function issueToken(identity: { accid: number; tier: string; login: strin
   return jwt.sign(
     { accid: identity.accid, tier: identity.tier, login: identity.login },
     SECRET,
-    { expiresIn: ttl as `${number}h` });
+    { expiresIn: ttl as `${number}h`, algorithm: 'HS256' });
 }
+
+// Pin the accepted algorithm on every verify: without this, jwt.verify
+// honours the token header's `alg`, opening algorithm-confusion attacks
+// (e.g. a forged `alg:none` or an RS256/HS256 key-confusion token).
+const VERIFY_OPTS = { algorithms: ['HS256'] as jwt.Algorithm[] };
 
 // ── Per-request account-state revocation ─────────────────────────────
 // A JWT is a bearer credential valid until it expires (tokenTtlHours,
@@ -150,7 +155,7 @@ export const requireAuth: RequestHandler = async (req, res, next) => {
   if (!token) { res.status(401).json({ error: 'no token' }); return; }
   let user: AuthUser;
   try {
-    user = jwt.verify(token, SECRET) as AuthUser;
+    user = jwt.verify(token, SECRET, VERIFY_OPTS) as AuthUser;
   } catch (_e) {
     res.status(401).json({ error: 'invalid or expired token' });
     return;
@@ -183,5 +188,5 @@ export async function userOwnsChar(pool: Pool, accid: number, charid: number): P
 
 // Verifies a raw JWT string; throws on invalid/expired.
 export function verifyToken(token: string): AuthUser {
-  return jwt.verify(token, SECRET) as AuthUser;
+  return jwt.verify(token, SECRET, VERIFY_OPTS) as AuthUser;
 }
