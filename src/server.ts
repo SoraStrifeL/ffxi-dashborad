@@ -53,7 +53,9 @@ const apiLimiter = rateLimit({
   max:              600,              // 2 req/s sustained
   standardHeaders:  'draft-7',
   legacyHeaders:    false,
-  skip: (req) => req.path.startsWith('/api/windower/'),
+  // originalUrl, not path: inside a middleware mounted at '/api/' Express strips
+  // the mount prefix from req.path, so '/api/windower/…' would never match
+  skip: (req) => req.originalUrl.startsWith('/api/windower/'),
   message: { error: 'Too many requests, please slow down.' },
 });
 app.use('/api/', apiLimiter);
@@ -82,9 +84,10 @@ app.use(createGithubFilesRouter());
 app.use(createAdminRouter());
 loadPlugins({ pool, app });
 
-// SPA fallback — serve index.html for all non-API routes so React Router works
+// SPA fallback — serve index.html for all non-API routes so React Router works.
+// Unknown /api/ routes get a JSON 404 (not Express's default HTML page).
 app.use((req: Request, res: Response, next: NextFunction) => {
-  if (req.path.startsWith('/api/')) { next(); return; }
+  if (req.path.startsWith('/api/')) { res.status(404).json({ error: 'not found' }); return; }
   res.sendFile(path.join(__dirname, '..', 'public', 'index.html'), (err) => { if (err) next(err); });
 });
 

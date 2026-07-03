@@ -3300,9 +3300,10 @@ async function loadExpTable() {
   }
 }
 
-// SPA fallback — serve index.html for all non-API routes so React Router works
+// SPA fallback — serve index.html for all non-API routes so React Router works.
+// Unknown /api/ routes get a JSON 404 (not Express's default HTML page).
 app.use((req, res, next) => {
-  if (req.path.startsWith('/api/')) return next();
+  if (req.path.startsWith('/api/')) return res.status(404).json({ error: 'not found' });
   res.sendFile(path.join(__dirname, 'public', 'index.html'), (err) => { if (err) next(err); });
 });
 

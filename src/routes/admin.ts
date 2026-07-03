@@ -12,7 +12,7 @@ export function createAdminRouter(): Router {
   });
 
   router.get('/api/audit', requireAuth, requirePermission('view:accounts'), (req, res) => {
-    const limit = Math.min(500, parseInt((req.query.limit as string) || '200'));
+    const limit = Math.max(1, Math.min(500, parseInt(req.query.limit as string) || 200));
     res.json(readAuditLog(limit));
   });
 

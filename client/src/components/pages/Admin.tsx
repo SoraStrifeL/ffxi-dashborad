@@ -29,7 +29,11 @@ export function Admin() {
   useWS((type, data) => {
     if (type === 'queue_update') {
       const entry = data as QueueEntry;
-      setQueue((prev) => prev.map((q) => q.id === entry.id ? entry : q));
+      // Entries not in the loaded page (another admin's action, a Console
+      // luaexec) are prepended so completed work shows up without a Refresh
+      setQueue((prev) => prev.some((q) => q.id === entry.id)
+        ? prev.map((q) => q.id === entry.id ? { ...q, ...entry } : q)
+        : [entry, ...prev]);
     }
   });
 
