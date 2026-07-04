@@ -1,0 +1,33 @@
+# Copy these 22 DAT files from your FFXI client into ffxi-dat/, PRESERVING the
+# ROM/<dir>/<file>.DAT folder structure (so e.g. ffxi-dat/ROM/118/106.DAT).
+# All are small string/item DATs. Resolved from your FTABLE/VTABLE (EN client).
+
+# ── Items (names + descriptions + icons are inside these) ──
+ROM/118/106.DAT   # general items
+ROM/118/107.DAT   # usable items
+ROM/118/108.DAT   # weapons
+ROM/118/109.DAT   # armor
+ROM/118/110.DAT   # puppet items
+ROM/174/48.DAT    # currency
+ROM/286/73.DAT    # armor (set 2)
+ROM/301/115.DAT   # general items (set 2)
+ROM/217/21.DAT    # vouchers / slips
+ROM/74/21.DAT     # furniture
+
+# ── Magic & abilities ──
+ROM/181/73.DAT    # spell names
+ROM/181/75.DAT    # spell descriptions
+ROM/181/72.DAT    # ability names
+ROM/181/74.DAT    # ability descriptions
+ROM/166/116.DAT   # blue magic
+ROM/27/80.DAT     # monster skill names
+
+# ── Status / titles / key items ──
+ROM/180/102.DAT   # status effect names
+ROM/119/57.DAT    # status info
+ROM/180/78.DAT    # titles
+ROM/175/35.DAT    # key items
+
+# ── Zones ──
+ROM/165/84.DAT    # area names (long)
+ROM/165/85.DAT    # area names (short)

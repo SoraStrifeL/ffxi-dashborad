@@ -34,9 +34,12 @@ import { createLsbUpdateRouter } from './routes/lsb-update';
 import { createDockerRouter }      from './routes/docker';
 import { createGithubFilesRouter } from './routes/github-files';
 import { createHealthRouter }    from './routes/health';
+import { createDatRouter }       from './routes/dat';
+import { initDat }               from './dat';
 import { loadPlugins }           from './plugin';
 
 initRedis();
+initDat();
 initAuthPool(pool);
 
 const app = express();
@@ -69,6 +72,7 @@ const wss = new WebSocket.Server({ server });
 
 // ── Wire up all routers ───────────────────────────────────────────────────────
 app.use(createHealthRouter(pool));    // /api/health  (public)
+app.use(createDatRouter());           // /api/dat/*   (optional DAT fetcher)
 app.use(createAuthRouter(pool));
 app.use(createMapRouter(pool));
 app.use(createZonesRouter(pool));

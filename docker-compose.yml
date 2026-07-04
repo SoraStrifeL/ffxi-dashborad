@@ -32,12 +32,14 @@ services:
       ANTHROPIC_API_KEY: "${ANTHROPIC_API_KEY}"
       REDIS_URL: "${REDIS_URL:-redis://ffxi-redis:6379}"
       AUTOLOGIN: "${AUTOLOGIN:-true}"
+      DAT_DIR: /ffxi-dat
     ports:
       - "3001:3000"
     volumes:
       - ./public/maps:/app/public/maps
       - ./public/uploads:/app/public/uploads
       - ./data:/app/data
+      - ./ffxi-dat:/ffxi-dat:ro          # optional FFXI client DATs (see DAT_DIR)
       - ffxi_ffxi-logs:/ffxi-log:ro
       - /opt/stacks/ffxi/settings:/ffxi-settings
       - /opt/stacks/ffxi/scripts/globals/quests.lua:/ffxi-scripts/quests.lua:ro
