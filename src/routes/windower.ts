@@ -35,14 +35,17 @@ function normalizeWindower(p: WindowerPosition) {
 // draws the player at, straight from the client's map DAT constants. Two samples far
 // enough apart solve the affine world->sheet transform per zone; the calibration
 // bounds are the world coords at the sheet edges. Convention matches the client
-// renderer: maxX = left edge, maxZ = top edge. Zones already in calStore are skipped.
+// renderer: maxX = left edge, maxZ = top edge. Zones already in calStore are
+// skipped — except DAT-generated approximations (src === 'dat'), which live
+// Windower samples are allowed to upgrade to exact values.
 const SHEET = 512;
 const CAL_MIN_DELTA = 25; // world units of separation required on each axis
 interface CalSample { x: number; z: number; px: number; py: number }
 const calSamples = new Map<number, CalSample[]>();
 
 function recordCalSample(zone: number, s: CalSample): void {
-  if (calStore[zone]) return;
+  const existing = calStore[zone] as { src?: string } | undefined;
+  if (existing && existing.src !== 'dat') return;
   const arr = calSamples.get(zone) ?? [];
   const mate = arr.find(o => Math.abs(o.x - s.x) >= CAL_MIN_DELTA && Math.abs(o.z - s.z) >= CAL_MIN_DELTA);
   if (!mate) {

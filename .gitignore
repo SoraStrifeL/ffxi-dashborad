@@ -42,3 +42,7 @@ ffxi-dat/**
 !ffxi-dat/README.md
 !ffxi-dat/NEEDED.txt
 !ffxi-dat/copy-from-client.sh
+
+# Full retail FFXI client install (copyrighted game data) — used by
+# tools/build-calibrations.js; never commit it.
+FINAL FANTASY XI/
