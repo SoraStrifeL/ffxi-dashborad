@@ -88,20 +88,20 @@ async function apiLogin() {
 // Robust bounding box of npc+mob positions: median-centred MAD trim throws
 // out event-NPC clones parked at other cities' coordinates.
 function robustBox(pts) {
-  if (pts.length < 15) return null;
+  if (pts.length < 8) return null;
   const med = a => { const s = [...a].sort((x, y) => x - y); return s[s.length >> 1]; };
   const cx = med(pts.map(p => p.x)), cz = med(pts.map(p => p.z));
   const dists = pts.map(p => Math.max(Math.abs(p.x - cx), Math.abs(p.z - cz)));
   const mad = med(dists);
   const lim = Math.max(6 * mad, 80);
   const kept = pts.filter((p, i) => dists[i] <= lim);
-  if (kept.length < 10) return null;
+  if (kept.length < 6) return null;
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
   for (const p of kept) {
     if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
     if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
   }
-  return { minX, maxX, minZ, maxZ, n: kept.length };
+  return { minX, maxX, minZ, maxZ, n: kept.length, kept };
 }
 
 async function fetchEntityBox(zone, token) {
@@ -170,10 +170,19 @@ const area = b => Math.max(1e-6, (b.maxX - b.minX) * (b.maxZ - b.minZ));
       // geometry is declared oversized; mob-less city districts are lined
       // wall-to-wall with NPCs, so 2x linear is already suspicious there.
       const ratio = ent && ent.mobCount >= 30 ? 9 : 4;
-      if (ent && area(bounds) > ratio * area(ent)) {
+      // Coverage: trimmed entities sitting outside geometry mean the DAT's
+      // extent doesn't describe this zone's map (e.g. Altar Room) — geometry
+      // that misses real entities is worse than the entity box.
+      const covered = ent
+        ? ent.kept.filter(p => p.x >= bounds.minX - 10 && p.x <= bounds.maxX + 10 &&
+                               p.z >= bounds.minZ - 10 && p.z <= bounds.maxZ + 10).length / ent.kept.length
+        : 1;
+      if (ent && (area(bounds) > ratio * area(ent) || covered < 0.9)) {
         const padX = (ent.maxX - ent.minX) * 0.10, padZ = (ent.maxZ - ent.minZ) * 0.10;
         box = { minX: ent.minX - padX, maxX: ent.maxX + padX, minZ: ent.minZ - padZ, maxZ: ent.maxZ + padZ };
-        note = `entity fallback (${ent.n} pts; geometry ${Math.sqrt(area(bounds) / area(ent)).toFixed(1)}x oversized)`;
+        note = `entity fallback (${ent.n} pts; ` +
+          (covered < 0.9 ? `geometry covers only ${(covered * 100).toFixed(0)}% of entities` :
+            `geometry ${Math.sqrt(area(bounds) / area(ent)).toFixed(1)}x oversized`) + ')';
         entityFallback++;
       }
     }

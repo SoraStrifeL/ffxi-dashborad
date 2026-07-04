@@ -108,6 +108,23 @@ export function createWindowerRouter(pool: Pool): Router {
         console.log(`[autocal] zone ${entry.zone}: map pixel out of 0..${SHEET} range (${px}, ${py}) — sheet size assumption may be wrong`);
     }
 
+    // Optional bulk calibration samples: the addon can probe get_map_data()
+    // with synthetic coordinates on zone-in and send several {x, z, px, py}
+    // pairs at once — two far-apart samples calibrate a zone exactly without
+    // the player having to walk anywhere. Same convention as map_x/map_y:
+    // x/z are world coords (z = Windower y), px/py the 512-sheet pixel.
+    const { cal } = (req.body as { cal?: unknown });
+    if (Array.isArray(cal)) {
+      for (const s of cal.slice(0, 16)) {
+        const cx = parseFloat(String((s as Record<string, unknown>)?.x));
+        const cz = parseFloat(String((s as Record<string, unknown>)?.z));
+        const px = parseFloat(String((s as Record<string, unknown>)?.px));
+        const py = parseFloat(String((s as Record<string, unknown>)?.py));
+        if ([cx, cz, px, py].every(isFinite) && px >= 0 && px <= SHEET && py >= 0 && py <= SHEET)
+          recordCalSample(entry.zone, { x: cx, z: cz, px, py });
+      }
+    }
+
     // Refresh DB data for the posting player (job, level, charid for Map overlay)
     try {
       const [rows] = await pool.execute<RowDataPacket[]>(
