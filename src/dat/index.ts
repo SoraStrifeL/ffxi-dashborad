@@ -10,7 +10,8 @@
 import fs from 'fs';
 import path from 'path';
 import { parseDmsg } from './dmsg';
-import { parseItemDat } from './item';
+import { parseItemDat, decodeItemRecord } from './item';
+import { extractItemIcon } from './icon';
 
 const DAT_DIR = process.env.DAT_DIR || path.join(__dirname, '..', '..', 'ffxi-dat');
 
@@ -63,6 +64,15 @@ export function readResource(fileId: number): Buffer | null {
   try { return fs.readFileSync(p); } catch { return null; }
 }
 
+// Cache item-DAT buffers (12–20 MB each) so icon lookups don't re-read from disk.
+const resourceBufCache = new Map<number, Buffer | null>();
+function readResourceCached(fileId: number): Buffer | null {
+  if (resourceBufCache.has(fileId)) return resourceBufCache.get(fileId)!;
+  const b = readResource(fileId);
+  resourceBufCache.set(fileId, b);
+  return b;
+}
+
 // Parsed string lists are cached in-process (the DATs never change at runtime).
 const stringCache = new Map<string, string[]>();
 
@@ -112,6 +122,10 @@ export function categoryKeys(): string[] {
 export interface DatRow { id: number; name: string; description?: string }
 
 const itemCache = new Map<string, DatRow[]>();
+// item id → { fileId, rec } so an icon can be re-decoded on demand.
+const itemIconIndex = new Map<number, { fileId: number; rec: number }>();
+const iconPngCache = new Map<number, Buffer | null>();
+
 function getItems(cat: string): DatRow[] {
   if (!enabled) return [];
   const cached = itemCache.get(cat);
@@ -119,13 +133,32 @@ function getItems(cat: string): DatRow[] {
   const ids = DAT_ITEM_CATEGORIES[cat];
   const rows: DatRow[] = [];
   for (const fileId of ids) {
-    const buf = readResource(fileId);
+    const buf = readResourceCached(fileId);
     if (!buf) continue;
-    for (const it of parseItemDat(buf)) rows.push({ id: it.id, name: it.name, description: it.description });
+    for (const it of parseItemDat(buf)) {
+      rows.push({ id: it.id, name: it.name, description: it.description });
+      itemIconIndex.set(it.id, { fileId, rec: it.rec });
+    }
   }
   rows.sort((a, b) => a.id - b.id);
   itemCache.set(cat, rows);
   return rows;
+}
+
+/** PNG icon bytes for an item id (any item category), lazily decoded + cached. */
+export function getItemIcon(id: number): Buffer | null {
+  if (!enabled) return null;
+  if (iconPngCache.has(id)) return iconPngCache.get(id)!;
+  // ensure the icon index is populated (parse each item category once)
+  if (itemIconIndex.size === 0) for (const c of Object.keys(DAT_ITEM_CATEGORIES)) getItems(c);
+  const loc = itemIconIndex.get(id);
+  let png: Buffer | null = null;
+  if (loc) {
+    const buf = readResourceCached(loc.fileId);
+    if (buf) png = extractItemIcon(decodeItemRecord(buf, loc.rec));
+  }
+  iconPngCache.set(id, png);
+  return png;
 }
 
 /** Joined id/name/description rows for a display category (string or item). */

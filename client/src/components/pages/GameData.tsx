@@ -58,6 +58,7 @@ export function GameData() {
   }
 
   const withDesc = cat === 'abilities' || cat === 'spells' || cat.startsWith('items_');
+  const withIcon = cat.startsWith('items_');
   const available = (key: string) => cats.length === 0 || cats.includes(key);
 
   return (
@@ -100,7 +101,16 @@ export function GameData() {
                   <tr onClick={() => withDesc && r.description && setExpanded(expanded === r.id ? null : r.id)}
                     style={{ cursor: withDesc && r.description ? 'pointer' : 'default' }}>
                     <td style={{ color: 'var(--color-text3)', fontSize: 11 }}>{r.id}</td>
-                    <td style={{ color: 'var(--color-text1)', fontWeight: 500 }}>{r.name}</td>
+                    <td style={{ color: 'var(--color-text1)', fontWeight: 500 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        {withIcon && (
+                          <img src={`/api/dat/icon/${r.id}`} alt="" width={32} height={32} loading="lazy"
+                            style={{ flexShrink: 0, imageRendering: 'pixelated' }}
+                            onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+                        )}
+                        {r.name}
+                      </div>
+                    </td>
                     {withDesc && (
                       <td style={{ color: 'var(--color-text3)', fontSize: 11, maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {(r.description || '—').replace(/\n/g, ' ')}

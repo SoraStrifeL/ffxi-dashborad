@@ -62,7 +62,7 @@ const apiLimiter = rateLimit({
   legacyHeaders:    false,
   // originalUrl, not path: inside a middleware mounted at '/api/' Express strips
   // the mount prefix from req.path, so '/api/windower/…' would never match
-  skip: (req) => req.originalUrl.startsWith('/api/windower/'),
+  skip: (req) => req.originalUrl.startsWith('/api/windower/') || req.originalUrl.startsWith('/api/dat/icon/'),
   message: { error: 'Too many requests, please slow down.' },
 });
 app.use('/api/', apiLimiter);

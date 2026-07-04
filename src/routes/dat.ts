@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth';
 import { requirePermission } from '../rbac';
-import { datEnabled, getStrings, stringResourceKeys, getTable, categoryKeys } from '../dat';
+import { datEnabled, getStrings, stringResourceKeys, getTable, categoryKeys, getItemIcon } from '../dat';
 
 export function createDatRouter(): Router {
   const router = Router();
@@ -38,6 +38,19 @@ export function createDatRouter(): Router {
     if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
     const slice = rows.slice(page * PAGE, page * PAGE + PAGE);
     res.json({ key, total: rows.length, page, rows: slice, hasMore: rows.length > (page + 1) * PAGE });
+  });
+
+  // Item icon PNG by item id. Public (non-sensitive game art) so <img> tags
+  // work without an auth header; 404 when disabled or no icon.
+  router.get('/api/dat/icon/:id', (req, res) => {
+    if (!datEnabled()) { res.status(404).end(); return; }
+    const id = parseInt(String(req.params.id));
+    if (!Number.isFinite(id)) { res.status(400).end(); return; }
+    const png = getItemIcon(id);
+    if (!png) { res.status(404).end(); return; }
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.end(png);
   });
 
   // Single entry by id.
