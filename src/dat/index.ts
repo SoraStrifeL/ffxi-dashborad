@@ -12,6 +12,7 @@ import path from 'path';
 import { parseDmsg } from './dmsg';
 import { parseItemDat, decodeItemRecord } from './item';
 import { extractItemIcon } from './icon';
+import { parseDialog, dialogFileId } from './dialog';
 
 const DAT_DIR = process.env.DAT_DIR || path.join(__dirname, '..', '..', 'ffxi-dat');
 
@@ -143,6 +144,35 @@ function getItems(cat: string): DatRow[] {
   rows.sort((a, b) => a.id - b.id);
   itemCache.set(cat, rows);
   return rows;
+}
+
+// ── Per-zone dialog ────────────────────────────────────────────────────
+const dialogCache = new Map<number, string[]>();
+
+/** Parsed dialog lines for a zone, lazily read + cached. */
+export function getDialog(zoneId: number): string[] {
+  if (!enabled) return [];
+  const cached = dialogCache.get(zoneId);
+  if (cached) return cached;
+  const fileId = dialogFileId(zoneId);
+  const buf = fileId != null ? readResource(fileId) : null;
+  const lines = buf ? parseDialog(buf) : [];
+  dialogCache.set(zoneId, lines);
+  return lines;
+}
+
+/** Zones that have a dialog table, paired with their DAT name. */
+export function dialogZones(): { id: number; name: string }[] {
+  if (!enabled) return [];
+  const names = getStrings('zones');
+  const out: { id: number; name: string }[] = [];
+  for (let z = 0; z <= 511; z++) {
+    const fileId = dialogFileId(z);
+    if (fileId == null || !resolvePath(fileId)) continue;
+    const name = names[z];
+    if (name && name !== 'unknown' && !/^\d+$/.test(name)) out.push({ id: z, name });
+  }
+  return out;
 }
 
 /** PNG icon bytes for an item id (any item category), lazily decoded + cached. */

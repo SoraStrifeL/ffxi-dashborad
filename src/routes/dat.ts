@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth';
 import { requirePermission } from '../rbac';
-import { datEnabled, getStrings, stringResourceKeys, getTable, categoryKeys, getItemIcon } from '../dat';
+import { datEnabled, getStrings, stringResourceKeys, getTable, categoryKeys, getItemIcon, getDialog, dialogZones } from '../dat';
 
 export function createDatRouter(): Router {
   const router = Router();
@@ -38,6 +38,25 @@ export function createDatRouter(): Router {
     if (q) rows = rows.filter(r => r.name.toLowerCase().includes(q));
     const slice = rows.slice(page * PAGE, page * PAGE + PAGE);
     res.json({ key, total: rows.length, page, rows: slice, hasMore: rows.length > (page + 1) * PAGE });
+  });
+
+  // Zones that have a dialog table (id + name).
+  router.get('/api/dat/dialog-zones', requireAuth, requirePermission('view:db'), (_req, res) => {
+    if (!datEnabled()) { res.status(503).json({ error: 'DAT fetcher disabled' }); return; }
+    res.json({ zones: dialogZones() });
+  });
+
+  // Per-zone dialog lines (paginated + searchable).
+  router.get('/api/dat/dialog/:zoneId', requireAuth, requirePermission('view:db'), (req, res) => {
+    if (!datEnabled()) { res.status(503).json({ error: 'DAT fetcher disabled' }); return; }
+    const zoneId = parseInt(String(req.params.zoneId));
+    if (!Number.isFinite(zoneId)) { res.status(400).json({ error: 'invalid zone' }); return; }
+    const q = String(req.query.q || '').toLowerCase();
+    const page = Math.max(0, parseInt(req.query.page as string) || 0);
+    const PAGE = 100;
+    let rows = getDialog(zoneId).map((text, id) => ({ id, text })).filter(r => r.text);
+    if (q) rows = rows.filter(r => r.text.toLowerCase().includes(q));
+    res.json({ zoneId, total: rows.length, page, rows: rows.slice(page * PAGE, page * PAGE + PAGE), hasMore: rows.length > (page + 1) * PAGE });
   });
 
   // Item icon PNG by item id. Public (non-sensitive game art) so <img> tags

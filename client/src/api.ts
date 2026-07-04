@@ -81,6 +81,10 @@ export const api = {
   datTable:  (cat: string, q = '', page = 0) =>
     req<{ cat: string; total: number; page: number; hasMore: boolean; rows: { id: number; name: string; description?: string }[] }>(
       `/api/dat/table/${cat}?q=${encodeURIComponent(q)}&page=${page}`),
+  datDialogZones: () => req<{ zones: { id: number; name: string }[] }>('/api/dat/dialog-zones'),
+  datDialog: (zone: number, q = '', page = 0) =>
+    req<{ zoneId: number; total: number; page: number; hasMore: boolean; rows: { id: number; text: string }[] }>(
+      `/api/dat/dialog/${zone}?q=${encodeURIComponent(q)}&page=${page}`),
 
   me: () => req<{ login: string; tier: 'admin' | 'player'; accid: number }>('/api/me'),
   mePermissions: () => req<{ login: string; tier: string; permissions: string[] }>('/api/me/permissions'),
