@@ -4,6 +4,11 @@ import { api } from '../../api';
 type Row = { id: number; name: string; description?: string };
 
 const CATS: { key: string; label: string }[] = [
+  { key: 'items_weapons',  label: 'Weapons' },
+  { key: 'items_armor',    label: 'Armor' },
+  { key: 'items_usable',   label: 'Usable' },
+  { key: 'items_general',  label: 'General' },
+  { key: 'items_currency', label: 'Currency' },
   { key: 'abilities',      label: 'Abilities' },
   { key: 'spells',         label: 'Spells' },
   { key: 'zones',          label: 'Zones' },
@@ -16,7 +21,7 @@ const CATS: { key: string; label: string }[] = [
 export function GameData() {
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [cats, setCats] = useState<string[]>([]);
-  const [cat, setCat] = useState('abilities');
+  const [cat, setCat] = useState('items_weapons');
   const [rows, setRows] = useState<Row[]>([]);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
@@ -52,7 +57,7 @@ export function GameData() {
     );
   }
 
-  const withDesc = cat === 'abilities' || cat === 'spells';
+  const withDesc = cat === 'abilities' || cat === 'spells' || cat.startsWith('items_');
   const available = (key: string) => cats.length === 0 || cats.includes(key);
 
   return (

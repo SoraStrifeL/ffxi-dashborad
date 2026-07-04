@@ -10,6 +10,7 @@
 import fs from 'fs';
 import path from 'path';
 import { parseDmsg } from './dmsg';
+import { parseItemDat } from './item';
 
 const DAT_DIR = process.env.DAT_DIR || path.join(__dirname, '..', '..', 'ffxi-dat');
 
@@ -94,14 +95,45 @@ export const DAT_CATEGORIES: Record<string, { names: string; desc?: string }> = 
   monster_skills: { names: 'monster_skills' },
 };
 
-export function categoryKeys(): string[] { return Object.keys(DAT_CATEGORIES); }
+// Item categories → the FTABLE resource ids of their item DAT(s). Some merge
+// two DATs (e.g. armor + the overflow armor2 range).
+export const DAT_ITEM_CATEGORIES: Record<string, number[]> = {
+  items_weapons:  [75],
+  items_armor:    [76, 55668],
+  items_usable:   [74],
+  items_general:  [73, 55671, 32922],
+  items_currency: [91],
+};
+
+export function categoryKeys(): string[] {
+  return [...Object.keys(DAT_CATEGORIES), ...Object.keys(DAT_ITEM_CATEGORIES)];
+}
 
 export interface DatRow { id: number; name: string; description?: string }
 
-/** Joined id/name/description rows for a display category. */
+const itemCache = new Map<string, DatRow[]>();
+function getItems(cat: string): DatRow[] {
+  if (!enabled) return [];
+  const cached = itemCache.get(cat);
+  if (cached) return cached;
+  const ids = DAT_ITEM_CATEGORIES[cat];
+  const rows: DatRow[] = [];
+  for (const fileId of ids) {
+    const buf = readResource(fileId);
+    if (!buf) continue;
+    for (const it of parseItemDat(buf)) rows.push({ id: it.id, name: it.name, description: it.description });
+  }
+  rows.sort((a, b) => a.id - b.id);
+  itemCache.set(cat, rows);
+  return rows;
+}
+
+/** Joined id/name/description rows for a display category (string or item). */
 export function getTable(cat: string): DatRow[] {
+  if (!enabled) return [];
+  if (DAT_ITEM_CATEGORIES[cat]) return getItems(cat);
   const c = DAT_CATEGORIES[cat];
-  if (!c || !enabled) return [];
+  if (!c) return [];
   const names = getStrings(c.names);
   const descs = c.desc ? getStrings(c.desc) : [];
   const rows: DatRow[] = [];
