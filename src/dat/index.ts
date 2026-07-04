@@ -81,3 +81,34 @@ export function getStrings(key: string): string[] {
 export function stringResourceKeys(): string[] {
   return Object.keys(DAT_STRING_RESOURCES);
 }
+
+// Display categories: pair a name list with its description list where one
+// exists, so the UI can show "all info" per entry in one row.
+export const DAT_CATEGORIES: Record<string, { names: string; desc?: string }> = {
+  abilities:      { names: 'ability_names', desc: 'ability_descriptions' },
+  spells:         { names: 'spell_names',   desc: 'spell_descriptions' },
+  zones:          { names: 'zones' },
+  statuses:       { names: 'status_names' },
+  titles:         { names: 'titles' },
+  key_items:      { names: 'key_items' },
+  monster_skills: { names: 'monster_skills' },
+};
+
+export function categoryKeys(): string[] { return Object.keys(DAT_CATEGORIES); }
+
+export interface DatRow { id: number; name: string; description?: string }
+
+/** Joined id/name/description rows for a display category. */
+export function getTable(cat: string): DatRow[] {
+  const c = DAT_CATEGORIES[cat];
+  if (!c || !enabled) return [];
+  const names = getStrings(c.names);
+  const descs = c.desc ? getStrings(c.desc) : [];
+  const rows: DatRow[] = [];
+  for (let id = 0; id < names.length; id++) {
+    const name = names[id];
+    if (!name || name === '.') continue;   // skip empty/placeholder slots
+    rows.push(c.desc ? { id, name, description: (descs[id] || '').trim() } : { id, name });
+  }
+  return rows;
+}

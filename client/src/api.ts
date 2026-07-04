@@ -76,6 +76,12 @@ export const api = {
 
   version: () => req<{ version: string; commit: string; buildDate: string; node: string; uptime: number }>('/api/version'),
 
+  // Optional FFXI DAT fetcher
+  datStatus: () => req<{ enabled: boolean; resources: string[]; categories: string[] }>('/api/dat/status'),
+  datTable:  (cat: string, q = '', page = 0) =>
+    req<{ cat: string; total: number; page: number; hasMore: boolean; rows: { id: number; name: string; description?: string }[] }>(
+      `/api/dat/table/${cat}?q=${encodeURIComponent(q)}&page=${page}`),
+
   me: () => req<{ login: string; tier: 'admin' | 'player'; accid: number }>('/api/me'),
   mePermissions: () => req<{ login: string; tier: string; permissions: string[] }>('/api/me/permissions'),
 

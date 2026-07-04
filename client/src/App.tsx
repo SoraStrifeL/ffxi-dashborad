@@ -15,6 +15,7 @@ import { Timers } from './components/pages/Timers';
 import { Scripts } from './components/pages/Scripts';
 import { Accounts } from './components/pages/Accounts';
 import { RoE } from './components/pages/RoE';
+import { GameData } from './components/pages/GameData';
 
 // Lazy-loaded: Map pulls in PIXI.js (~the bulk of the bundle) — split it out
 // so every other tab loads without it
@@ -45,6 +46,7 @@ export default function App() {
           <Route path="scripts" element={<Scripts />} />
           <Route path="accounts" element={<Accounts />} />
           <Route path="roe" element={<RoE />} />
+          <Route path="gamedata" element={<GameData />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
