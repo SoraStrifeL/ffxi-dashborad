@@ -117,11 +117,21 @@ export function GameData() {
                       </td>
                     )}
                   </tr>
-                  {withDesc && expanded === r.id && r.description && (
+                  {withDesc && expanded === r.id && (r.description || withIcon) && (
                     <tr>
                       <td />
-                      <td colSpan={2} style={{ padding: '8px 14px 12px', background: 'var(--color-surface2)', fontSize: 12, color: 'var(--color-text2)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                        {r.description}
+                      <td colSpan={2} style={{ padding: '12px 14px 14px', background: 'var(--color-surface2)' }}>
+                        <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+                          {withIcon && (
+                            <img src={`/api/dat/icon/${r.id}`} alt="" width={64} height={64}
+                              style={{ flexShrink: 0, imageRendering: 'pixelated', background: 'rgba(0,0,0,.2)', borderRadius: 6 }}
+                              onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+                          )}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: 12, color: 'var(--color-text2)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{r.description || '—'}</div>
+                            <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text3)', fontFamily: 'var(--font-mono)' }}>id {r.id} · 0x{r.id.toString(16).toUpperCase()}</div>
+                          </div>
+                        </div>
                       </td>
                     </tr>
                   )}
