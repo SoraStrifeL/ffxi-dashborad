@@ -77,5 +77,9 @@ export function extractDib(rec: Buffer, from: number, to: number): Buffer | null
 
 /** Extract the 8-bit icon from a decoded item record → RGBA PNG, or null. */
 export function extractItemIcon(rec: Buffer): Buffer | null {
+  // Placeholder items (unused Geo- scrolls, itm_test, unreleased instincts)
+  // carry a graphic literally named "noimage" with all-zero pixels — treat
+  // as absent rather than serving a fully transparent PNG.
+  if (rec.subarray(0x288, 0x298).includes('noimage', 0, 'latin1')) return null;
   return extractDib(rec, 0x284, 0x2A8);
 }
