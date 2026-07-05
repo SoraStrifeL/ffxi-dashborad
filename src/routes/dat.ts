@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth';
 import { requirePermission } from '../rbac';
-import { datEnabled, getStrings, stringResourceKeys, getTable, categoryKeys, getItemIcon, getDialog, dialogZones } from '../dat';
+import { datEnabled, getStrings, stringResourceKeys, getTable, categoryKeys, getItemIcon, getStatusIcon, getDialog, dialogZones } from '../dat';
 
 export function createDatRouter(): Router {
   const router = Router();
@@ -66,6 +66,18 @@ export function createDatRouter(): Router {
     const id = parseInt(String(req.params.id));
     if (!Number.isFinite(id)) { res.status(400).end(); return; }
     const png = getItemIcon(id);
+    if (!png) { res.status(404).end(); return; }
+    res.setHeader('Content-Type', 'image/png');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.end(png);
+  });
+
+  // Status-effect icon PNG by status id. Public for the same reason as items.
+  router.get('/api/dat/status-icon/:id', (req, res) => {
+    if (!datEnabled()) { res.status(404).end(); return; }
+    const id = parseInt(String(req.params.id));
+    if (!Number.isFinite(id)) { res.status(400).end(); return; }
+    const png = getStatusIcon(id);
     if (!png) { res.status(404).end(); return; }
     res.setHeader('Content-Type', 'image/png');
     res.setHeader('Cache-Control', 'public, max-age=86400');

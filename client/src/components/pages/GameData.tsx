@@ -72,8 +72,9 @@ export function GameData() {
     );
   }
 
-  const withDesc = cat === 'abilities' || cat === 'spells' || cat.startsWith('items_');
-  const withIcon = cat.startsWith('items_');
+  const withDesc = cat === 'abilities' || cat === 'spells' || cat === 'statuses' || cat.startsWith('items_');
+  const withIcon = cat.startsWith('items_') || cat === 'statuses';
+  const iconUrl = (id: number) => cat === 'statuses' ? `/api/dat/status-icon/${id}` : `/api/dat/icon/${id}`;
   // 'dialog' is a special per-zone mode, not a status table category, so it is
   // always available when the fetcher is enabled.
   const available = (key: string) => key === 'dialog' || cats.length === 0 || cats.includes(key);
@@ -127,7 +128,7 @@ export function GameData() {
                       {isDialog ? r.name : (
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                           {withIcon && (
-                            <img src={`/api/dat/icon/${r.id}`} alt="" width={32} height={32} loading="lazy"
+                            <img src={iconUrl(r.id)} alt="" width={32} height={32} loading="lazy"
                               style={{ flexShrink: 0, imageRendering: 'pixelated' }}
                               onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
                           )}
@@ -147,7 +148,7 @@ export function GameData() {
                       <td colSpan={2} style={{ padding: '12px 14px 14px', background: 'var(--color-surface2)' }}>
                         <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
                           {withIcon && (
-                            <img src={`/api/dat/icon/${r.id}`} alt="" width={64} height={64}
+                            <img src={iconUrl(r.id)} alt="" width={64} height={64}
                               style={{ flexShrink: 0, imageRendering: 'pixelated', background: 'rgba(0,0,0,.2)', borderRadius: 6 }}
                               onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
                           )}

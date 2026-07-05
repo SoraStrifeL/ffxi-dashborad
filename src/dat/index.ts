@@ -12,6 +12,7 @@ import path from 'path';
 import { parseDmsg } from './dmsg';
 import { parseItemDat, decodeItemRecord } from './item';
 import { extractItemIcon } from './icon';
+import { extractStatusIcon, statusDescription } from './status';
 import { parseDialog, dialogFileId } from './dialog';
 
 const DAT_DIR = process.env.DAT_DIR || path.join(__dirname, '..', '..', 'ffxi-dat');
@@ -34,6 +35,10 @@ export const DAT_STRING_RESOURCES: Record<string, number> = {
   key_items:           55695,
   monster_skills:      7035,
 };
+
+// Status-effect icon DAT (ROM/119/57): 640 × 0x1800-byte entries indexed by
+// status id — 32×32 icon + help text per entry (see dat/status.ts).
+const STATUS_ICON_RESOURCE = 87;
 
 export function initDat(): void {
   try {
@@ -175,6 +180,17 @@ export function dialogZones(): { id: number; name: string }[] {
   return out;
 }
 
+/** PNG icon bytes for a status id, lazily decoded + cached. */
+const statusIconCache = new Map<number, Buffer | null>();
+export function getStatusIcon(id: number): Buffer | null {
+  if (!enabled) return null;
+  if (statusIconCache.has(id)) return statusIconCache.get(id)!;
+  const buf = readResourceCached(STATUS_ICON_RESOURCE);
+  const png = buf ? extractStatusIcon(buf, id) : null;
+  statusIconCache.set(id, png);
+  return png;
+}
+
 /** PNG icon bytes for an item id (any item category), lazily decoded + cached. */
 export function getItemIcon(id: number): Buffer | null {
   if (!enabled) return null;
@@ -199,11 +215,14 @@ export function getTable(cat: string): DatRow[] {
   if (!c) return [];
   const names = getStrings(c.names);
   const descs = c.desc ? getStrings(c.desc) : [];
+  // statuses have no description dmsg, but the icon DAT embeds help text
+  const statusBuf = cat === 'statuses' ? readResourceCached(STATUS_ICON_RESOURCE) : null;
   const rows: DatRow[] = [];
   for (let id = 0; id < names.length; id++) {
     const name = names[id];
     if (!name || name === '.') continue;   // skip empty/placeholder slots
-    rows.push(c.desc ? { id, name, description: (descs[id] || '').trim() } : { id, name });
+    if (statusBuf) rows.push({ id, name, description: statusDescription(statusBuf, id) });
+    else rows.push(c.desc ? { id, name, description: (descs[id] || '').trim() } : { id, name });
   }
   return rows;
 }

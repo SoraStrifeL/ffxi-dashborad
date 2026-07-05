@@ -40,29 +40,32 @@ function encodePng(width: number, height: number, rgba: Buffer): Buffer {
   ]);
 }
 
-/** Extract the 8-bit icon from a decoded item record → RGBA PNG, or null. */
-export function extractItemIcon(rec: Buffer): Buffer | null {
-  // Locate the BITMAPINFOHEADER (biSize = 40) in the icon region.
-  let o = -1;
-  for (let p = 0x284; p < 0x2A8; p++) {
+/**
+ * Locate a headerless DIB (biSize = 40) in [from, to) and convert it to a
+ * RGBA PNG. Handles the two encodings FFXI uses: 8-bit indexed with a
+ * 256-entry BGRA palette (item icons) and raw 32-bit BGRA (status icons).
+ */
+export function extractDib(rec: Buffer, from: number, to: number): Buffer | null {
+  let o = -1, bpp = 0;
+  for (let p = from; p < to && p + 16 <= rec.length; p++) {
     if (rec.readUInt32LE(p) === 40) {
-      const w = rec.readInt32LE(p + 4), h = rec.readInt32LE(p + 8), bpp = rec.readUInt16LE(p + 14);
-      if (w > 0 && w <= 256 && Math.abs(h) <= 256 && bpp === 8) { o = p; break; }
+      const w = rec.readInt32LE(p + 4), h = rec.readInt32LE(p + 8), b = rec.readUInt16LE(p + 14);
+      if (w > 0 && w <= 256 && Math.abs(h) <= 256 && (b === 8 || b === 32)) { o = p; bpp = b; break; }
     }
   }
   if (o < 0) return null;
   const w = rec.readInt32LE(o + 4);
   const h = Math.abs(rec.readInt32LE(o + 8));
   const palOff = o + 40;
-  const pixOff = palOff + 256 * 4;
-  const rowSize = Math.floor((w * 8 + 31) / 32) * 4; // BMP rows padded to 4 bytes
+  const pixOff = bpp === 8 ? palOff + 256 * 4 : palOff;
+  const rowSize = Math.floor((w * bpp + 31) / 32) * 4; // BMP rows padded to 4 bytes
   if (pixOff + rowSize * h > rec.length) return null;
 
   const rgba = Buffer.alloc(w * h * 4);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const idx = rec[pixOff + (h - 1 - y) * rowSize + x]; // bottom-up
-      const p = palOff + idx * 4;
+      const row = pixOff + (h - 1 - y) * rowSize; // bottom-up
+      const p = bpp === 8 ? palOff + rec[row + x] * 4 : row + x * 4;
       const B = rec[p], G = rec[p + 1], R = rec[p + 2], A = rec[p + 3];
       const d = (y * w + x) * 4;
       rgba[d] = R; rgba[d + 1] = G; rgba[d + 2] = B;
@@ -70,4 +73,9 @@ export function extractItemIcon(rec: Buffer): Buffer | null {
     }
   }
   return encodePng(w, h, rgba);
+}
+
+/** Extract the 8-bit icon from a decoded item record → RGBA PNG, or null. */
+export function extractItemIcon(rec: Buffer): Buffer | null {
+  return extractDib(rec, 0x284, 0x2A8);
 }

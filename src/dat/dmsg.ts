@@ -23,6 +23,30 @@ function readCString(raw: Buffer, start: number): string {
   return raw.toString('latin1', start, end);
 }
 
+// Entries begin with a sub-header — u32 sub-entry count, then count × (u32
+// offset, u32 type) — type 0 = string at entry offset 0x1C + offset, type 1 =
+// uint32 param. The name is the first non-empty string sub-entry (key items
+// lead with two params and two empty strings before the singular name). The
+// legacy fixed +0x28 read only worked for single-string entries (0x1C + 0x0C);
+// multi-string tables like status names ("KO" + "KO'd") parsed empty. Falls
+// back to +0x28 when the sub-header doesn't look valid.
+function entryString(raw: Buffer): string {
+  if (raw.length > 12) {
+    const n = raw.readUInt32LE(0);
+    if (n >= 1 && n <= 16 && 4 + n * 8 <= raw.length) {
+      for (let k = 0; k < n; k++) {
+        if (raw.readUInt32LE(8 + k * 8) !== 0) continue; // not a string
+        const off = 0x1C + raw.readUInt32LE(4 + k * 8);
+        if (off <= 4 + n * 8 || off >= raw.length) return raw.length > STRING_OFFSET ? readCString(raw, STRING_OFFSET) : '';
+        const s = readCString(raw, off);
+        if (s) return s;
+      }
+      return '';
+    }
+  }
+  return raw.length > STRING_OFFSET ? readCString(raw, STRING_OFFSET) : '';
+}
+
 /** Parse a d_msg DAT into an array of strings, indexed by entry id. */
 export function parseDmsg(buf: Buffer): string[] {
   if (!isDmsg(buf)) return [];
@@ -46,7 +70,7 @@ export function parseDmsg(buf: Buffer): string[] {
       if (base + len > buf.length || len > 0x10000) { out[i] = ''; continue; }
       const raw = Buffer.alloc(len);
       for (let k = 0; k < len; k++) raw[k] = dec(buf[base + k]);
-      out[i] = raw.length > STRING_OFFSET ? readCString(raw, STRING_OFFSET) : '';
+      out[i] = entryString(raw);
     }
   } else if (recordSize > 0) {
     // fixed-size records back-to-back from headerSize
@@ -55,7 +79,7 @@ export function parseDmsg(buf: Buffer): string[] {
       if (base + recordSize > buf.length) { out[i] = ''; continue; }
       const raw = Buffer.alloc(recordSize);
       for (let k = 0; k < recordSize; k++) raw[k] = dec(buf[base + k]);
-      out[i] = readCString(raw, STRING_OFFSET);
+      out[i] = entryString(raw);
     }
   }
   return out;
