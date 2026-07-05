@@ -3,6 +3,7 @@ import path from 'path';
 import multer from 'multer';
 import { Pool, RowDataPacket } from 'mysql2/promise';
 import { WindowerPosition, ZoneEntity } from './types';
+import { canonicalQuestName } from './dat/quest-names';
 
 // ── Paths ─────────────────────────────────────────────────────────────────────
 export const MAPS_DIR    = path.join(__dirname, '..', 'public', 'maps');
@@ -525,6 +526,17 @@ export function _fmtConst(s: string): string {
   return s.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
 }
 
+// Quest names specifically get a second pass against the client's own quest
+// title tables (src/dat/quest-names.ts) — the Lua constant only round-trips
+// to a naive title-case guess ("A Foremans Best Friend"), losing apostrophes
+// and other punctuation the client's real text has ("A Foreman's Best
+// Friend"). Falls back to the formatted constant when the client isn't
+// mounted (FFXI_CLIENT_DIR unset) or no match is found.
+function _fmtQuestName(s: string): string {
+  const formatted = _fmtConst(s);
+  return canonicalQuestName(formatted) ?? formatted;
+}
+
 export function buildQuestCatalog(): QuestCatalogWithMeta {
   const catalog = Array.from({ length: 11 }, () => ({} as Record<number, string>)) as QuestCatalogWithMeta;
   const constToId: Record<string, number> = {};
@@ -539,7 +551,7 @@ export function buildQuestCatalog(): QuestCatalogWithMeta {
       let e: RegExpExecArray | null;
       while ((e = entryRe.exec(m[2])) !== null) {
         const qid = parseInt(e[2]);
-        catalog[logIdx][qid] = e[1].replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+        catalog[logIdx][qid] = _fmtQuestName(e[1]);
         constToId[`${logIdx}:${e[1]}`] = qid;
       }
     }
@@ -615,7 +627,7 @@ export function _parseRequirements(text: string): unknown[] {
   const preRe = /hasCompletedQuest\s*\(\s*xi\.questLog\.(\w+)\s*,\s*xi\.quest\.id\.\w+\.(\w+)\s*\)/g;
   let pm: RegExpExecArray | null;
   while ((pm = preRe.exec(checkBlock)) !== null) {
-    reqs.push({ type: 'quest', log: pm[1], name: _fmtConst(pm[2]) });
+    reqs.push({ type: 'quest', log: pm[1], name: _fmtQuestName(pm[2]) });
   }
   const misRe = /hasCompletedMission\s*\(\s*xi\.mission\.log_id\.(\w+)\s*,\s*(\d+)\s*\)/g;
   let mm: RegExpExecArray | null;
