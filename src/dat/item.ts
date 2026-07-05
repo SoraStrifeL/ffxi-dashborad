@@ -27,7 +27,7 @@ export function decodeItemRecord(buf: Buffer, recIndex: number): Buffer {
 /** Parse id/name/description from an already-decoded item record. */
 export function parseItemRecord(d: Buffer): { id: number; name: string; description: string } | null {
   const id = d.readUInt32LE(0);
-  if (!id) return null;
+  if (!id || id > 0xFFFF) return null; // item ids are 16-bit; larger = not an item record
   const runs: string[] = [];
   let cur = '';
   for (let i = 0x30; i < 0x280; i++) {

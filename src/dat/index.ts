@@ -112,13 +112,17 @@ export const DAT_CATEGORIES: Record<string, { names: string; desc?: string }> = 
 };
 
 // Item categories → the FTABLE resource ids of their item DAT(s). Some merge
-// two DATs (e.g. armor + the overflow armor2 range).
+// several DATs (e.g. armor + the overflow armor2 range). General also folds
+// in the Moblin Maze Mongers gear (55667, 0x7000+), Monstrosity instincts
+// (55670, 0x7403+) and monipulators (55669, 0xF001+) so their icons are
+// browsable; the automaton range (0x2000–0x21FF) gets its own category.
 export const DAT_ITEM_CATEGORIES: Record<string, number[]> = {
-  items_weapons:  [75],
-  items_armor:    [76, 55668],
-  items_usable:   [74],
-  items_general:  [73, 55671, 32922],
-  items_currency: [91],
+  items_weapons:   [75],
+  items_armor:     [76, 55668],
+  items_usable:    [74],
+  items_general:   [73, 55671, 55667, 55670, 55669],
+  items_automaton: [77],
+  items_currency:  [91],
 };
 
 export function categoryKeys(): string[] {

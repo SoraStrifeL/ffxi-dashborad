@@ -8,6 +8,7 @@ const CATS: { key: string; label: string }[] = [
   { key: 'items_armor',    label: 'Armor' },
   { key: 'items_usable',   label: 'Usable' },
   { key: 'items_general',  label: 'General' },
+  { key: 'items_automaton', label: 'Automaton' },
   { key: 'items_currency', label: 'Currency' },
   { key: 'abilities',      label: 'Abilities' },
   { key: 'spells',         label: 'Spells' },
