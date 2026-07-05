@@ -33,6 +33,7 @@ services:
       REDIS_URL: "${REDIS_URL:-redis://ffxi-redis:6379}"
       AUTOLOGIN: "${AUTOLOGIN:-true}"
       DAT_DIR: /ffxi-dat
+      FFXI_CLIENT_DIR: /ffxi-client
     ports:
       - "3001:3000"
     volumes:
@@ -40,6 +41,7 @@ services:
       - ./public/uploads:/app/public/uploads
       - ./data:/app/data
       - ./ffxi-dat:/ffxi-dat:ro          # optional FFXI client DATs (see DAT_DIR)
+      - "./FINAL FANTASY XI:/ffxi-client:ro"  # full retail client (DLLs + all ROM volumes)
       - ffxi_ffxi-logs:/ffxi-log:ro
       - /opt/stacks/ffxi/settings:/ffxi-settings
       - /opt/stacks/ffxi/scripts/globals/quests.lua:/ffxi-scripts/quests.lua:ro
