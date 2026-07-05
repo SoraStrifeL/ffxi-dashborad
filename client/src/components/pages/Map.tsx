@@ -22,7 +22,18 @@ function fmtDur(ms: number) {
 }
 function esc(s: string) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-type Layers = {players:boolean;npcs:boolean;mobs:boolean;bounds:boolean;aggroonly:boolean;labels:boolean;offlineplayers:boolean;hidezero:boolean;grid:boolean};
+type Layers = {players:boolean;npcs:boolean;mobs:boolean;teleports:boolean;bounds:boolean;aggroonly:boolean;labels:boolean;offlineplayers:boolean;hidezero:boolean;grid:boolean};
+
+// Invisible/trigger objects that clutter the map: parked at (0,0), unnamed,
+// 'blank' placeholders, underscore-prefixed triggers (_6ey), quest markers (qm2).
+const isJunkNpc = (n: { name: string; pos_x: number; pos_z: number }) =>
+  (n.pos_x === 0 && n.pos_z === 0) ||
+  !n.name || n.name.trim() === '' || n.name.toLowerCase() === 'blank' ||
+  n.name.startsWith('_') || /^qm\d*$/i.test(n.name);
+
+// Teleport NPCs get their own layer + marker (names appear with spaces or underscores).
+const isTeleportNpc = (name: string) =>
+  /^(home[ _]?point|waypoint|survival[ _]guide|ethereal[ _]ingress)/i.test(name || '');
 
 // ── Pixi map hook ─────────────────────────────────────────────────────────────
 function usePixi(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
@@ -85,7 +96,7 @@ export function MapPage() {
   const [bounds, setBounds]  = useState<Record<number, CalibrationBounds>>({});
   const [dbMobs, setDbMobs]  = useState<MobEntry[]>([]);
   const [dbNpcs, setDbNpcs]  = useState<NpcEntry[]>([]);
-  const [layers, setLayers]  = useState<Layers>({ players:true, npcs:true, mobs:true, bounds:false, aggroonly:false, labels:false, offlineplayers:false, hidezero:false, grid:false });
+  const [layers, setLayers]  = useState<Layers>({ players:true, npcs:true, mobs:true, teleports:true, bounds:false, aggroonly:false, labels:false, offlineplayers:false, hidezero:true, grid:false });
   const [detectFilter, setDetectFilter] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [calForm, setCalForm] = useState({ minX: -512, maxX: 512, minZ: -512, maxZ: 512 });
@@ -337,7 +348,8 @@ export function MapPage() {
 
     if (lay.npcs) {
       npcs.forEach((n) => {
-        if (lay.hidezero && n.pos_x === 0 && n.pos_z === 0) return;
+        if (isTeleportNpc(n.name)) return; // drawn by the Teleports layer below
+        if (lay.hidezero && isJunkNpc(n)) return;
         if (!isInBounds(n.pos_x, n.pos_z)) return;
         const pos = worldToContainer(n.pos_x, n.pos_z);
         const g = new PIXI.Graphics();
@@ -349,6 +361,28 @@ export function MapPage() {
         if (lay.labels) {
           const txt = new PIXI.Text(n.name, { fontSize: 8, fill: 0x90e8cc, stroke: 0x000000, strokeThickness: 2 });
           txt.position.set(pos.x - txt.width / 2, pos.y + 6);
+          l.npc.addChild(txt);
+        }
+      });
+    }
+
+    if (lay.teleports) {
+      npcs.forEach((n) => {
+        if (!isTeleportNpc(n.name)) return;
+        if (n.pos_x === 0 && n.pos_z === 0) return;
+        if (!isInBounds(n.pos_x, n.pos_z)) return;
+        const pos = worldToContainer(n.pos_x, n.pos_z);
+        const g = new PIXI.Graphics();
+        // blue diamond with white ring — distinct from NPC dots and mob triangles
+        g.lineStyle(1.2, 0xffffff, 0.8);
+        g.beginFill(0x4a9df7); g.drawPolygon([0, -6, 6, 0, 0, 6, -6, 0]); g.endFill();
+        g.position.set(pos.x, pos.y); g.eventMode = 'static'; g.cursor = 'pointer';
+        g.on('pointerover', () => showTip(n.name.replace(/_/g, ' '), 'Teleport', pos.x, pos.y));
+        g.on('pointerout',  hideTip);
+        l.npc.addChild(g);
+        if (lay.labels) {
+          const txt = new PIXI.Text(n.name.replace(/_/g, ' '), { fontSize: 8, fill: 0x9cc8ff, stroke: 0x000000, strokeThickness: 2 });
+          txt.position.set(pos.x - txt.width / 2, pos.y + 8);
           l.npc.addChild(txt);
         }
       });
@@ -998,6 +1032,7 @@ export function MapPage() {
               { key: 'players', label: 'Players', color: '#7c6af7', badge: zone !== null ? (zonePlayers as unknown[]).length : undefined },
               { key: 'npcs',    label: 'NPCs',    color: '#4fc3a1', badge: zone !== null ? dbNpcs.length : undefined },
               { key: 'mobs',    label: 'Mobs',    color: '#ccc',    badge: zone !== null ? dbMobs.length : undefined },
+              { key: 'teleports', label: 'Teleports', color: '#4a9df7', badge: zone !== null ? dbNpcs.filter(n => isTeleportNpc(n.name)).length : undefined },
             ] as const).map(({ key, label, color, badge }) => (
               <LayerToggle key={key} active={layers[key]} color={color} label={label} badge={badge} onClick={() => toggleLayer(key)} />
             ))}
