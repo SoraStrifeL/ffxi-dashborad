@@ -74,6 +74,12 @@ function recordCalSample(zone: number, s: CalSample): void {
 export function createWindowerRouter(pool: Pool): Router {
   const router = Router();
 
+  router.get('/api/windower/ping', (req, res) => {
+    if (!WINDOWER_API_KEY || req.headers['x-windower-key'] !== WINDOWER_API_KEY)
+      return void res.status(401).json({ error: 'unauthorized' });
+    res.json({ ok: true });
+  });
+
   router.post('/api/windower/position', async (req, res) => {
     if (!WINDOWER_API_KEY || req.headers['x-windower-key'] !== WINDOWER_API_KEY)
       return void res.status(401).json({ error: 'unauthorized' });
