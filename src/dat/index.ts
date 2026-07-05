@@ -90,7 +90,8 @@ export function getStrings(key: string): string[] {
   const id = DAT_STRING_RESOURCES[key];
   if (id === undefined) return [];
   const buf = readResource(id);
-  const list = buf ? parseDmsg(buf) : [];
+  // monster skills (7035) is an offset-table dialog file, not a d_msg
+  const list = buf ? (key === 'monster_skills' ? parseDialog(buf) : parseDmsg(buf)) : [];
   stringCache.set(key, list);
   return list;
 }

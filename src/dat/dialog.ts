@@ -16,10 +16,14 @@ export function parseDialog(buf: Buffer): string[] {
   const out: string[] = new Array(count);
   for (let i = 0; i < count; i++) {
     const s = off(4 + i * 4);
-    const e = i + 1 < count ? off(8 + i * 4) : buf.length;
-    if (s < 4 || s >= buf.length || e > buf.length || e <= s) { out[i] = ''; continue; }
+    if (s < 4 || s >= buf.length) { out[i] = ''; continue; }
     let txt = '';
-    for (let k = s + 4; k < e; k++) {          // skip the 4-byte per-string header
+    // Strings are NUL-terminated; read to the terminator rather than the next
+    // table offset — in some tables (monster skills, ROM/27/80) the following
+    // offset points 4 bytes before its own string, INSIDE this one, and using
+    // it as the end truncated the tail. Cap length as a corruption guard.
+    const cap = Math.min(buf.length, s + 4 + 0x2000);
+    for (let k = s + 4; k < cap; k++) {        // skip the 4-byte per-string header
       const c = buf[k] ^ 0x80;
       if (c === 0) break;
       if (c >= 0x20 && c < 0x7F) txt += String.fromCharCode(c);
