@@ -19,6 +19,7 @@ const CATS: { key: string; label: string }[] = [
   { key: 'monster_skills', label: 'Monster Skills' },
   { key: 'emotes',         label: 'Emotes' },
   { key: 'augments',       label: 'Augments' },
+  { key: 'quests',         label: 'Quests' },
   { key: 'dialog',         label: 'Dialog' },
 ];
 

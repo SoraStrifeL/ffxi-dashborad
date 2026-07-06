@@ -51,6 +51,18 @@ const PAIRED_CATEGORIES: Record<string, string> = {
 // status id — 32×32 icon + help text per entry (see dat/status.ts).
 const STATUS_ICON_RESOURCE = 87;
 
+// Quest/mission title tables — the client ships one per nation/expansion/
+// log-category rather than a single master table (same 55465-55765 range
+// dat/quest-names.ts scans for its name-lookup dictionary). Concatenated
+// here, in client order, for a flat "Quests" Game Data category. No
+// description table exists client-side; quest text/rewards live in the
+// Lua-backed Database tab instead.
+const QUEST_NAME_RESOURCES = [
+  55706, 55707, 55708, 55709, 55710, 55711, 55712, 55713, 55715, 55716, 55717,
+  55718, 55719, 55720, 55721, 55722, 55723, 55724, 55735, 55736, 55737, 55738,
+  55739, 55740, 55741, 55742,
+];
+
 export function initDat(): void {
   try {
     ftable = fs.readFileSync(path.join(DAT_DIR, 'FTABLE.DAT'));
@@ -138,10 +150,27 @@ export const DAT_ITEM_CATEGORIES: Record<string, number[]> = {
 };
 
 export function categoryKeys(): string[] {
-  return [...Object.keys(DAT_CATEGORIES), ...Object.keys(PAIRED_CATEGORIES), ...Object.keys(DAT_ITEM_CATEGORIES)];
+  return ['quests', ...Object.keys(DAT_CATEGORIES), ...Object.keys(PAIRED_CATEGORIES), ...Object.keys(DAT_ITEM_CATEGORIES)];
 }
 
 export interface DatRow { id: number; name: string; description?: string }
+
+let questRows: DatRow[] | null = null;
+function getQuests(): DatRow[] {
+  if (!enabled) return [];
+  if (questRows) return questRows;
+  const rows: DatRow[] = [];
+  for (const fileId of QUEST_NAME_RESOURCES) {
+    const buf = readResourceCached(fileId);
+    if (!buf) continue;
+    for (const name of parseDmsg(buf)) {
+      if (!name || name === '.') continue;
+      rows.push({ id: rows.length, name });
+    }
+  }
+  questRows = rows;
+  return rows;
+}
 
 const itemCache = new Map<string, DatRow[]>();
 // item id → { fileId, rec } so an icon can be re-decoded on demand.
@@ -226,6 +255,7 @@ export function getItemIcon(id: number): Buffer | null {
 /** Joined id/name/description rows for a display category (string or item). */
 export function getTable(cat: string): DatRow[] {
   if (!enabled) return [];
+  if (cat === 'quests') return getQuests();
   if (DAT_ITEM_CATEGORIES[cat]) return getItems(cat);
   const pairedKey = PAIRED_CATEGORIES[cat];
   if (pairedKey) {
