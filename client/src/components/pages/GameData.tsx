@@ -36,8 +36,10 @@ export function GameData() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dzones, setDzones] = useState<{ id: number; name: string }[]>([]);
   const [zone, setZone] = useState<number | null>(null);
+  const [questDesc, setQuestDesc] = useState<Record<number, { loading: boolean; text?: string; notFound?: boolean; wikiUrl?: string }>>({});
 
   const isDialog = cat === 'dialog';
+  const isQuests = cat === 'quests';
 
   useEffect(() => {
     api.datStatus().then(s => { setEnabled(s.enabled); setCats(s.categories || []); }).catch(() => setEnabled(false));
@@ -50,7 +52,7 @@ export function GameData() {
   }, [enabled, isDialog, dzones.length, zone]);
 
   // reset paging on category / search / zone change
-  useEffect(() => { setPage(0); }, [cat, search, zone]);
+  useEffect(() => { setPage(0); setExpanded(null); setQuestDesc({}); }, [cat, search, zone]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -77,12 +79,26 @@ export function GameData() {
   }
 
   const withDesc = cat === 'abilities' || cat === 'spells' || cat === 'statuses' ||
-    cat === 'emotes' || cat === 'augments' || cat.startsWith('items_');
+    cat === 'emotes' || cat === 'augments' || isQuests || cat.startsWith('items_');
   const withIcon = cat.startsWith('items_') || cat === 'statuses';
   const iconUrl = (id: number) => cat === 'statuses' ? `/api/dat/status-icon/${id}` : `/api/dat/icon/${id}`;
   // 'dialog' is a special per-zone mode, not a status table category, so it is
   // always available when the fetcher is enabled.
   const available = (key: string) => key === 'dialog' || cats.length === 0 || cats.includes(key);
+  // Quests have no client-side description table; fetch BG-wiki text on
+  // demand (server caches it 24h — see /api/db/quests/wiki) rather than
+  // firing 2,800 requests eagerly.
+  const expandable = (r: Row) => isQuests || !!r.description;
+  function toggleExpand(r: Row) {
+    const next = expanded === r.id ? null : r.id;
+    setExpanded(next);
+    if (next != null && isQuests && !questDesc[r.id]) {
+      setQuestDesc(prev => ({ ...prev, [r.id]: { loading: true } }));
+      api.dbQuestWiki(r.name)
+        .then(res => setQuestDesc(prev => ({ ...prev, [r.id]: { loading: false, text: res?.description, notFound: res?.notFound, wikiUrl: res?.wikiUrl } })))
+        .catch(() => setQuestDesc(prev => ({ ...prev, [r.id]: { loading: false, notFound: true } })));
+    }
+  }
 
   return (
     <div style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
@@ -126,8 +142,8 @@ export function GameData() {
             <tbody>
               {rows.map(r => (
                 <React.Fragment key={r.id}>
-                  <tr onClick={() => withDesc && r.description && setExpanded(expanded === r.id ? null : r.id)}
-                    style={{ cursor: withDesc && r.description ? 'pointer' : 'default' }}>
+                  <tr onClick={() => withDesc && expandable(r) && toggleExpand(r)}
+                    style={{ cursor: withDesc && expandable(r) ? 'pointer' : 'default' }}>
                     <td style={{ color: 'var(--color-text3)', fontSize: 11 }}>{r.id}</td>
                     <td style={{ color: isDialog ? 'var(--color-text2)' : 'var(--color-text1)', fontWeight: isDialog ? 400 : 500, whiteSpace: isDialog ? 'pre-wrap' : undefined, fontSize: isDialog ? 12 : undefined, lineHeight: isDialog ? 1.5 : undefined }}>
                       {isDialog ? r.name : (
@@ -143,11 +159,13 @@ export function GameData() {
                     </td>
                     {withDesc && (
                       <td style={{ color: 'var(--color-text3)', fontSize: 11, maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {(r.description || '—').replace(/\n/g, ' ')}
+                        {isQuests
+                          ? (questDesc[r.id]?.text?.replace(/\n/g, ' ') ?? (questDesc[r.id]?.loading ? 'Loading…' : questDesc[r.id]?.notFound ? 'No wiki match' : 'Click for description'))
+                          : (r.description || '—').replace(/\n/g, ' ')}
                       </td>
                     )}
                   </tr>
-                  {withDesc && expanded === r.id && (r.description || withIcon) && (
+                  {withDesc && expanded === r.id && expandable(r) && (
                     <tr>
                       <td />
                       <td colSpan={2} style={{ padding: '12px 14px 14px', background: 'var(--color-surface2)' }}>
@@ -158,7 +176,23 @@ export function GameData() {
                               onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
                           )}
                           <div style={{ minWidth: 0 }}>
-                            <div style={{ fontSize: 12, color: 'var(--color-text2)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{r.description || '—'}</div>
+                            {isQuests ? (
+                              questDesc[r.id]?.loading ? (
+                                <div style={{ fontSize: 12, color: 'var(--color-text3)' }}>Loading from BG-Wiki…</div>
+                              ) : questDesc[r.id]?.notFound ? (
+                                <div style={{ fontSize: 12, color: 'var(--color-text3)' }}>No wiki match found.</div>
+                              ) : (
+                                <>
+                                  <div style={{ fontSize: 12, color: 'var(--color-text2)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{questDesc[r.id]?.text || '—'}</div>
+                                  {questDesc[r.id]?.wikiUrl && (
+                                    <a href={questDesc[r.id]!.wikiUrl} target="_blank" rel="noreferrer"
+                                      style={{ fontSize: 11, color: 'var(--color-accent)' }}>View on BG-Wiki ↗</a>
+                                  )}
+                                </>
+                              )
+                            ) : (
+                              <div style={{ fontSize: 12, color: 'var(--color-text2)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{r.description || '—'}</div>
+                            )}
                             <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text3)', fontFamily: 'var(--font-mono)' }}>id {r.id} · 0x{r.id.toString(16).toUpperCase()}</div>
                           </div>
                         </div>
