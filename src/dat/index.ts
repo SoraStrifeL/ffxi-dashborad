@@ -34,6 +34,17 @@ export const DAT_STRING_RESOURCES: Record<string, number> = {
   titles:              55704,
   key_items:           55695,
   monster_skills:      7035,
+  // These two are single tables with name/description interleaved at
+  // even/odd indices (raw[2k] = name, raw[2k+1] = description) rather than
+  // separate name+desc tables — split in getTable() via PAIRED_CATEGORIES.
+  emotes_raw:          55675,
+  augments_raw:        55674,
+};
+
+// Category key → its interleaved-pair resource key (see comment above).
+const PAIRED_CATEGORIES: Record<string, string> = {
+  emotes: 'emotes_raw',
+  augments: 'augments_raw',
 };
 
 // Status-effect icon DAT (ROM/119/57): 640 × 0x1800-byte entries indexed by
@@ -127,7 +138,7 @@ export const DAT_ITEM_CATEGORIES: Record<string, number[]> = {
 };
 
 export function categoryKeys(): string[] {
-  return [...Object.keys(DAT_CATEGORIES), ...Object.keys(DAT_ITEM_CATEGORIES)];
+  return [...Object.keys(DAT_CATEGORIES), ...Object.keys(PAIRED_CATEGORIES), ...Object.keys(DAT_ITEM_CATEGORIES)];
 }
 
 export interface DatRow { id: number; name: string; description?: string }
@@ -216,6 +227,17 @@ export function getItemIcon(id: number): Buffer | null {
 export function getTable(cat: string): DatRow[] {
   if (!enabled) return [];
   if (DAT_ITEM_CATEGORIES[cat]) return getItems(cat);
+  const pairedKey = PAIRED_CATEGORIES[cat];
+  if (pairedKey) {
+    const raw = getStrings(pairedKey);
+    const rows: DatRow[] = [];
+    for (let i = 0; i + 1 < raw.length; i += 2) {
+      const name = raw[i];
+      if (!name || name === '.') continue;
+      rows.push({ id: i / 2, name, description: (raw[i + 1] || '').trim() });
+    }
+    return rows;
+  }
   const c = DAT_CATEGORIES[cat];
   if (!c) return [];
   const names = getStrings(c.names);

@@ -17,6 +17,8 @@ const CATS: { key: string; label: string }[] = [
   { key: 'titles',         label: 'Titles' },
   { key: 'key_items',      label: 'Key Items' },
   { key: 'monster_skills', label: 'Monster Skills' },
+  { key: 'emotes',         label: 'Emotes' },
+  { key: 'augments',       label: 'Augments' },
   { key: 'dialog',         label: 'Dialog' },
 ];
 
@@ -73,7 +75,8 @@ export function GameData() {
     );
   }
 
-  const withDesc = cat === 'abilities' || cat === 'spells' || cat === 'statuses' || cat.startsWith('items_');
+  const withDesc = cat === 'abilities' || cat === 'spells' || cat === 'statuses' ||
+    cat === 'emotes' || cat === 'augments' || cat.startsWith('items_');
   const withIcon = cat.startsWith('items_') || cat === 'statuses';
   const iconUrl = (id: number) => cat === 'statuses' ? `/api/dat/status-icon/${id}` : `/api/dat/icon/${id}`;
   // 'dialog' is a special per-zone mode, not a status table category, so it is
