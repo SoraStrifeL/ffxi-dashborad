@@ -34,6 +34,7 @@ const DAT_TABLE_CATS = new Set<Category>(['spells', 'statuses', 'titles', 'monst
 // Module-level (not component-local) because DetailView/EnrichedDescription
 // below are also module-level functions and need this shape — see Task 8.
 type Enrichment = { loading: boolean; source: 'dat' | 'wiki' | 'script' | 'none' | null; text: string | null; datId?: number; wikiUrl?: string };
+type NpcDialog = { loading: boolean; found: boolean; lines: { const: string; id: number; text: string }[] };
 
 const NON_PAGED: Category[] = ['zones','jobs','skills','trusts','mounts','gmcmds'];
 const DB_PAGE = 50; // must match server.js DB_PAGE
@@ -161,6 +162,7 @@ export function Database() {
   const [wikiLoading, setWikiLoading] = useState(false);
   const [scriptData, setScriptData] = useState<{ found: boolean; path?: string; content?: string; vars?: string[] } | null>(null);
   const [scriptLoading, setScriptLoading] = useState(false);
+  const [npcDialog, setNpcDialog] = useState<NpcDialog | null>(null);
   const uploadRef = useRef<HTMLInputElement>(null);
   const user = useStore((s) => s.user);
   const [itemImageUrl, setItemImageUrl] = useState<string | null>(null);
@@ -288,6 +290,7 @@ export function Database() {
   async function openDetail(row: Record<string, unknown>) {
     setDetailRow(row); setDetailData(null); setDetailLoading(true); setWikiData(null); setScriptData(null); setItemImageUrl(null);
     setEnrichment({ loading: false, source: null, text: null });
+    setNpcDialog(null);
     try {
       if (cat === 'items') {
         const [detail, img] = await Promise.all([
@@ -326,7 +329,17 @@ export function Database() {
           }
         }
       }
-      else if (cat === 'npcs' || cat === 'zones' || cat === 'trusts' || cat === 'mounts' || cat === 'gmcmds' || DAT_TABLE_CATS.has(cat)) setDetailData(row);
+      else if (cat === 'npcs') {
+        setDetailData(row);
+        setNpcDialog({ loading: true, found: false, lines: [] });
+        try {
+          const dialog = await api.npcDialog(String(row.name ?? ''), String(row.zone ?? ''));
+          setNpcDialog({ loading: false, found: dialog.found, lines: dialog.lines });
+        } catch (_) {
+          setNpcDialog({ loading: false, found: false, lines: [] });
+        }
+      }
+      else if (cat === 'zones' || cat === 'trusts' || cat === 'mounts' || cat === 'gmcmds' || DAT_TABLE_CATS.has(cat)) setDetailData(row);
     } catch (_) {}
     setDetailLoading(false);
   }
@@ -537,11 +550,11 @@ export function Database() {
                 {scriptLoading ? '…' : 'Script'}
               </button>
             )}
-            <button onClick={() => { setDetailRow(null); setDetailData(null); setWikiData(null); setScriptData(null); setEnrichment({ loading: false, source: null, text: null }); }} className="btn btn-ghost btn-xs">✕</button>
+            <button onClick={() => { setDetailRow(null); setDetailData(null); setWikiData(null); setScriptData(null); setEnrichment({ loading: false, source: null, text: null }); setNpcDialog(null); }} className="btn btn-ghost btn-xs">✕</button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', fontSize: 12 }}>
             {detailLoading && <div style={{ color: 'var(--color-text3)' }}>Loading…</div>}
-            {detailData && <DetailView data={detailData} cat={cat} itemImageUrl={itemImageUrl} enrichment={enrichment} />}
+            {detailData && <DetailView data={detailData} cat={cat} itemImageUrl={itemImageUrl} enrichment={enrichment} npcDialog={npcDialog} />}
             {wikiData && (
               <div style={{ marginTop: detailData ? 12 : 0, padding: '10px 12px', background: 'var(--color-surface2)', borderRadius: 8, border: '1px solid var(--color-border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -680,7 +693,7 @@ function EnrichedDescription({ enrichment, idMismatchCaveat, noneMessage }: { en
   );
 }
 
-function DetailView({ data, cat, itemImageUrl, enrichment }: { data: Record<string, unknown>; cat: Category; itemImageUrl?: string | null; enrichment: Enrichment }) {
+function DetailView({ data, cat, itemImageUrl, enrichment, npcDialog }: { data: Record<string, unknown>; cat: Category; itemImageUrl?: string | null; enrichment: Enrichment; npcDialog: NpcDialog | null }) {
   if (cat === 'items') {
     const slots = Number(data.slot ?? 0);
     const equippedSlots = SLOT_NAMES.filter((_, i) => (slots >> i) & 1);
@@ -828,6 +841,21 @@ function DetailView({ data, cat, itemImageUrl, enrichment }: { data: Record<stri
         {data.zone  != null && <DRow k="Zone" v={fmtName(String(data.zone))} />}
         {data.x     != null && <DRow k="X" v={Number(data.x).toFixed(2)} />}
         {data.z     != null && <DRow k="Z" v={Number(data.z).toFixed(2)} />}
+        <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--color-text3)', marginBottom: 4 }}>Dialogue</div>
+          {!npcDialog || npcDialog.loading ? (
+            <div style={{ fontSize: 12, color: 'var(--color-text3)' }}>Loading…</div>
+          ) : !npcDialog.found || npcDialog.lines.length === 0 ? (
+            <div style={{ fontSize: 12, color: 'var(--color-text3)' }}>No dialogue found for this NPC.</div>
+          ) : (
+            npcDialog.lines.map((l, i) => (
+              <div key={i} style={{ marginBottom: 8 }}>
+                <div style={{ fontSize: 12, color: 'var(--color-text2)', fontStyle: 'italic' }}>&ldquo;{l.text}&rdquo;</div>
+                <div style={{ fontSize: 10, color: 'var(--color-text3)', marginTop: 2 }}>{l.const}</div>
+              </div>
+            ))
+          )}
+        </div>
       </div>
     );
   }

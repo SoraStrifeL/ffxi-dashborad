@@ -227,6 +227,7 @@ export const api = {
   dbNpcWiki:   (name: string) => req<{ description?: string; quests?: string[]; wikiUrl?: string; notFound?: boolean }>(`/api/db/npcs/wiki?name=${encodeURIComponent(name)}`),
   dbQuestWiki: (name: string) => req<{ description?: string; startNpc?: string; repeatable?: boolean; wikiUrl?: string; notFound?: boolean }>(`/api/db/quests/wiki?name=${encodeURIComponent(name)}`),
   dbAbilityWiki: (name: string) => req<{ description?: string | null; wikiUrl?: string; notFound?: boolean } | null>(`/api/db/abilities/wiki?name=${encodeURIComponent(name)}`),
+  npcDialog: (name: string, zone: string) => req<{ found: boolean; scriptPath?: string; lines: { const: string; id: number; text: string }[] }>(`/api/db/npcs/dialog?name=${encodeURIComponent(name)}&zone=${encodeURIComponent(zone)}`),
   dbKeyItemWiki: (name: string) => req<{ description?: string | null; wikiUrl?: string; notFound?: boolean } | null>(`/api/db/keyitems/wiki?name=${encodeURIComponent(name)}`),
   dbZoneWiki:  (name: string) => req<{ description?: string; wikiUrl?: string; notFound?: boolean }>(`/api/db/zones/wiki?name=${encodeURIComponent(name)}`),
 
