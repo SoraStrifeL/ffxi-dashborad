@@ -36,7 +36,7 @@ export function GameData() {
   const [expanded, setExpanded] = useState<number | null>(null);
   const [dzones, setDzones] = useState<{ id: number; name: string }[]>([]);
   const [zone, setZone] = useState<number | null>(null);
-  const [questDesc, setQuestDesc] = useState<Record<number, { loading: boolean; text?: string; notFound?: boolean; wikiUrl?: string }>>({});
+  const [questDesc, setQuestDesc] = useState<Record<number, { loading: boolean; text?: string; steps?: string[]; notFound?: boolean; wikiUrl?: string }>>({});
 
   const isDialog = cat === 'dialog';
   const isQuests = cat === 'quests';
@@ -85,8 +85,10 @@ export function GameData() {
   // 'dialog' is a special per-zone mode, not a status table category, so it is
   // always available when the fetcher is enabled.
   const available = (key: string) => key === 'dialog' || cats.length === 0 || cats.includes(key);
-  // Quests have no client-side description table; fetch BG-wiki text on
-  // demand (server caches it 24h — see /api/db/quests/wiki) rather than
+  // Quests have no client-side description table. Try the LSB quest script's
+  // own walkthrough comments first (instant, no network — only ~18% of
+  // scripts have them); fall back to a BG-wiki fetch (cached 24h server-side
+  // — see /api/db/quests/wiki) for the rest, fetched on demand rather than
   // firing 2,800 requests eagerly.
   const expandable = (r: Row) => isQuests || !!r.description;
   function toggleExpand(r: Row) {
@@ -94,8 +96,14 @@ export function GameData() {
     setExpanded(next);
     if (next != null && isQuests && !questDesc[r.id]) {
       setQuestDesc(prev => ({ ...prev, [r.id]: { loading: true } }));
-      api.dbQuestWiki(r.name)
-        .then(res => setQuestDesc(prev => ({ ...prev, [r.id]: { loading: false, text: res?.description, notFound: res?.notFound, wikiUrl: res?.wikiUrl } })))
+      api.dbQuestWalkthrough(r.name)
+        .then(w => {
+          if (w?.steps?.length) {
+            setQuestDesc(prev => ({ ...prev, [r.id]: { loading: false, steps: w.steps } }));
+            return;
+          }
+          return api.dbQuestWiki(r.name).then(res => setQuestDesc(prev => ({ ...prev, [r.id]: { loading: false, text: res?.description, notFound: res?.notFound, wikiUrl: res?.wikiUrl } })));
+        })
         .catch(() => setQuestDesc(prev => ({ ...prev, [r.id]: { loading: false, notFound: true } })));
     }
   }
@@ -160,7 +168,7 @@ export function GameData() {
                     {withDesc && (
                       <td style={{ color: 'var(--color-text3)', fontSize: 11, maxWidth: 480, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {isQuests
-                          ? (questDesc[r.id]?.text?.replace(/\n/g, ' ') ?? (questDesc[r.id]?.loading ? 'Loading…' : questDesc[r.id]?.notFound ? 'No wiki match' : 'Click for description'))
+                          ? (questDesc[r.id]?.steps?.[0] ?? questDesc[r.id]?.text?.replace(/\n/g, ' ') ?? (questDesc[r.id]?.loading ? 'Loading…' : questDesc[r.id]?.notFound ? 'No wiki match' : 'Click for description'))
                           : (r.description || '—').replace(/\n/g, ' ')}
                       </td>
                     )}
@@ -178,7 +186,14 @@ export function GameData() {
                           <div style={{ minWidth: 0 }}>
                             {isQuests ? (
                               questDesc[r.id]?.loading ? (
-                                <div style={{ fontSize: 12, color: 'var(--color-text3)' }}>Loading from BG-Wiki…</div>
+                                <div style={{ fontSize: 12, color: 'var(--color-text3)' }}>Loading…</div>
+                              ) : questDesc[r.id]?.steps?.length ? (
+                                <>
+                                  <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: 'var(--color-text2)', lineHeight: 1.6 }}>
+                                    {questDesc[r.id]!.steps!.map((s, i) => <li key={i}>{s}</li>)}
+                                  </ol>
+                                  <div style={{ marginTop: 6, fontSize: 10, color: 'var(--color-text3)' }}>From the quest script</div>
+                                </>
                               ) : questDesc[r.id]?.notFound ? (
                                 <div style={{ fontSize: 12, color: 'var(--color-text3)' }}>No wiki match found.</div>
                               ) : (

@@ -562,6 +562,20 @@ export function buildQuestCatalog(): QuestCatalogWithMeta {
 export const QUEST_CATALOG = buildQuestCatalog();
 export const QUEST_CONST_TO_ID = QUEST_CATALOG._constToId;
 
+// name → {logId, questId}, keyed by the same normalization quest-names.ts
+// uses for its client-title dictionary, so a DAT-sourced quest title (Game
+// Data tab) can be matched back to its LSB script for walkthrough/reward text.
+const _normQuestName = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+export const QUEST_NAME_INDEX: Record<string, { logId: number; questId: number }> = (() => {
+  const idx: Record<string, { logId: number; questId: number }> = {};
+  for (let logId = 0; logId < QUEST_CATALOG.length; logId++) {
+    for (const [qidStr, name] of Object.entries(QUEST_CATALOG[logId])) {
+      idx[_normQuestName(name as string)] = { logId, questId: parseInt(qidStr) };
+    }
+  }
+  return idx;
+})();
+
 // ── Fame / job lookup tables ───────────────────────────────────────────────────
 export const FAME_AREA_NAMES: Record<number, string> = {
   0: "San d'Oria", 1: 'Bastok', 2: 'Windurst', 3: 'Jeuno', 4: 'Selbina/Rabao',
@@ -687,6 +701,28 @@ export function _loadQuestSettings(): Record<string, unknown> {
 }
 export const QUEST_SETTINGS = _loadQuestSettings();
 
+// Some quest scripts document each section with a `-- ` comment directly
+// above its `check = function` (e.g. "Talk to Glenne; she's worried about
+// her husband..."). Not every quest has these — only ~18% of scripts do,
+// and some are just section labels ("Section: Begin quest") rather than
+// prose — but when present they're a free, always-current walkthrough with
+// no external fetch. Used as the primary description source, with BG-Wiki
+// as fallback for the rest (see /api/db/quests/walkthrough).
+function _extractWalkthrough(text: string): string[] {
+  const steps: string[] = [];
+  const stepRe = /((?:^[ \t]*--[^\n]*\n)+)[ \t]*\{\s*check\s*=\s*function/gm;
+  let m: RegExpExecArray | null;
+  while ((m = stepRe.exec(text)) !== null) {
+    const comment = m[1]
+      .split('\n')
+      .map(l => l.replace(/^[ \t]*--\s?/, '').trim())
+      .filter(l => l && !/^-+$/.test(l))
+      .join(' ');
+    if (comment) steps.push(comment);
+  }
+  return steps;
+}
+
 // ── Quest rewards ──────────────────────────────────────────────────────────────
 export function buildQuestRewards(): Record<number, Record<number, Record<string, unknown>>> {
   const rewards: Record<number, Record<number, Record<string, unknown>>> = {};
@@ -756,6 +792,9 @@ export function buildQuestRewards(): Record<number, Record<number, Record<string
 
       const reqs = _parseRequirements(text);
       if (reqs.length) entry.reqs = reqs;
+
+      const walkthrough = _extractWalkthrough(text);
+      if (walkthrough.length) entry.walkthrough = walkthrough;
 
       if (Object.keys(entry).length) rewards[logId][questId] = entry;
     });

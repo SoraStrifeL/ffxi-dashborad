@@ -218,6 +218,7 @@ export const api = {
   dbItemWiki:  (id: number) => req<{ description?: string; wikiUrl?: string; notFound?: boolean }>(`/api/db/items/wiki?id=${id}`),
   dbNpcWiki:   (name: string) => req<{ description?: string; quests?: string[]; wikiUrl?: string; notFound?: boolean }>(`/api/db/npcs/wiki?name=${encodeURIComponent(name)}`),
   dbQuestWiki: (name: string) => req<{ description?: string; startNpc?: string; repeatable?: boolean; wikiUrl?: string; notFound?: boolean }>(`/api/db/quests/wiki?name=${encodeURIComponent(name)}`),
+  dbQuestWalkthrough: (name: string) => req<{ steps: string[]; logId: number | null; questId: number | null }>(`/api/db/quests/walkthrough?name=${encodeURIComponent(name)}`),
   dbZoneWiki:  (name: string) => req<{ description?: string; wikiUrl?: string; notFound?: boolean }>(`/api/db/zones/wiki?name=${encodeURIComponent(name)}`),
 
   // Image uploads (multipart form data)

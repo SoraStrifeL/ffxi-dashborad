@@ -3,7 +3,7 @@ import { Pool, RowDataPacket } from 'mysql2/promise';
 import { requireAuth } from '../auth';
 import {
   MOB_CATALOG, NPC_CATALOG, DB_PAGE,
-  QUEST_CATALOG, QUEST_REWARDS, QUEST_LOG_NAMES,
+  QUEST_CATALOG, QUEST_REWARDS, QUEST_LOG_NAMES, QUEST_NAME_INDEX,
   QUEST_SETTINGS,
   ROE_RECORDS,
   _mobRegionMatch,
@@ -300,6 +300,18 @@ export function createDbRouter(pool: Pool): Router {
       counts.push({ logId: i, name: QUEST_LOG_NAMES[i], total, scripted });
     }
     res.json(counts);
+  });
+
+  // Local walkthrough steps parsed from the LSB quest scripts (see
+  // _extractWalkthrough in catalog.ts) — checked before falling back to the
+  // BG-Wiki fetch, since it's instant and needs no network round-trip.
+  router.get('/api/db/quests/walkthrough', requireAuth, (req, res) => {
+    const questName = ((req.query.name as string) || '').trim();
+    const norm = questName.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const loc = norm ? QUEST_NAME_INDEX[norm] : undefined;
+    const reward = loc ? QUEST_REWARDS[loc.logId]?.[loc.questId] : null;
+    const steps = (reward?.walkthrough as string[] | undefined) || [];
+    res.json({ steps, logId: loc?.logId ?? null, questId: loc?.questId ?? null, reward: reward || null });
   });
 
   router.get('/api/db/quests/wiki', requireAuth, async (req, res) => {
