@@ -165,6 +165,13 @@ export function Database() {
   const [dzones, setDzones] = useState<{ id: number; name: string }[]>([]);
   const [dialogZone, setDialogZone] = useState<number | null>(null);
   const isDialog = cat === 'dialog';
+  // Shared by Items/Abilities/Key Items/Quests: DAT-then-Wiki auto fallback
+  // for description text the DB never stores. `source` records which step
+  // actually supplied the text so the detail panel can label it. (Enrichment
+  // is the module-level type added in Task 6 Step 1 — DetailView and
+  // EnrichedDescription below are module-level functions and need the same
+  // shape, so it can't be declared component-local.)
+  const [enrichment, setEnrichment] = useState<Enrichment>({ loading: false, source: null, text: null });
   // Guards against out-of-order responses: a slow request from a previous
   // category/filter must not overwrite the rows of the current one
   const loadSeq = useRef(0);
@@ -274,6 +281,7 @@ export function Database() {
 
   async function openDetail(row: Record<string, unknown>) {
     setDetailRow(row); setDetailData(null); setDetailLoading(true); setWikiData(null); setScriptData(null); setItemImageUrl(null);
+    setEnrichment({ loading: false, source: null, text: null });
     try {
       if (cat === 'items') {
         const [detail, img] = await Promise.all([
@@ -282,6 +290,7 @@ export function Database() {
         ]);
         setDetailData(detail);
         setItemImageUrl(img.exists ? img.url : null);
+        fetchItemEnrichment(Number(row.itemid), String(row.name ?? ''));
       } else if (cat === 'mobs') {
         const detail = await api.dbMobDetail(String(row.name ?? ''), Number(row.zoneid ?? 0));
         setDetailData({ zone: row.zone, min_lvl: row.min_lvl, max_lvl: row.max_lvl, spawns: row.spawns, ...detail });
@@ -291,13 +300,31 @@ export function Database() {
     setDetailLoading(false);
   }
 
+  async function fetchItemEnrichment(itemId: number, dbName: string) {
+    setEnrichment({ loading: true, source: null, text: null });
+    try {
+      const dat = await api.datEnrich('items', itemId);
+      if (dat?.description) {
+        setEnrichment({ loading: false, source: 'dat', text: dat.description, datId: dat.datId });
+        return;
+      }
+      const wiki = await api.dbItemWiki(dbName);
+      if (wiki?.description) {
+        setEnrichment({ loading: false, source: 'wiki', text: wiki.description, wikiUrl: wiki.wikiUrl });
+        return;
+      }
+      setEnrichment({ loading: false, source: 'none', text: null });
+    } catch (_) {
+      setEnrichment({ loading: false, source: 'none', text: null });
+    }
+  }
+
   async function fetchWiki() {
     if (!detailRow) return;
     setWikiLoading(true); setWikiData(null);
     try {
       let result: { description?: string; wikiUrl?: string; notFound?: boolean } | null = null;
-      if (cat === 'items') result = await api.dbItemWiki(Number(detailRow.itemid));
-      else if (cat === 'npcs') result = await api.dbNpcWiki(String(detailRow.name ?? ''));
+      if (cat === 'npcs') result = await api.dbNpcWiki(String(detailRow.name ?? ''));
       else if (cat === 'mobs') result = await api.dbNpcWiki(String(detailRow.name ?? ''));
       else if (cat === 'quests') result = await api.dbQuestWiki(String(detailRow.name ?? ''));
       else if (cat === 'zones') result = await api.dbZoneWiki(String(detailRow.name ?? ''));
@@ -444,11 +471,11 @@ export function Database() {
                 {scriptLoading ? '…' : 'Script'}
               </button>
             )}
-            <button onClick={() => { setDetailRow(null); setDetailData(null); setWikiData(null); setScriptData(null); }} className="btn btn-ghost btn-xs">✕</button>
+            <button onClick={() => { setDetailRow(null); setDetailData(null); setWikiData(null); setScriptData(null); setEnrichment({ loading: false, source: null, text: null }); }} className="btn btn-ghost btn-xs">✕</button>
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '10px 14px', fontSize: 12 }}>
             {detailLoading && <div style={{ color: 'var(--color-text3)' }}>Loading…</div>}
-            {detailData && <DetailView data={detailData} cat={cat} itemImageUrl={itemImageUrl} />}
+            {detailData && <DetailView data={detailData} cat={cat} itemImageUrl={itemImageUrl} enrichment={enrichment} />}
             {wikiData && (
               <div style={{ marginTop: detailData ? 12 : 0, padding: '10px 12px', background: 'var(--color-surface2)', borderRadius: 8, border: '1px solid var(--color-border)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
@@ -553,7 +580,33 @@ function DRow({ k, v }: { k: string; v: React.ReactNode }) {
   );
 }
 
-function DetailView({ data, cat, itemImageUrl }: { data: Record<string, unknown>; cat: Category; itemImageUrl?: string | null }) {
+// Shared by Items/Abilities/Key Items detail views: renders whichever
+// source (DAT, Wiki, or neither) resolved the description, with a small
+// caption naming the source. `idMismatchCaveat`, when non-null, is
+// appended to the DAT caption — used by Abilities/Key Items, which match
+// by name across two different id spaces (see enrichment fetch functions).
+function EnrichedDescription({ enrichment, idMismatchCaveat }: { enrichment: Enrichment; idMismatchCaveat: string | null }) {
+  if (enrichment.loading) {
+    return <div style={{ fontSize: 12, color: 'var(--color-text3)', marginBottom: 8 }}>Loading…</div>;
+  }
+  if (enrichment.source === 'none' || enrichment.source === null) {
+    return <div style={{ fontSize: 12, color: 'var(--color-text3)', marginBottom: 8 }}>No description available — not on this server's DAT or BG-Wiki.</div>;
+  }
+  const caption = enrichment.source === 'dat'
+    ? (idMismatchCaveat ? `From client DAT (${idMismatchCaveat})` : 'From client DAT')
+    : enrichment.source === 'wiki' ? 'From BG-Wiki' : 'From the quest script';
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ fontSize: 12, color: 'var(--color-text2)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{enrichment.text}</div>
+      <div style={{ marginTop: 4, fontSize: 10, color: 'var(--color-text3)' }}>{caption}</div>
+      {enrichment.wikiUrl && (
+        <a href={enrichment.wikiUrl} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: 'var(--color-accent)' }}>View on BG-Wiki ↗</a>
+      )}
+    </div>
+  );
+}
+
+function DetailView({ data, cat, itemImageUrl, enrichment }: { data: Record<string, unknown>; cat: Category; itemImageUrl?: string | null; enrichment: Enrichment }) {
   if (cat === 'items') {
     const slots = Number(data.slot ?? 0);
     const SLOT_NAMES = ['Main','Sub','Range','Ammo','Head','Body','Hands','Legs','Feet','Neck','Waist','L.Ear','R.Ear','L.Ring','R.Ring','Back'];
@@ -562,11 +615,17 @@ function DetailView({ data, cat, itemImageUrl }: { data: Record<string, unknown>
     const jobList = JOB_ABBR.slice(1).filter((_, i) => (jobsMask >> (i + 1)) & 1);
     return (
       <div>
-        {itemImageUrl && (
+        {itemImageUrl ? (
           <div style={{ marginBottom: 10, textAlign: 'center' }}>
             <img src={itemImageUrl} alt={String(data.name ?? '')} style={{ maxWidth: 64, maxHeight: 64, borderRadius: 6, border: '1px solid var(--color-border)' }} />
           </div>
+        ) : (
+          <div style={{ marginBottom: 10, textAlign: 'center' }}>
+            <img src={`/api/dat/icon/${data.itemid}`} alt="" style={{ maxWidth: 64, maxHeight: 64, borderRadius: 6, border: '1px solid var(--color-border)', imageRendering: 'pixelated' }}
+              onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+          </div>
         )}
+        <EnrichedDescription enrichment={enrichment} idMismatchCaveat={null} />
         {data.level   != null && <DRow k="Level" v={String(data.level)} />}
         {data.ilevel  != null && <DRow k="iLevel" v={String(data.ilevel)} />}
         {data.type    != null && <DRow k="Type" v={ITEM_TYPE[Number(data.type)] ?? String(data.type)} />}
