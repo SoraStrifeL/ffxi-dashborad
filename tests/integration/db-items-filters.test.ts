@@ -67,6 +67,17 @@ describe('GET /api/db/items filters', () => {
     expect(params).toEqual(['%%', 1, 50, 0]);
   });
 
+  it('applies the weapon-skill filter when type=6 (Equipment)', async () => {
+    const res = await request(app)
+      .get('/api/db/items?type=6&skill=12')
+      .set('Authorization', `Bearer ${TOKEN}`);
+    expect(res.status).toBe(200);
+    const [sql, params] = lastCall();
+    expect(sql).toContain('ib.type=?');
+    expect(sql).toContain('iw.skill=?');
+    expect(params).toEqual(['%%', 6, 12, 50, 0]);
+  });
+
   it('combines the slot filter and the weapon-skill filter together', async () => {
     const res = await request(app)
       .get('/api/db/items?type=7&slot=1&skill=1')

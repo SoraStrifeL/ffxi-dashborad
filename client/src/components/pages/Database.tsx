@@ -209,7 +209,7 @@ export function Database() {
     if (cat === 'abilities' && jobFilter !== null) params.job = jobFilter;
     if (cat === 'items' && typeFilter !== null) params.type = typeFilter;
     if (cat === 'items' && (typeFilter === 6 || typeFilter === 7) && slotFilter !== null) params.slot = slotFilter;
-    if (cat === 'items' && typeFilter === 7 && skillFilter !== null) params.skill = skillFilter;
+    if (cat === 'items' && (typeFilter === 6 || typeFilter === 7) && skillFilter !== null) params.skill = skillFilter;
     if (cat === 'items' && rareExFilter) params.rareex = 1;
     if (cat === 'npcs' && regionFilter) params.region = regionFilter;
     if (cat === 'npcs' && roleFilter) params.role = roleFilter;
@@ -490,7 +490,7 @@ export function Database() {
             {SLOT_NAMES.map((name, i) => chipBtn(name, 1 << i, slotFilter, setSlotFilter))}
           </div>
         )}
-        {hasTypeFilter && typeFilter === 7 && (
+        {hasTypeFilter && (typeFilter === 6 || typeFilter === 7) && (
           <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {chipBtn('All', null, skillFilter, setSkillFilter)}
             {Object.entries(WEAPON_SKILL_NAMES).map(([id, name]) => chipBtn(name, Number(id), skillFilter, setSkillFilter))}
