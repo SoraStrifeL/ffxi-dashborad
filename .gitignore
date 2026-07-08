@@ -46,3 +46,6 @@ ffxi-dat/**
 # Full retail FFXI client install (copyrighted game data) — used by
 # tools/build-calibrations.js; never commit it.
 FINAL FANTASY XI/
+
+# subagent-driven-development scratch (progress ledger, task briefs, reports)
+.superpowers/
