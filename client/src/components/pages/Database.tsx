@@ -3,9 +3,15 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { api } from '../../api';
 import { useStore } from '../../store';
 
-type Category = 'items'|'npcs'|'mobs'|'zones'|'jobs'|'skills'|'abilities'|'quests'|'keyitems'|'trusts'|'mounts'|'gmcmds';
+type Category = 'items'|'npcs'|'mobs'|'zones'|'jobs'|'skills'|'abilities'|'quests'|'keyitems'|'trusts'|'mounts'|'gmcmds'
+  |'spells'|'statuses'|'titles'|'monster_skills'|'emotes'|'augments'|'dialog';
 
-const CATS: { key: Category; label: string }[] = [
+type CatDef = { key: Category; label: string };
+
+// "Server Data" = rows come from the live DB/Lua catalogs (ground truth for
+// this server). "Client Reference" = DAT-only categories with no
+// server-side equivalent, ported from the old Game Data tab.
+const SERVER_CATS: CatDef[] = [
   { key: 'items', label: 'Items' }, { key: 'npcs', label: 'NPCs' },
   { key: 'mobs', label: 'Mobs' }, { key: 'zones', label: 'Zones' },
   { key: 'jobs', label: 'Jobs' }, { key: 'skills', label: 'Skills' },
@@ -13,6 +19,21 @@ const CATS: { key: Category; label: string }[] = [
   { key: 'keyitems', label: 'Key Items' }, { key: 'trusts', label: 'Trusts' },
   { key: 'mounts', label: 'Mounts' }, { key: 'gmcmds', label: 'GM Commands' },
 ];
+const CLIENT_REF_CATS: CatDef[] = [
+  { key: 'spells', label: 'Spells' }, { key: 'statuses', label: 'Statuses' },
+  { key: 'titles', label: 'Titles' }, { key: 'monster_skills', label: 'Monster Skills' },
+  { key: 'emotes', label: 'Emotes' }, { key: 'augments', label: 'Augments' },
+  { key: 'dialog', label: 'Dialog' },
+];
+const CATS: CatDef[] = [...SERVER_CATS, ...CLIENT_REF_CATS];
+
+// The six DAT-only, name+description table categories (Dialog is handled
+// separately — it's per-zone line dumps, not a name/description table).
+const DAT_TABLE_CATS = new Set<Category>(['spells', 'statuses', 'titles', 'monster_skills', 'emotes', 'augments']);
+
+// Module-level (not component-local) because DetailView/EnrichedDescription
+// below are also module-level functions and need this shape — see Task 8.
+type Enrichment = { loading: boolean; source: 'dat' | 'wiki' | 'script' | 'none' | null; text: string | null; datId?: number; wikiUrl?: string };
 
 const NON_PAGED: Category[] = ['zones','jobs','skills','trusts','mounts','gmcmds'];
 const DB_PAGE = 50; // must match server.js DB_PAGE
@@ -140,6 +161,7 @@ export function Database() {
   const uploadRef = useRef<HTMLInputElement>(null);
   const user = useStore((s) => s.user);
   const [itemImageUrl, setItemImageUrl] = useState<string | null>(null);
+  const [datEnabled, setDatEnabled] = useState(false);
   // Guards against out-of-order responses: a slow request from a previous
   // category/filter must not overwrite the rows of the current one
   const loadSeq = useRef(0);
@@ -147,6 +169,7 @@ export function Database() {
   useEffect(() => { api.zones().then(z => setZones(z)).catch(() => {}); }, []);
   useEffect(() => { api.dbItemTypes().then(setItemTypes).catch(() => {}); }, []);
   useEffect(() => { api.dbQuestLogs().then(setQuestLogs).catch(() => {}); }, []);
+  useEffect(() => { api.datStatus().then(s => setDatEnabled(s.enabled)).catch(() => setDatEnabled(false)); }, []);
 
   const load = useCallback(async (reset = true) => {
     const seq = ++loadSeq.current;
@@ -162,7 +185,13 @@ export function Database() {
       // All server DB endpoints return plain arrays (not { rows, hasMore }).
       // hasMore is inferred: if the page is full (== DB_PAGE), there may be more.
       let newRows: unknown[] | null = null;
-      if (cat === 'items')          newRows = (await api.dbItems(params)) as unknown as unknown[];
+      let datHasMore: boolean | null = null; // DAT_TABLE_CATS report hasMore directly, unlike DB_PAGE inference below
+      if (DAT_TABLE_CATS.has(cat)) {
+        const r = await api.datTable(cat, search, p);
+        newRows = r.rows;
+        datHasMore = r.hasMore;
+      }
+      else if (cat === 'items')          newRows = (await api.dbItems(params)) as unknown as unknown[];
       else if (cat === 'npcs')      newRows = (await api.dbNpcs(params)) as unknown as unknown[];
       else if (cat === 'mobs')      newRows = (await api.dbMobs(params)) as unknown as unknown[];
       else if (cat === 'abilities') newRows = (await api.dbAbilities(params)) as unknown as unknown[];
@@ -180,7 +209,7 @@ export function Database() {
 
       if (newRows !== null && seq === loadSeq.current) {
         setRows((prev) => reset ? newRows! : [...prev, ...newRows!]);
-        setHasMore(NON_PAGED.includes(cat) ? false : newRows.length === DB_PAGE);
+        setHasMore(datHasMore !== null ? datHasMore : NON_PAGED.includes(cat) ? false : newRows.length === DB_PAGE);
         setPage(p);
       }
     } catch (_) {}
@@ -219,8 +248,11 @@ export function Database() {
   const hasJobFilter      = cat === 'abilities';
   const hasTypeFilter     = cat === 'items';
   const hasQuestLogFilter = cat === 'quests';
-  const isClickable       = cat === 'items' || cat === 'mobs' || cat === 'npcs' || cat === 'quests' || cat === 'zones' || cat === 'trusts' || cat === 'mounts' || cat === 'abilities' || cat === 'keyitems' || cat === 'gmcmds';
-  const hasWiki           = cat === 'items' || cat === 'mobs' || cat === 'npcs' || cat === 'quests' || cat === 'zones';
+  const isClickable       = cat === 'items' || cat === 'mobs' || cat === 'npcs' || cat === 'quests' || cat === 'zones' || cat === 'trusts' || cat === 'mounts' || cat === 'abilities' || cat === 'keyitems' || cat === 'gmcmds' || DAT_TABLE_CATS.has(cat);
+  // npcs/mobs/zones have no DAT layer to chain from, so they keep today's
+  // manual Wiki button. Items/Abilities/Quests/Key Items get the automatic
+  // DAT->Wiki chain instead (Tasks 8-10) and no longer show this button.
+  const hasWiki            = cat === 'mobs' || cat === 'npcs' || cat === 'zones';
   const hasUpload         = user?.tier === 'admin' && (cat === 'items' || cat === 'mobs' || cat === 'npcs');
   const hasScript         = user?.tier === 'admin' && cat === 'quests';
   const hasMapLink        = (cat === 'zones' || cat === 'npcs' || cat === 'mobs') && detailRow?.zoneid != null;
@@ -239,7 +271,7 @@ export function Database() {
         const detail = await api.dbMobDetail(String(row.name ?? ''), Number(row.zoneid ?? 0));
         setDetailData({ zone: row.zone, min_lvl: row.min_lvl, max_lvl: row.max_lvl, spawns: row.spawns, ...detail });
       }
-      else if (cat === 'npcs' || cat === 'zones' || cat === 'quests' || cat === 'trusts' || cat === 'mounts' || cat === 'abilities' || cat === 'keyitems' || cat === 'gmcmds') setDetailData(row);
+      else if (cat === 'npcs' || cat === 'zones' || cat === 'quests' || cat === 'trusts' || cat === 'mounts' || cat === 'abilities' || cat === 'keyitems' || cat === 'gmcmds' || DAT_TABLE_CATS.has(cat)) setDetailData(row);
     } catch (_) {}
     setDetailLoading(false);
   }
@@ -280,24 +312,16 @@ export function Database() {
     e.target.value = '';
   }
 
+  function selectCat(key: Category) {
+    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
+  }
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Category sidebar */}
-      <div style={{ width: 160, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)', padding: '12px 8px', flexShrink: 0, overflowY: 'auto' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--color-text3)', padding: '4px 8px 10px' }}>Database</div>
-        {CATS.map(({ key, label }) => (
-          <button key={key} onClick={() => { setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setQuestLogFilter(null); setDetailRow(null); setDetailData(null); }}
-            style={{
-              display: 'block', width: '100%', textAlign: 'left',
-              padding: '8px 10px', borderRadius: 7, border: 'none', fontSize: 13,
-              fontWeight: cat === key ? 600 : 400,
-              background: cat === key ? 'var(--color-surface2)' : 'transparent',
-              color: cat === key ? 'var(--color-text1)' : 'var(--color-text3)',
-              cursor: 'pointer', marginBottom: 2,
-            }}>
-            {label}
-          </button>
-        ))}
+      <div style={{ width: 170, background: 'var(--color-surface)', borderRight: '1px solid var(--color-border)', padding: '12px 8px', flexShrink: 0, overflowY: 'auto' }}>
+        {renderCatGroup('Server Data', SERVER_CATS, cat, selectCat)}
+        {datEnabled && renderCatGroup('Client Reference', CLIENT_REF_CATS, cat, selectCat)}
       </div>
 
       {/* Content */}
@@ -465,6 +489,27 @@ const ITEM_TYPE: Record<number, string> = {
   38:'Training', 39:'Record', 40:'Meal', 41:'Crest', 42:'Fetish', 43:'Merit',
   44:'Ability', 45:'TP', 46:'Ranged', 47:'Throwing',
 };
+
+function renderCatGroup(title: string, cats: CatDef[], current: Category, onSelect: (key: Category) => void) {
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--color-text3)', padding: '4px 8px 8px' }}>{title}</div>
+      {cats.map(({ key, label }) => (
+        <button key={key} onClick={() => onSelect(key)}
+          style={{
+            display: 'block', width: '100%', textAlign: 'left',
+            padding: '8px 10px', borderRadius: 7, border: 'none', fontSize: 13,
+            fontWeight: current === key ? 600 : 400,
+            background: current === key ? 'var(--color-surface2)' : 'transparent',
+            color: current === key ? 'var(--color-text1)' : 'var(--color-text3)',
+            cursor: 'pointer', marginBottom: 2,
+          }}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 function chipBtn(label: string, value: number | null, current: number | null, set: (v: number | null) => void) {
   const active = value === current;
@@ -700,6 +745,20 @@ function DetailView({ data, cat, itemImageUrl }: { data: Record<string, unknown>
       </div>
     );
   }
+  if (cat === 'spells' || cat === 'statuses' || cat === 'titles' || cat === 'monster_skills' || cat === 'emotes' || cat === 'augments') {
+    return (
+      <div>
+        {cat === 'statuses' && (
+          <div style={{ marginBottom: 10, textAlign: 'center' }}>
+            <img src={`/api/dat/status-icon/${data.id}`} alt="" style={{ maxWidth: 48, maxHeight: 48, imageRendering: 'pixelated' }}
+              onError={e => { (e.currentTarget as HTMLImageElement).style.visibility = 'hidden'; }} />
+          </div>
+        )}
+        <div style={{ color: 'var(--color-text2)', fontSize: 12, whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>{String(data.description ?? '—')}</div>
+        <div style={{ marginTop: 8, fontSize: 11, color: 'var(--color-text3)', fontFamily: 'var(--font-mono)' }}>id {String(data.id)}</div>
+      </div>
+    );
+  }
   return null;
 }
 const ACTION_TYPE: Record<number, string> = { 3: 'Ranged', 6: 'JA', 13: 'Pet' };
@@ -718,6 +777,8 @@ function getColumns(cat: Category): ColDef[] {
     case 'trusts':   return [{ key: 'name', label: 'Trust', color: 'var(--color-text1)', render: fmtTrust }, { key: 'itemid', label: 'Item ID', color: 'var(--color-text3)' }];
     case 'mounts':   return [{ key: 'name', label: 'Mount', color: 'var(--color-text1)', render: fmtMount }, { key: 'itemid', label: 'Item ID', color: 'var(--color-text3)' }];
     case 'gmcmds':   return [{ key: 'name', label: 'Command', color: 'var(--color-accent)' }, { key: 'group', label: 'Category', color: 'var(--color-text3)' }, { key: 'desc', label: 'Description', color: 'var(--color-text2)' }];
+    case 'spells': case 'statuses': case 'titles': case 'monster_skills': case 'emotes': case 'augments':
+      return [{ key: 'id', label: 'ID', color: 'var(--color-text3)' }, { key: 'name', label: 'Name', color: 'var(--color-text1)' }, { key: 'description', label: 'Description', color: 'var(--color-text2)' }];
     default: return [];
   }
 }
