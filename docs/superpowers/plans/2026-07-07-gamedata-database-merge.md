@@ -599,8 +599,11 @@ Replace with:
   dbQuestWiki: (name: string) => req<{ description?: string; startNpc?: string; repeatable?: boolean; wikiUrl?: string; notFound?: boolean }>(`/api/db/quests/wiki?name=${encodeURIComponent(name)}`),
   dbAbilityWiki: (name: string) => req<{ description?: string | null; wikiUrl?: string; notFound?: boolean } | null>(`/api/db/abilities/wiki?name=${encodeURIComponent(name)}`),
   dbKeyItemWiki: (name: string) => req<{ description?: string | null; wikiUrl?: string; notFound?: boolean } | null>(`/api/db/keyitems/wiki?name=${encodeURIComponent(name)}`),
+  dbQuestWalkthrough: (name: string) => req<{ steps: string[]; logId: number | null; questId: number | null }>(`/api/db/quests/walkthrough?name=${encodeURIComponent(name)}`),
   dbZoneWiki:  (name: string) => req<{ description?: string; wikiUrl?: string; notFound?: boolean }>(`/api/db/zones/wiki?name=${encodeURIComponent(name)}`),
 ```
+
+**Correction (found during task review):** `dbQuestWalkthrough` must be **kept** here, not deleted — its backend route was already removed in Task 3, so this helper now points at a 404, but `client/src/components/pages/GameData.tsx` still calls it and is still live/routed until Task 11 deletes that file. Deleting it in this task broke the client typecheck for every task in between. It moves to Task 11's cleanup list instead, deleted in the same step that deletes its only remaining caller.
 
 - [ ] **Step 3: Compile check**
 
@@ -1645,15 +1648,21 @@ Find:
 
 Delete that line.
 
-- [ ] **Step 4: Check for now-orphaned `api.ts` helpers**
+- [ ] **Step 4: Remove the now-dead `dbQuestWalkthrough` helper and check for other orphaned `api.ts` helpers**
 
-`datStatus`, `datTable`, `datDialogZones`, `datDialog` are all still used by `Database.tsx` (Tasks 6–7) — keep them. Run a grep to confirm nothing else references GameData-only helpers:
+`datStatus`, `datTable`, `datDialogZones`, `datDialog` are all still used by `Database.tsx` (Tasks 6–7) — keep them. `dbQuestWalkthrough`, however, has had no working backend route since Task 3 (which deleted `/api/db/quests/walkthrough`) and, as of Step 1 above, no caller either — `GameData.tsx` was its last one. Open `client/src/api.ts` and find:
+
+```ts
+  dbQuestWalkthrough: (name: string) => req<{ steps: string[]; logId: number | null; questId: number | null }>(`/api/db/quests/walkthrough?name=${encodeURIComponent(name)}`),
+```
+
+Delete that line. Then run a grep to confirm nothing else references it or any other GameData-only helper:
 
 ```bash
 grep -rn "dbQuestWalkthrough" client/src/ src/
 ```
 
-Expected: no output (removed in Tasks 3 and 5). If anything shows up, stop and investigate before proceeding — it means a reference was missed.
+Expected: no output. If anything shows up, stop and investigate before proceeding — it means a reference was missed.
 
 - [ ] **Step 5: Full client build**
 
