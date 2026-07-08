@@ -36,11 +36,21 @@ Spot-checked live against the mounted LSB script tree
   `IDs.lua`'s numbers (6385, 11237, ...) are a different, larger id space.
   This feature does not touch or reuse the existing Dialog category's
   data path — it's a new, independent extraction from the Lua script tree.
-- **This is scripts-only, not DAT-dependent.** No dependency on
-  `datEnabled` / the client DAT mount — only `LSB_SCRIPTS_DIR`, same as
-  the existing Quest walkthrough feature. Degrades gracefully (empty
-  result) when scripts aren't mounted, per this repo's established
-  mount-degradation convention.
+- **This is scripts-only, not DAT-dependent** — but it needs the *other*
+  scripts mount, not the one the Quest walkthrough feature uses. Verified
+  directly against the running container (`docker exec ffxi-dashboard ls
+  ...`): `/ffxi-scripts` (`LSB_SCRIPTS_DIR`, used by the existing quest
+  walkthrough) is a curated set of individual files + just `quests/` —
+  it has no `zones/` subtree at all. `/ffxi-server-scripts`
+  (`SERVER_SCRIPTS_ROOT`, `src/catalog.ts:818`, already used by the
+  admin-only `/api/questscript` raw-script-viewer route in
+  `src/routes/characters.ts`) is mounted to the full LSB scripts tree
+  (`docker-compose.yml:55`) and does contain `zones/<Zone>/npcs/*.lua`
+  and `zones/<Zone>/IDs.lua` — confirmed both paths exist inside the
+  container under this mount. This feature must use `SERVER_SCRIPTS_ROOT`.
+  Still no dependency on `datEnabled` / the client DAT mount, and still
+  degrades gracefully (empty result) when unmounted, per this repo's
+  established mount-degradation convention.
 
 ## Decisions (confirmed with user)
 
@@ -74,7 +84,7 @@ its own `src/dat/index.ts` module rather than folding into an existing
 file. `src/routes/db.ts` imports from here.
 
 - New function `resolveNpcDialog(zoneName: string, npcName: string): { found: boolean; scriptPath?: string; lines: { const: string; id: number; text: string }[] }`.
-  - Locate script: `path.join(LSB_SCRIPTS_DIR, 'zones', zoneName, 'npcs', <npcName>.lua)` exact match first; on miss, brute-force scan that directory with the same `normalize()` fuzzy-match fallback already used by `/api/questscript` in `src/routes/characters.ts:377`.
+  - Locate script: `path.join(SERVER_SCRIPTS_ROOT, 'zones', zoneName, 'npcs', <npcName>.lua)` exact match first; on miss, brute-force scan that directory with the same `normalize()` fuzzy-match fallback already used by `/api/questscript` in `src/routes/characters.ts:377`.
   - Not found (directory missing, e.g. scripts unmounted, or no matching file) → `{ found: false, lines: [] }`.
   - Regex-scan the script's text for `/\.text\.([A-Za-z0-9_]+)/g`, dedup preserving first-seen order.
   - Lazily parse + cache (`Map<string, Record<string, {id:number; text:string}>>`, keyed by zone name — mirrors `dialogCache` in `src/dat/index.ts:182`) the zone's `IDs.lua`: extract the substring between the first `text\s*=\s*\{` and its matching `}` (brace-depth scan, not a naive non-nested regex — `IDs.lua` has sibling `mob = {...}` / `npc = {...}` tables after it), then per line match `/^\s*([A-Z0-9_]+)\s*=\s*(\d+),?\s*(?:--\s*(.*))?$/`.
