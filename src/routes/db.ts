@@ -229,6 +229,7 @@ export function createDbRouter(pool: Pool): Router {
     const zone      = ((req.query.zone as string) || '').trim().toLowerCase();
     const region    = (req.query.region as string) || null;
     const ecosystem = (req.query.ecosystem as string) || null;
+    const aggro     = req.query.aggro === '1';
     const sort      = (req.query.sort as string) || '';
     const page      = Math.max(0, parseInt((req.query.page as string) || '0'));
     let rows = MOB_CATALOG;
@@ -236,10 +237,21 @@ export function createDbRouter(pool: Pool): Router {
     if (zone)      rows = rows.filter(r => r.zone && (r.zone as string).toLowerCase().includes(zone));
     if (region)    rows = rows.filter(r => _mobRegionMatch((r.zone as string) || '', region));
     if (ecosystem) rows = rows.filter(r => r.ecosystem === ecosystem);
+    if (aggro)     rows = rows.filter(r => r.aggro === 1);
     const MOB_SORT = new Set(['name', 'zone', 'min_lvl', 'max_lvl', 'family', 'aggro', 'spawns', 'ecosystem']);
     if (sort === 'level') rows = [...rows].sort(cmpBy('max_lvl', sortDir(req)));
     else if (MOB_SORT.has(sort)) rows = [...rows].sort(cmpBy(sort, sortDir(req)));
     res.json(rows.slice(page * DB_PAGE, page * DB_PAGE + DB_PAGE));
+  });
+
+  router.get('/api/db/mob-ecosystems', requireAuth, (_req, res) => {
+    const counts: Record<string, number> = {};
+    for (const row of MOB_CATALOG) {
+      const eco = row.ecosystem as string | null;
+      if (!eco) continue;
+      counts[eco] = (counts[eco] || 0) + 1;
+    }
+    res.json(Object.entries(counts).map(([ecosystem, cnt]) => ({ ecosystem, cnt })).sort((a, b) => b.cnt - a.cnt));
   });
 
   router.get('/api/db/mobs/detail', requireAuth, async (req, res) => {
