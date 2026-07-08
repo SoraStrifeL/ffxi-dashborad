@@ -569,16 +569,24 @@ type ColDef = { key: string; label: string; color?: string; render?: (v: unknown
 // Index 0 = monster/pet abilities; 1–22 = player jobs
 const JOB_ABBR = ['MON','WAR','MNK','WHM','BLM','RDM','THF','PLD','DRK','BST','BRD','RNG','SAM','NIN','DRG','SMN','BLU','COR','PUP','DNC','SCH','GEO','RUN'];
 
-// item_basic.type values
+// item_basic.type values — verified against /home/sora/ffxi/sql/item_basic.sql
+// (@GENERAL_TYPE=1 .. @CURRENCY_TYPE=8) and live GET /api/db/items?type=N
+// for N=1..8. The old map here did not match this schema at all.
 const ITEM_TYPE: Record<number, string> = {
-  0:'Basic', 1:'Armor', 2:'Weapon', 3:'Linkshell', 4:'Gil', 5:'Key Item', 6:'Food',
-  7:'Crystal', 8:'Voucher', 9:'Slip', 10:'Linkshell 2', 11:'Instinct', 12:'Coupon',
-  13:'Chocobo Ticket', 14:'Seasonal', 15:'Avatar', 16:'Temporary', 17:'Jug Pet', 18:'NPC',
-  19:'Furnishing', 20:'Plant', 21:'Flowerpot', 22:'Mannequin', 23:'Book', 24:'Strap',
-  25:'Dice', 26:'Ninja Tool', 27:'Fishing', 28:'Bait', 29:'Pet', 30:'Automaton',
-  31:'Armor Set', 32:'Stall', 33:'Event', 34:'Misc', 36:'Fellow', 37:'Emerald',
-  38:'Training', 39:'Record', 40:'Meal', 41:'Crest', 42:'Fetish', 43:'Merit',
-  44:'Ability', 45:'TP', 46:'Ranged', 47:'Throwing',
+  1: 'General', 2: 'Linkshell', 3: 'Furnishing', 4: 'Puppet',
+  5: 'Usable', 6: 'Equipment', 7: 'Weapon', 8: 'Currency',
+};
+
+// item_equipment.slot bit indices, used both for the Items detail panel's
+// "Slot" row and the Equipment second-level filter chips (Task 3).
+const SLOT_NAMES = ['Main','Sub','Range','Ammo','Head','Body','Hands','Legs','Feet','Neck','Waist','L.Ear','R.Ear','L.Ring','R.Ring','Back'];
+
+// item_weapon.skill values — verified live against GET /api/db/items?type=7&skill=N
+// for N=1..15, matches /home/sora/ffxi/sql/item_basic.sql's AH weapon category list.
+const WEAPON_SKILL_NAMES: Record<number, string> = {
+  1: 'H2H', 2: 'Dagger', 3: 'Sword', 4: 'Greatsword', 5: 'Axe', 6: 'Greataxe',
+  7: 'Scythe', 8: 'Polearm', 9: 'Katana', 10: 'Greatkatana', 11: 'Club',
+  12: 'Staff', 13: 'Bow', 14: 'Instrument', 15: 'Ammunition',
 };
 
 function renderCatGroup(title: string, cats: CatDef[], current: Category, onSelect: (key: Category) => void) {
@@ -652,7 +660,6 @@ function EnrichedDescription({ enrichment, idMismatchCaveat, noneMessage }: { en
 function DetailView({ data, cat, itemImageUrl, enrichment }: { data: Record<string, unknown>; cat: Category; itemImageUrl?: string | null; enrichment: Enrichment }) {
   if (cat === 'items') {
     const slots = Number(data.slot ?? 0);
-    const SLOT_NAMES = ['Main','Sub','Range','Ammo','Head','Body','Hands','Legs','Feet','Neck','Waist','L.Ear','R.Ear','L.Ring','R.Ring','Back'];
     const equippedSlots = SLOT_NAMES.filter((_, i) => (slots >> i) & 1);
     const jobsMask = Number(data.jobs ?? 0);
     const jobList = JOB_ABBR.slice(1).filter((_, i) => (jobsMask >> (i + 1)) & 1);
