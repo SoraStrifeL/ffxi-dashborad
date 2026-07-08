@@ -51,17 +51,6 @@ const PAIRED_CATEGORIES: Record<string, string> = {
 // status id — 32×32 icon + help text per entry (see dat/status.ts).
 const STATUS_ICON_RESOURCE = 87;
 
-// Quest/mission title tables — the client ships one per nation/expansion/
-// log-category rather than a single master table (same 55465-55765 range
-// dat/quest-names.ts scans for its name-lookup dictionary). Concatenated
-// here, in client order, for a flat "Quests" Game Data category. No
-// description table exists client-side; quest text/rewards live in the
-// Lua-backed Database tab instead.
-const QUEST_NAME_RESOURCES = [
-  55706, 55707, 55708, 55709, 55710, 55711, 55712, 55713, 55715, 55716, 55717,
-  55718, 55719, 55720, 55721, 55722, 55723, 55724, 55735, 55736, 55737, 55738,
-  55739, 55740, 55741, 55742,
-];
 
 export function initDat(): void {
   try {
@@ -149,28 +138,21 @@ export const DAT_ITEM_CATEGORIES: Record<string, number[]> = {
   items_currency:  [91],
 };
 
+// Categories exposed as their own browsable table in the Database tab's
+// "Client Reference" sidebar group. Abilities, Key Items, Items, and
+// Quests are deliberately excluded — the DB versions are primary now, and
+// DAT data for those is enrichment-only, reached via /api/dat/enrich (see
+// bottom of this file) or (for quests) the reward.walkthrough already
+// inline on /api/db/quests, never a standalone chip. DAT "zones" is
+// excluded too — it has no description text to add over the DB Zones
+// category, so there's nothing to gain from listing it separately.
 export function categoryKeys(): string[] {
-  return ['quests', ...Object.keys(DAT_CATEGORIES), ...Object.keys(PAIRED_CATEGORIES), ...Object.keys(DAT_ITEM_CATEGORIES)];
+  const CLIENT_REFERENCE = ['spells', 'statuses', 'titles', 'monster_skills'];
+  return [...CLIENT_REFERENCE, ...Object.keys(PAIRED_CATEGORIES)];
 }
 
 export interface DatRow { id: number; name: string; description?: string }
 
-let questRows: DatRow[] | null = null;
-function getQuests(): DatRow[] {
-  if (!enabled) return [];
-  if (questRows) return questRows;
-  const rows: DatRow[] = [];
-  for (const fileId of QUEST_NAME_RESOURCES) {
-    const buf = readResourceCached(fileId);
-    if (!buf) continue;
-    for (const name of parseDmsg(buf)) {
-      if (!name || name === '.') continue;
-      rows.push({ id: rows.length, name });
-    }
-  }
-  questRows = rows;
-  return rows;
-}
 
 const itemCache = new Map<string, DatRow[]>();
 // item id → { fileId, rec } so an icon can be re-decoded on demand.
@@ -255,7 +237,6 @@ export function getItemIcon(id: number): Buffer | null {
 /** Joined id/name/description rows for a display category (string or item). */
 export function getTable(cat: string): DatRow[] {
   if (!enabled) return [];
-  if (cat === 'quests') return getQuests();
   if (DAT_ITEM_CATEGORIES[cat]) return getItems(cat);
   const pairedKey = PAIRED_CATEGORIES[cat];
   if (pairedKey) {
@@ -282,4 +263,61 @@ export function getTable(cat: string): DatRow[] {
     else rows.push(c.desc ? { id, name, description: (descs[id] || '').trim() } : { id, name });
   }
   return rows;
+}
+
+// ── Cross-source enrichment lookups ─────────────────────────────────────
+// The live DB and the client DAT don't share an id space for everything.
+// Items do (DB item_basic.itemid == DAT item id, verified) so enrichment
+// there is a direct id lookup. Abilities and key items don't (e.g. DB
+// ability 35 "Provoke" == DAT ability id 547) so those two are matched by
+// normalized name instead. The two builder helpers are pure and unit-
+// tested directly with fixture rows — no DAT_DIR needed for that test.
+export function normalizeDatName(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+export function buildIdIndex(rows: DatRow[]): Map<number, DatRow> {
+  const idx = new Map<number, DatRow>();
+  for (const row of rows) idx.set(row.id, row);
+  return idx;
+}
+
+export function buildNameIndex(rows: DatRow[]): Map<string, DatRow> {
+  const idx = new Map<string, DatRow>();
+  for (const row of rows) idx.set(normalizeDatName(row.name), row);
+  return idx;
+}
+
+let itemDatIndex: Map<number, DatRow> | null = null;
+/** DAT item row by id (DB item_basic.itemid and the DAT item id are the same number). */
+export function getItemDatById(id: number): DatRow | null {
+  if (!enabled) return null;
+  if (!itemDatIndex) {
+    const rows: DatRow[] = [];
+    for (const cat of Object.keys(DAT_ITEM_CATEGORIES)) rows.push(...getTable(cat));
+    itemDatIndex = buildIdIndex(rows);
+  }
+  return itemDatIndex.get(id) ?? null;
+}
+
+let abilityDatIndex: Map<string, DatRow> | null = null;
+/** DAT ability row by name — server and client ability ids don't match (see file header). */
+export function getAbilityDatByName(name: string): DatRow | null {
+  if (!enabled) return null;
+  if (!abilityDatIndex) abilityDatIndex = buildNameIndex(getTable('abilities'));
+  return abilityDatIndex.get(normalizeDatName(name)) ?? null;
+}
+
+let keyItemDatIndex: Map<string, DatRow> | null = null;
+/**
+ * DAT key-item row by name. Note: the key_items DAT resource (55695) has no
+ * paired description resource configured above, so every row here has
+ * description === undefined today — matches always fall through to the
+ * Wiki fallback in the client. Kept in case a description resource id is
+ * identified later; the lookup itself is correct and tested now.
+ */
+export function getKeyItemDatByName(name: string): DatRow | null {
+  if (!enabled) return null;
+  if (!keyItemDatIndex) keyItemDatIndex = buildNameIndex(getTable('key_items'));
+  return keyItemDatIndex.get(normalizeDatName(name)) ?? null;
 }
