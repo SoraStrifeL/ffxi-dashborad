@@ -43,6 +43,7 @@ export function createDbRouter(pool: Pool): Router {
       const qNumVal = numCol && /^\d+$/.test(qRaw) ? parseInt(qRaw) : null;
       const typeBit = req.query.type ? parseInt(req.query.type as string) : null;
       const rareOnly = req.query.rare === '1';
+      const rareExOnly = req.query.rareex === '1';
       const flagMask = req.query.flagmask ? parseInt(req.query.flagmask as string) : null;
       const flagVal  = req.query.flagval  !== undefined ? parseInt((req.query.flagval as string) || '0') : null;
       const skill = req.query.skill !== undefined && req.query.skill !== '' ? parseInt(req.query.skill as string) : null;
@@ -70,6 +71,7 @@ export function createDbRouter(pool: Pool): Router {
       }
       if (typeBit !== null && !isNaN(typeBit)) { extra.push('AND ib.type=?'); params.push(typeBit); }
       if (rareOnly) extra.push('AND (ib.flags & 0x8000) != 0');
+      if (rareExOnly) extra.push('AND (ib.flags & 0xC000) != 0');
       if (flagMask !== null && !isNaN(flagMask)) {
         extra.push(`AND (ib.flags & ?) = ?`);
         params.push(flagMask, isNaN(flagVal as number) ? flagMask : flagVal);
