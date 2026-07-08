@@ -148,6 +148,9 @@ export function Database() {
   const [zoneFilter, setZoneFilter] = useState('');
   const [regionFilter, setRegionFilter] = useState<string | null>(null);
   const [roleFilter, setRoleFilter] = useState<string | null>(null);
+  const [mobsRegionFilter, setMobsRegionFilter] = useState<string | null>(null);
+  const [mobsEcosystemFilter, setMobsEcosystemFilter] = useState<string | null>(null);
+  const [aggroFilter, setAggroFilter] = useState(false);
   const [jobFilter, setJobFilter] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<number | null>(null);
   const [slotFilter, setSlotFilter] = useState<number | null>(null);
@@ -157,6 +160,7 @@ export function Database() {
   const [zones, setZones] = useState<{ zoneid: number; name: string }[]>([]);
   const [itemTypes, setItemTypes] = useState<{ type: number; cnt: number }[]>([]);
   const [npcRoles, setNpcRoles] = useState<{ role: string; cnt: number }[]>([]);
+  const [mobEcosystems, setMobEcosystems] = useState<{ ecosystem: string; cnt: number }[]>([]);
   const [questLogs, setQuestLogs] = useState<{ logId: number; name: string; total: number }[]>([]);
   const [detailRow, setDetailRow] = useState<Record<string, unknown> | null>(null);
   const [detailData, setDetailData] = useState<Record<string, unknown> | null>(null);
@@ -187,6 +191,7 @@ export function Database() {
   useEffect(() => { api.zones().then(z => setZones(z)).catch(() => {}); }, []);
   useEffect(() => { api.dbItemTypes().then(setItemTypes).catch(() => {}); }, []);
   useEffect(() => { api.dbNpcRoles().then(setNpcRoles).catch(() => {}); }, []);
+  useEffect(() => { api.dbMobEcosystems().then(setMobEcosystems).catch(() => {}); }, []);
   useEffect(() => { api.dbQuestLogs().then(setQuestLogs).catch(() => {}); }, []);
   useEffect(() => { api.datStatus().then(s => setDatEnabled(s.enabled)).catch(() => setDatEnabled(false)); }, []);
   useEffect(() => {
@@ -208,6 +213,9 @@ export function Database() {
     if (cat === 'items' && rareExFilter) params.rareex = 1;
     if (cat === 'npcs' && regionFilter) params.region = regionFilter;
     if (cat === 'npcs' && roleFilter) params.role = roleFilter;
+    if (cat === 'mobs' && mobsRegionFilter) params.region = mobsRegionFilter;
+    if (cat === 'mobs' && mobsEcosystemFilter) params.ecosystem = mobsEcosystemFilter;
+    if (cat === 'mobs' && aggroFilter) params.aggro = 1;
     if (cat === 'quests' && questLogFilter !== null) params.log = questLogFilter;
     try {
       // All server DB endpoints return plain arrays (not { rows, hasMore }).
@@ -250,9 +258,9 @@ export function Database() {
       }
     } catch (_) {}
     if (seq === loadSeq.current) setLoading(false);
-  }, [cat, page, search, zoneFilter, regionFilter, roleFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
+  }, [cat, page, search, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
 
-  useEffect(() => { load(true); }, [cat, zoneFilter, regionFilter, roleFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(true); }, [cat, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); load(true); };
 
@@ -423,7 +431,7 @@ export function Database() {
   }
 
   function selectCat(key: Category) {
-    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setRegionFilter(null); setRoleFilter(null); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
+    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setRegionFilter(null); setRoleFilter(null); setMobsRegionFilter(null); setMobsEcosystemFilter(null); setAggroFilter(false); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
   }
 
   function selectTypeFilter(v: number | null) {
@@ -461,6 +469,7 @@ export function Database() {
             </select>
           )}
           {cat === 'items' && chipBtn('Rare/Ex', 1, rareExFilter ? 1 : null, (v) => setRareExFilter(v === 1))}
+          {cat === 'mobs' && chipBtn('Aggro only', 1, aggroFilter ? 1 : null, (v) => setAggroFilter(v === 1))}
           <span style={{ fontSize: 11, color: 'var(--color-text3)' }}>{rows.length} rows</span>
         </div>
         {hasJobFilter && (
@@ -496,13 +505,25 @@ export function Database() {
         {cat === 'npcs' && (
           <div style={{ padding: '6px 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {chipBtnStr('All regions', null, regionFilter, setRegionFilter)}
-            {NPC_REGIONS.map(r => chipBtnStr(r.label, r.key, regionFilter, setRegionFilter))}
+            {REGIONS.map(r => chipBtnStr(r.label, r.key, regionFilter, setRegionFilter))}
           </div>
         )}
         {cat === 'npcs' && npcRoles.some(r => r.cnt > 0) && (
           <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {chipBtnStr('All roles', null, roleFilter, setRoleFilter)}
             {npcRoles.filter(r => r.cnt > 0).map(r => chipBtnStr(NPC_ROLE_LABELS[r.role] ?? r.role, r.role, roleFilter, setRoleFilter))}
+          </div>
+        )}
+        {cat === 'mobs' && (
+          <div style={{ padding: '6px 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {chipBtnStr('All regions', null, mobsRegionFilter, setMobsRegionFilter)}
+            {REGIONS.map(r => chipBtnStr(r.label, r.key, mobsRegionFilter, setMobsRegionFilter))}
+          </div>
+        )}
+        {cat === 'mobs' && mobEcosystems.length > 0 && (
+          <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {chipBtnStr('All', null, mobsEcosystemFilter, setMobsEcosystemFilter)}
+            {mobEcosystems.map(e => chipBtnStr(e.ecosystem, e.ecosystem, mobsEcosystemFilter, setMobsEcosystemFilter))}
           </div>
         )}
         </div>
@@ -644,9 +665,9 @@ const WEAPON_SKILL_NAMES: Record<number, string> = {
 };
 
 // Matches src/catalog.ts's NPC_REGION_SQL keys exactly — six geographic
-// regions the backend already filters NPCs/Mobs by (?region=), just never
-// wired up in the client until now.
-const NPC_REGIONS: { key: string; label: string }[] = [
+// regions the backend filters NPCs and Mobs by (?region=). Not
+// NPC-specific despite the original name — both categories reuse this.
+const REGIONS: { key: string; label: string }[] = [
   { key: 'san_doria', label: "San d'Oria" },
   { key: 'bastok', label: 'Bastok' },
   { key: 'windurst', label: 'Windurst' },

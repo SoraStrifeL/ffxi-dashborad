@@ -214,6 +214,7 @@ export const api = {
 
   dbItemTypes: () => req<{ type: number; cnt: number }[]>('/api/db/item-types'),
   dbNpcRoles: () => req<{ role: string; cnt: number }[]>('/api/db/npc-roles'),
+  dbMobEcosystems: () => req<{ ecosystem: string; cnt: number }[]>('/api/db/mob-ecosystems'),
   dbQuestLogs: () => req<{ logId: number; name: string; total: number; scripted: number }[]>('/api/db/quest-logs'),
   dbItemDetail:(id: number) => req<Record<string, unknown>>(`/api/db/items/${id}`),
   dbMobDetail: (name: string, zone: number) => req<Record<string, unknown>>(`/api/db/mobs/detail?name=${encodeURIComponent(name)}&zone=${zone}`),
