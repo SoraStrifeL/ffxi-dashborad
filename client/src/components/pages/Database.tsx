@@ -208,7 +208,7 @@ export function Database() {
     if (sortKey && !NON_PAGED.includes(cat)) { params.sort = sortKey; params.dir = sortDir; }
     if (cat === 'abilities' && jobFilter !== null) params.job = jobFilter;
     if (cat === 'items' && typeFilter !== null) params.type = typeFilter;
-    if (cat === 'items' && typeFilter === 6 && slotFilter !== null) params.slot = slotFilter;
+    if (cat === 'items' && (typeFilter === 6 || typeFilter === 7) && slotFilter !== null) params.slot = slotFilter;
     if (cat === 'items' && typeFilter === 7 && skillFilter !== null) params.skill = skillFilter;
     if (cat === 'items' && rareExFilter) params.rareex = 1;
     if (cat === 'npcs' && regionFilter) params.region = regionFilter;
@@ -484,7 +484,7 @@ export function Database() {
             {itemTypes.map(t => chipBtn(ITEM_TYPE[t.type] ?? `Type ${t.type}`, t.type, typeFilter, selectTypeFilter))}
           </div>
         )}
-        {hasTypeFilter && typeFilter === 6 && (
+        {hasTypeFilter && (typeFilter === 6 || typeFilter === 7) && (
           <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {chipBtn('All', null, slotFilter, setSlotFilter)}
             {SLOT_NAMES.map((name, i) => chipBtn(name, 1 << i, slotFilter, setSlotFilter))}
