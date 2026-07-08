@@ -85,6 +85,9 @@ export const api = {
   datDialog: (zone: number, q = '', page = 0) =>
     req<{ zoneId: number; total: number; page: number; hasMore: boolean; rows: { id: number; text: string }[] }>(
       `/api/dat/dialog/${zone}?q=${encodeURIComponent(q)}&page=${page}`),
+  datEnrich: (cat: string, key: string | number) =>
+    req<{ name: string; description: string; datId: number } | null>(
+      `/api/dat/enrich/${cat}/${encodeURIComponent(String(key))}`),
 
   me: () => req<{ login: string; tier: 'admin' | 'player'; accid: number }>('/api/me'),
   mePermissions: () => req<{ login: string; tier: string; permissions: string[] }>('/api/me/permissions'),
@@ -215,9 +218,16 @@ export const api = {
   dbMobDetail: (name: string, zone: number) => req<Record<string, unknown>>(`/api/db/mobs/detail?name=${encodeURIComponent(name)}&zone=${zone}`),
 
   // Wiki lookups per DB category
-  dbItemWiki:  (id: number) => req<{ description?: string; wikiUrl?: string; notFound?: boolean }>(`/api/db/items/wiki?id=${id}`),
+  // NOTE: /api/db/items/wiki (src/routes/db.ts) reads req.query.name, but
+  // this helper used to send ?id= — meaning the Items "Wiki" fetch has
+  // always silently returned null. Fixed here to send the item's internal
+  // `name` field (e.g. "bronze_subligar"), same convention as every other
+  // dbXWiki helper below.
+  dbItemWiki:  (name: string) => req<{ description?: string | null; flags?: string | null; ahCategory?: string | null; itemType?: string | null; wikiUrl?: string; cachedAt?: number } | null>(`/api/db/items/wiki?name=${encodeURIComponent(name)}`),
   dbNpcWiki:   (name: string) => req<{ description?: string; quests?: string[]; wikiUrl?: string; notFound?: boolean }>(`/api/db/npcs/wiki?name=${encodeURIComponent(name)}`),
   dbQuestWiki: (name: string) => req<{ description?: string; startNpc?: string; repeatable?: boolean; wikiUrl?: string; notFound?: boolean }>(`/api/db/quests/wiki?name=${encodeURIComponent(name)}`),
+  dbAbilityWiki: (name: string) => req<{ description?: string | null; wikiUrl?: string; notFound?: boolean } | null>(`/api/db/abilities/wiki?name=${encodeURIComponent(name)}`),
+  dbKeyItemWiki: (name: string) => req<{ description?: string | null; wikiUrl?: string; notFound?: boolean } | null>(`/api/db/keyitems/wiki?name=${encodeURIComponent(name)}`),
   dbQuestWalkthrough: (name: string) => req<{ steps: string[]; logId: number | null; questId: number | null }>(`/api/db/quests/walkthrough?name=${encodeURIComponent(name)}`),
   dbZoneWiki:  (name: string) => req<{ description?: string; wikiUrl?: string; notFound?: boolean }>(`/api/db/zones/wiki?name=${encodeURIComponent(name)}`),
 
