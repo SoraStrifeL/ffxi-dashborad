@@ -6,11 +6,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Docker (preferred):**
 ```bash
-docker compose build                        # rebuild image after code changes
+npm run docker:build                        # rebuild image after code changes (bakes in GIT_COMMIT/BUILD_DATE)
 docker compose up -d --force-recreate       # deploy new image
 docker compose logs -f                      # tail logs
 ```
 Use `docker compose up -d --force-recreate` after every build to swap to the new image.
+
+`npm run docker:build` wraps `docker compose build` with `GIT_COMMIT`/`BUILD_DATE`
+computed from the current git state, so `/api/version` (shown in the sidebar
+footer) reports a real commit instead of `unknown`. `.git` is excluded from the
+Docker build context (`.dockerignore`), so these can't be computed inside the
+Dockerfile itself — they must be passed in as build args from outside. Plain
+`docker compose build` still works but leaves the version footer showing
+`unknown` — always prefer `npm run docker:build`.
 
 **Bare-metal (non-Docker) — Linux/macOS/Windows:**
 Runs the **same `src/` code as Docker** — build once, then run the compiled output.

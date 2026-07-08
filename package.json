@@ -7,6 +7,7 @@
     "build": "tsc",
     "build:client": "npm run build --prefix client",
     "build:all": "tsc && npm run build --prefix client",
+    "docker:build": "GIT_COMMIT=$(git rev-parse HEAD) BUILD_DATE=$(date -u +%FT%TZ) docker compose build",
     "start": "node dist/server.js",
     "serve": "npm run build:all && node dist/server.js",
     "dev": "npx ts-node src/server.ts",
