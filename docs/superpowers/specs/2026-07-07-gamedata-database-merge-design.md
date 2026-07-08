@@ -76,33 +76,54 @@ the enrichment mechanism:
 ## Enriching overlapping categories
 
 Row lists for Items, Abilities, Quests, and Key Items are unchanged (same
-DB endpoints as today). The detail panel gains a DAT-sourced section,
-fetched as part of `openDetail()` in parallel with the existing detail
-call — not gated behind a manual button, since these are local file reads
-with no network round-trip (unlike the Wiki button, which stays manual).
+DB endpoints as today) — the DB never stores flavor-text descriptions for
+these, only mechanical stats/ids, so description text always has to come
+from somewhere else. The detail panel auto-chains through the available
+sources and labels which one it used:
+
+1. **DAT first** (instant, local, no network) — fetched as part of
+   `openDetail()` in parallel with the existing detail call.
+2. **BG-Wiki second**, automatically, only when DAT had no match —
+   reusing the existing scrape-and-cache pattern already used for
+   items/npcs/mobs/quests/zones. The manual "Wiki" button is **removed**
+   for these four categories, since the fallback is now automatic; it's
+   unaffected for npcs/mobs/zones, which have no DAT layer to chain from
+   and keep today's manual click.
+3. **Neither** — show an explicit note: *"No description available — not
+   on this server's DAT or BG-Wiki."* (replaces today's silent omission).
+
+Whichever source supplied the text gets a small caption underneath it:
+*"From client DAT"* or *"From BG-Wiki"* — same visual treatment as the
+"From the quest script" label already shipped for GameData's quest
+walkthroughs.
 
 - **Items**: new `getItemDatById(id)` in `src/dat/index.ts`, backed by a
   `Map<id, DatRow>` built once across `DAT_ITEM_CATEGORIES`. Detail panel
   shows the DAT icon (`/api/dat/icon/:id`, already exists) beside the
-  name and the flavor-text description below the stats block. A custom
-  uploaded image (existing feature) takes priority over the DAT icon when
-  both exist.
-- **Abilities** / **Key Items**: no shared id space, so enrichment is
+  name regardless of which description source is used. A custom uploaded
+  image (existing feature) takes priority over the DAT icon when both
+  exist. Description falls back to the existing `/api/db/items/wiki`.
+- **Abilities** / **Key Items**: no shared id space, so DAT enrichment is
   name-matched via two new normalized-name indexes built once at startup
   — `ABILITY_NAME_INDEX` and `KEY_ITEM_DAT_INDEX` (same normalization
-  helper pattern as the quest-name matching this replaces). Detail panel
-  shows the DAT flavor-text description when a match exists; silently
-  omitted when it doesn't, same convention as any other optional
-  `description` field today.
-- **Quests**: no new fetch. `reward.walkthrough` is already returned
-  inline by `/api/db/quests` (added last session). `DetailView`'s quests
-  case renders it as a numbered list when present. Existing Wiki/Script
-  buttons remain as manual fallbacks.
+  helper pattern as the quest-name matching this replaces). Neither
+  category has a Wiki lookup today; two new routes are added following
+  the existing scrape pattern — `/api/db/abilities/wiki?name=` and
+  `/api/db/keyitems/wiki?name=` — solely to complete the fallback chain.
+- **Quests**: DAT step is `reward.walkthrough`, already returned inline
+  by `/api/db/quests` (added last session) — no fetch needed for it.
+  Falls back to the existing `/api/db/quests/wiki` automatically when
+  `reward.walkthrough` is empty. The manual "Wiki" button is removed for
+  quests; the "Script" button (full Lua source dump) is unrelated to the
+  description chain and stays manual.
 
-One backend route covers items/abilities/key-items enrichment:
+One backend route covers items/abilities/key-items DAT enrichment:
 `GET /api/dat/enrich/:cat/:key` (e.g. `/api/dat/enrich/items/12832`,
 `/api/dat/enrich/abilities/Provoke`) → `{ name, description, hasIcon } |
-null`, instead of three near-identical routes.
+null`, instead of three near-identical routes. Wiki fallback continues to
+use the existing per-category `/api/db/<cat>/wiki` convention (two new
+routes for abilities/key-items as noted above, matching the shape of the
+four that already exist).
 
 ## Client Reference categories (DAT-only, ported unchanged)
 
@@ -140,14 +161,23 @@ chip filter) is gone — kept only if something else still needs it.
 
 ## Error handling
 
-- `/api/dat/enrich/:cat/:key` returns `null` on no match — never a loud
-  "not found," matching the existing silent-omit convention for optional
-  fields.
+- `/api/dat/enrich/:cat/:key` returns `null` on no match. `/api/db/<cat>/
+  wiki` returns `notFound`/`null` on no match (existing convention,
+  unchanged). Neither is a thrown error — both are expected, silent
+  outcomes that the client's fallback chain checks in sequence.
+- The client only shows the *"No description available — not on this
+  server's DAT or BG-Wiki"* note once both steps of the chain have
+  resolved (DAT checked synchronously, then Wiki fetched and resolved) —
+  never while the Wiki fetch is still in flight, to avoid a flash of
+  "not available" before the real answer arrives. A brief loading state
+  covers that gap, matching the existing "Loading…" pattern GameData used
+  for its quest-walkthrough fetch.
 - If the client DAT isn't mounted (bare-metal without `DAT_DIR`, per
   CLAUDE.md's graceful-degradation pattern), the entire "Client Reference"
-  sidebar group disappears and all enrichment fetches no-op — mirrors
+  sidebar group disappears, the DAT step of every fallback chain no-ops
+  straight to Wiki, and enrichment icons simply don't render — mirrors
   GameData's existing `enabled === false` gate. Nothing breaks; the
-  Database tab just looks like it does pre-merge.
+  Database tab just looks like it does pre-merge, minus DAT-sourced icons.
 
 ## Testing
 
@@ -158,8 +188,11 @@ chip filter) is gone — kept only if something else still needs it.
   the riskiest new logic and the id-space verification above was a
   spot-check, not exhaustive.
 - Manual/Playwright verification after implementation: Items detail shows
-  DAT icon + flavor text, Abilities/Key Items detail shows flavor text
-  when matched, Quests detail shows the walkthrough list inline, Client
-  Reference categories (especially Dialog's zone selector) work inside
-  the new shell, and the DAT-disabled case still renders cleanly with no
-  Client Reference group and no broken enrichment calls.
+  DAT icon + flavor text with a "From client DAT" caption; an item/
+  ability/key-item with no DAT match but a real Wiki page shows text
+  labeled "From BG-Wiki" instead; one with neither shows the explicit
+  no-description note; Quests detail shows the walkthrough list inline
+  (or falls back to Wiki the same way); Client Reference categories
+  (especially Dialog's zone selector) work inside the new shell; and the
+  DAT-disabled case still renders cleanly with no Client Reference group,
+  no broken enrichment calls, and every fallback chain landing on Wiki.
