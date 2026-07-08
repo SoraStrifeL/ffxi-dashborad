@@ -303,7 +303,24 @@ export function Database() {
         setDetailData(row);
         fetchNameMatchedEnrichment('key_items', String(row.name ?? ''), api.dbKeyItemWiki);
       }
-      else if (cat === 'npcs' || cat === 'zones' || cat === 'quests' || cat === 'trusts' || cat === 'mounts' || cat === 'gmcmds' || DAT_TABLE_CATS.has(cat)) setDetailData(row);
+      else if (cat === 'quests') {
+        setDetailData(row);
+        const steps = ((row.reward as Record<string, unknown> | null)?.walkthrough as string[] | undefined) || [];
+        if (steps.length) {
+          setEnrichment({ loading: false, source: 'script', text: steps.map((s, i) => `${i + 1}. ${s}`).join('\n') });
+        } else {
+          setEnrichment({ loading: true, source: null, text: null });
+          try {
+            const wiki = await api.dbQuestWiki(String(row.name ?? ''));
+            setEnrichment(wiki?.description
+              ? { loading: false, source: 'wiki', text: wiki.description, wikiUrl: wiki.wikiUrl }
+              : { loading: false, source: 'none', text: null });
+          } catch (_) {
+            setEnrichment({ loading: false, source: 'none', text: null });
+          }
+        }
+      }
+      else if (cat === 'npcs' || cat === 'zones' || cat === 'trusts' || cat === 'mounts' || cat === 'gmcmds' || DAT_TABLE_CATS.has(cat)) setDetailData(row);
     } catch (_) {}
     setDetailLoading(false);
   }
@@ -804,6 +821,7 @@ function DetailView({ data, cat, itemImageUrl, enrichment }: { data: Record<stri
   if (cat === 'quests') {
     return (
       <div>
+        <EnrichedDescription enrichment={enrichment} idMismatchCaveat={null} />
         {data.questId  != null && <DRow k="Quest ID" v={String(data.questId)} />}
         {data.logName  != null && <DRow k="Area" v={String(data.logName)} />}
         {data.logId    != null && <DRow k="Log ID" v={String(data.logId)} />}
