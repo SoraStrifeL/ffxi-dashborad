@@ -10,6 +10,7 @@ import {
   KEY_ITEM_NAMES,
 } from '../catalog';
 import { cacheGetJSON, cacheSetJSON, WIKI_TTL, ITEM_TYPES_TTL } from '../cache';
+import { resolveNpcDialog } from '../npc-dialog';
 
 export function createDbRouter(pool: Pool): Router {
   const router = Router();
@@ -292,6 +293,15 @@ export function createDbRouter(pool: Pool): Router {
       await cacheSetJSON(cacheKey, out, WIKI_TTL);
       res.json(out);
     } catch (e) { res.json({ error: (e as Error).message }); }
+  });
+
+  router.get('/api/db/npcs/dialog', requireAuth, (req, res) => {
+    try {
+      const name = ((req.query.name as string) || '').trim();
+      const zone = ((req.query.zone as string) || '').trim();
+      if (!name || !zone) { res.json({ found: false, lines: [] }); return; }
+      res.json(resolveNpcDialog(zone, name));
+    } catch (e) { res.status(500).json({ error: (e as Error).message }); }
   });
 
   // Shared by the abilities/key-items Wiki routes below: title-cases the
