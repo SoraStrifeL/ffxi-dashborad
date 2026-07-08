@@ -13,7 +13,8 @@ installCrashHandlers();
 import { pool } from './db';
 import { initRedis } from './cache';
 import { initAuthPool } from './auth';
-import { buildZoneMaps, loadMobCatalog, loadNpcCatalog, loadZoneCache, loadExpTable } from './catalog';
+import { buildZoneMaps, loadMobCatalog, loadNpcCatalog, loadZoneCache, loadExpTable, applyNpcRoles } from './catalog';
+import { scanNpcRoles } from './npc-roles';
 import { initWebSocket, startPosWatcher, pollAndBroadcast } from './ws';
 
 import { createAuthRouter }      from './routes/auth';
@@ -134,10 +135,16 @@ const PORT = parseInt(process.env.PORT || '3000');
 startPosWatcher();
 server.listen(PORT, () => console.log(`FFXI Dashboard running on port ${PORT}`));
 
+// NPC role tags are derived from static Lua script files, not the DB, so
+// they're scanned once here rather than on every 5-minute NPC_CATALOG DB
+// refresh below — the script tree doesn't change at runtime.
+const npcRoleMap = scanNpcRoles();
+
 async function loadCatalogs(): Promise<void> {
   await buildZoneMaps(pool);
   await loadExpTable(pool);
   await Promise.all([loadMobCatalog(pool), loadNpcCatalog(pool), loadZoneCache(pool)]);
+  applyNpcRoles(npcRoleMap);
 }
 
 (function loadCatalogsWithRetry() {
@@ -151,4 +158,4 @@ async function loadCatalogs(): Promise<void> {
 
 // Periodic refreshes — guarded so a transient DB outage can't crash the process.
 setInterval(() => loadZoneCache(pool).catch(() => {}), 30_000);
-setInterval(() => { loadMobCatalog(pool).catch(() => {}); loadNpcCatalog(pool).catch(() => {}); }, 5 * 60_000);
+setInterval(() => { loadMobCatalog(pool).catch(() => {}); loadNpcCatalog(pool).then(() => applyNpcRoles(npcRoleMap)).catch(() => {}); }, 5 * 60_000);

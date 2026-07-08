@@ -183,6 +183,18 @@ export async function loadNpcCatalog(pool: Pool): Promise<void> {
   } catch (e) { console.error('[catalog] NPC load error:', (e as Error).message); }
 }
 
+/** Attaches each NPC's inferred role tags onto the in-memory NPC_CATALOG
+ *  rows, from a role map computed once at startup by npc-roles.ts's
+ *  scanNpcRoles() (passed in by the caller, src/server.ts). Runs after
+ *  every loadNpcCatalog() refresh so DB-driven catalog reloads don't wipe
+ *  the role field — but this function itself never re-scans the script
+ *  tree, since Lua files on disk don't change at runtime. */
+export function applyNpcRoles(roleMap: Map<string, string[]>): void {
+  for (const row of NPC_CATALOG) {
+    row.role = roleMap.get(`${row.zone}::${row.name}`) || [];
+  }
+}
+
 export async function loadZoneCache(pool: Pool): Promise<void> {
   try {
     const [rows] = await pool.execute<RowDataPacket[]>(`

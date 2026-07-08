@@ -201,15 +201,27 @@ export function createDbRouter(pool: Pool): Router {
     const q      = ((req.query.q as string) || '').trim().toLowerCase();
     const zone   = ((req.query.zone as string) || '').trim().toLowerCase();
     const region = (req.query.region as string) || null;
+    const role   = (req.query.role as string) || null;
     const sort   = (req.query.sort as string) || '';
     const page   = Math.max(0, parseInt((req.query.page as string) || '0'));
     let rows = NPC_CATALOG;
     if (q)      rows = rows.filter(r => (r.name as string).toLowerCase().includes(q));
     if (zone)   rows = rows.filter(r => r.zone && (r.zone as string).toLowerCase().includes(zone));
     if (region) rows = rows.filter(r => _mobRegionMatch((r.zone as string) || '', region));
+    if (role)   rows = rows.filter(r => ((r.role as string[]) || []).includes(role));
     const NPC_SORT = new Set(['npcid', 'name', 'zone', 'x', 'z']);
     if (NPC_SORT.has(sort)) rows = [...rows].sort(cmpBy(sort, sortDir(req)));
     res.json(rows.slice(page * DB_PAGE, page * DB_PAGE + DB_PAGE).map(r => ({ ...r, _total: undefined })));
+  });
+
+  router.get('/api/db/npc-roles', requireAuth, (_req, res) => {
+    const counts: Record<string, number> = { shop: 0, quest: 0, mission: 0, homepoint: 0 };
+    for (const row of NPC_CATALOG) {
+      for (const role of (row.role as string[]) || []) {
+        if (role in counts) counts[role]++;
+      }
+    }
+    res.json(Object.entries(counts).map(([role, cnt]) => ({ role, cnt })));
   });
 
   router.get('/api/db/mobs', requireAuth, (req, res) => {
