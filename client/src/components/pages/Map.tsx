@@ -718,7 +718,13 @@ export function MapPage() {
       }
       prevMobNamesRef.current = new Map(updatedMobs.map((m) => [m.mobid, m.name]));
       prevMobIdsRef.current   = new Set(prevMobNamesRef.current.keys());
-      drawEntities(updatedMobs, dbNpcs, layers, detectFilter);
+
+      const liveNpcs = (pos.npcs ?? []).filter((n) => n.z_id === zone && (n.x !== 0 || n.z !== 0));
+      const updatedNpcs: NpcEntry[] = liveNpcs.map((n) => ({
+        npcid: n.i, name: n.n, pos_x: n.x, pos_y: n.y, pos_z: n.z,
+      }));
+
+      drawEntities(updatedMobs, updatedNpcs, layers, detectFilter);
     }
   }, [zone, dbNpcs, layers, detectFilter, watchList, evtDefs]); // eslint-disable-line react-hooks/exhaustive-deps
 
