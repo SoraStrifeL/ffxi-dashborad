@@ -146,6 +146,8 @@ export function Database() {
   const [sortKey, setSortKey] = useState('');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [zoneFilter, setZoneFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState<string | null>(null);
+  const [roleFilter, setRoleFilter] = useState<string | null>(null);
   const [jobFilter, setJobFilter] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<number | null>(null);
   const [slotFilter, setSlotFilter] = useState<number | null>(null);
@@ -154,6 +156,7 @@ export function Database() {
   const [questLogFilter, setQuestLogFilter] = useState<number | null>(null);
   const [zones, setZones] = useState<{ zoneid: number; name: string }[]>([]);
   const [itemTypes, setItemTypes] = useState<{ type: number; cnt: number }[]>([]);
+  const [npcRoles, setNpcRoles] = useState<{ role: string; cnt: number }[]>([]);
   const [questLogs, setQuestLogs] = useState<{ logId: number; name: string; total: number }[]>([]);
   const [detailRow, setDetailRow] = useState<Record<string, unknown> | null>(null);
   const [detailData, setDetailData] = useState<Record<string, unknown> | null>(null);
@@ -183,6 +186,7 @@ export function Database() {
 
   useEffect(() => { api.zones().then(z => setZones(z)).catch(() => {}); }, []);
   useEffect(() => { api.dbItemTypes().then(setItemTypes).catch(() => {}); }, []);
+  useEffect(() => { api.dbNpcRoles().then(setNpcRoles).catch(() => {}); }, []);
   useEffect(() => { api.dbQuestLogs().then(setQuestLogs).catch(() => {}); }, []);
   useEffect(() => { api.datStatus().then(s => setDatEnabled(s.enabled)).catch(() => setDatEnabled(false)); }, []);
   useEffect(() => {
@@ -202,6 +206,8 @@ export function Database() {
     if (cat === 'items' && typeFilter === 6 && slotFilter !== null) params.slot = slotFilter;
     if (cat === 'items' && typeFilter === 7 && skillFilter !== null) params.skill = skillFilter;
     if (cat === 'items' && rareExFilter) params.rareex = 1;
+    if (cat === 'npcs' && regionFilter) params.region = regionFilter;
+    if (cat === 'npcs' && roleFilter) params.role = roleFilter;
     if (cat === 'quests' && questLogFilter !== null) params.log = questLogFilter;
     try {
       // All server DB endpoints return plain arrays (not { rows, hasMore }).
@@ -244,9 +250,9 @@ export function Database() {
       }
     } catch (_) {}
     if (seq === loadSeq.current) setLoading(false);
-  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
+  }, [cat, page, search, zoneFilter, regionFilter, roleFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
 
-  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(true); }, [cat, zoneFilter, regionFilter, roleFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); load(true); };
 
@@ -417,7 +423,7 @@ export function Database() {
   }
 
   function selectCat(key: Category) {
-    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
+    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setRegionFilter(null); setRoleFilter(null); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
   }
 
   function selectTypeFilter(v: number | null) {
@@ -485,6 +491,18 @@ export function Database() {
           <div style={{ padding: '6px 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {chipBtn('All', null, questLogFilter, setQuestLogFilter)}
             {questLogs.filter(l => l.total > 0).map(l => chipBtn(l.name, l.logId, questLogFilter, setQuestLogFilter))}
+          </div>
+        )}
+        {cat === 'npcs' && (
+          <div style={{ padding: '6px 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {chipBtnStr('All regions', null, regionFilter, setRegionFilter)}
+            {NPC_REGIONS.map(r => chipBtnStr(r.label, r.key, regionFilter, setRegionFilter))}
+          </div>
+        )}
+        {cat === 'npcs' && npcRoles.some(r => r.cnt > 0) && (
+          <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {chipBtnStr('All roles', null, roleFilter, setRoleFilter)}
+            {npcRoles.filter(r => r.cnt > 0).map(r => chipBtnStr(NPC_ROLE_LABELS[r.role] ?? r.role, r.role, roleFilter, setRoleFilter))}
           </div>
         )}
         </div>
@@ -625,6 +643,23 @@ const WEAPON_SKILL_NAMES: Record<number, string> = {
   12: 'Staff', 13: 'Bow', 14: 'Instrument', 15: 'Ammunition',
 };
 
+// Matches src/catalog.ts's NPC_REGION_SQL keys exactly — six geographic
+// regions the backend already filters NPCs/Mobs by (?region=), just never
+// wired up in the client until now.
+const NPC_REGIONS: { key: string; label: string }[] = [
+  { key: 'san_doria', label: "San d'Oria" },
+  { key: 'bastok', label: 'Bastok' },
+  { key: 'windurst', label: 'Windurst' },
+  { key: 'jeuno', label: 'Jeuno' },
+  { key: 'aht_urhgan', label: 'Aht Urhgan' },
+  { key: 'adoulin', label: 'Adoulin' },
+];
+
+// Matches the role keys src/npc-roles.ts's classifyNpcScript can return.
+const NPC_ROLE_LABELS: Record<string, string> = {
+  shop: 'Shop', quest: 'Quest', mission: 'Mission', homepoint: 'Homepoint',
+};
+
 function renderCatGroup(title: string, cats: CatDef[], current: Category, onSelect: (key: Category) => void) {
   return (
     <div style={{ marginBottom: 14 }}>
@@ -647,6 +682,18 @@ function renderCatGroup(title: string, cats: CatDef[], current: Category, onSele
 }
 
 function chipBtn(label: string, value: number | null, current: number | null, set: (v: number | null) => void) {
+  const active = value === current;
+  return (
+    <button key={String(value)} onClick={() => set(active ? null : value)}
+      style={{ padding: '3px 9px', borderRadius: 20, border: 'none', fontSize: 11, fontWeight: 600, cursor: 'pointer',
+        background: active ? 'var(--color-accent)' : 'var(--color-surface2)',
+        color: active ? '#fff' : 'var(--color-text3)' }}>
+      {label}
+    </button>
+  );
+}
+
+function chipBtnStr(label: string, value: string | null, current: string | null, set: (v: string | null) => void) {
   const active = value === current;
   return (
     <button key={String(value)} onClick={() => set(active ? null : value)}
@@ -835,12 +882,14 @@ function DetailView({ data, cat, itemImageUrl, enrichment, npcDialog }: { data: 
     );
   }
   if (cat === 'npcs') {
+    const roles = Array.isArray(data.role) ? (data.role as string[]) : [];
     return (
       <div>
         {data.npcid != null && <DRow k="NPC ID" v={String(data.npcid)} />}
         {data.zone  != null && <DRow k="Zone" v={fmtName(String(data.zone))} />}
         {data.x     != null && <DRow k="X" v={Number(data.x).toFixed(2)} />}
         {data.z     != null && <DRow k="Z" v={Number(data.z).toFixed(2)} />}
+        {roles.length > 0 && <DRow k="Roles" v={roles.map(r => NPC_ROLE_LABELS[r] ?? r).join(', ')} />}
         <div style={{ marginTop: 10 }}>
           <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.5px', color: 'var(--color-text3)', marginBottom: 4 }}>Dialogue</div>
           {!npcDialog || npcDialog.loading ? (

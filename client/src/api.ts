@@ -213,6 +213,7 @@ export const api = {
   dockerFsBrowse:  (containerId: string, path: string) => req<{ path: string; entries: { name: string; type: string; size?: number }[] }>(`/api/docker/containers/${containerId}/fs/browse?path=${encodeURIComponent(path)}`),
 
   dbItemTypes: () => req<{ type: number; cnt: number }[]>('/api/db/item-types'),
+  dbNpcRoles: () => req<{ role: string; cnt: number }[]>('/api/db/npc-roles'),
   dbQuestLogs: () => req<{ logId: number; name: string; total: number; scripted: number }[]>('/api/db/quest-logs'),
   dbItemDetail:(id: number) => req<Record<string, unknown>>(`/api/db/items/${id}`),
   dbMobDetail: (name: string, zone: number) => req<Record<string, unknown>>(`/api/db/mobs/detail?name=${encodeURIComponent(name)}&zone=${zone}`),
