@@ -162,6 +162,9 @@ export function Database() {
   const user = useStore((s) => s.user);
   const [itemImageUrl, setItemImageUrl] = useState<string | null>(null);
   const [datEnabled, setDatEnabled] = useState(false);
+  const [dzones, setDzones] = useState<{ id: number; name: string }[]>([]);
+  const [dialogZone, setDialogZone] = useState<number | null>(null);
+  const isDialog = cat === 'dialog';
   // Guards against out-of-order responses: a slow request from a previous
   // category/filter must not overwrite the rows of the current one
   const loadSeq = useRef(0);
@@ -170,6 +173,10 @@ export function Database() {
   useEffect(() => { api.dbItemTypes().then(setItemTypes).catch(() => {}); }, []);
   useEffect(() => { api.dbQuestLogs().then(setQuestLogs).catch(() => {}); }, []);
   useEffect(() => { api.datStatus().then(s => setDatEnabled(s.enabled)).catch(() => setDatEnabled(false)); }, []);
+  useEffect(() => {
+    if (!isDialog || dzones.length) return;
+    api.datDialogZones().then(r => { setDzones(r.zones); if (r.zones.length && dialogZone == null) setDialogZone(r.zones[0].id); }).catch(() => {});
+  }, [isDialog, dzones.length, dialogZone]);
 
   const load = useCallback(async (reset = true) => {
     const seq = ++loadSeq.current;
@@ -186,7 +193,15 @@ export function Database() {
       // hasMore is inferred: if the page is full (== DB_PAGE), there may be more.
       let newRows: unknown[] | null = null;
       let datHasMore: boolean | null = null; // DAT_TABLE_CATS report hasMore directly, unlike DB_PAGE inference below
-      if (DAT_TABLE_CATS.has(cat)) {
+      if (isDialog) {
+        if (dialogZone == null) { newRows = []; datHasMore = false; }
+        else {
+          const r = await api.datDialog(dialogZone, search, p);
+          newRows = r.rows.map(x => ({ id: x.id, name: x.text }));
+          datHasMore = r.hasMore;
+        }
+      }
+      else if (DAT_TABLE_CATS.has(cat)) {
         const r = await api.datTable(cat, search, p);
         newRows = r.rows;
         datHasMore = r.hasMore;
@@ -214,9 +229,9 @@ export function Database() {
       }
     } catch (_) {}
     if (seq === loadSeq.current) setLoading(false);
-  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir]);
+  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir, dialogZone]);
 
-  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); load(true); };
 
@@ -338,6 +353,12 @@ export function Database() {
               style={{ background: 'var(--color-surface2)', border: '1px solid var(--color-border)', color: 'var(--color-text1)', padding: '7px 9px', borderRadius: 7, fontSize: 12 }}>
               <option value="">All zones</option>
               {zones.map((z) => <option key={z.zoneid} value={z.name}>{z.name}</option>)}
+            </select>
+          )}
+          {isDialog && (
+            <select value={dialogZone ?? ''} onChange={(e) => setDialogZone(Number(e.target.value))}
+              style={{ background: 'var(--color-surface2)', border: '1px solid var(--color-border)', color: 'var(--color-text1)', padding: '7px 9px', borderRadius: 7, fontSize: 12 }}>
+              {dzones.map((z) => <option key={z.id} value={z.id}>{z.name.replace(/_/g, ' ')}</option>)}
             </select>
           )}
           <span style={{ fontSize: 11, color: 'var(--color-text3)' }}>{rows.length} rows</span>
@@ -779,6 +800,8 @@ function getColumns(cat: Category): ColDef[] {
     case 'gmcmds':   return [{ key: 'name', label: 'Command', color: 'var(--color-accent)' }, { key: 'group', label: 'Category', color: 'var(--color-text3)' }, { key: 'desc', label: 'Description', color: 'var(--color-text2)' }];
     case 'spells': case 'statuses': case 'titles': case 'monster_skills': case 'emotes': case 'augments':
       return [{ key: 'id', label: 'ID', color: 'var(--color-text3)' }, { key: 'name', label: 'Name', color: 'var(--color-text1)' }, { key: 'description', label: 'Description', color: 'var(--color-text2)' }];
+    case 'dialog':
+      return [{ key: 'id', label: 'ID', color: 'var(--color-text3)' }, { key: 'name', label: 'Text', color: 'var(--color-text2)' }];
     default: return [];
   }
 }
