@@ -95,7 +95,12 @@ sources and labels which one it used:
 Whichever source supplied the text gets a small caption underneath it:
 *"From client DAT"* or *"From BG-Wiki"* — same visual treatment as the
 "From the quest script" label already shipped for GameData's quest
-walkthroughs.
+walkthroughs. For the two name-matched categories (Abilities, Key Items),
+the DAT match is a different id on each side by construction (see
+"Verified facts" above) — the caption appends that caveat inline, e.g.
+*"From client DAT (id 547, matched by name — server id is 35)"*, so the
+id mismatch is visible right where the text is instead of a separate
+warning block. Items, which match by id exactly, never show this caveat.
 
 - **Items**: new `getItemDatById(id)` in `src/dat/index.ts`, backed by a
   `Map<id, DatRow>` built once across `DAT_ITEM_CATEGORIES`. Detail panel
@@ -188,9 +193,11 @@ chip filter) is gone — kept only if something else still needs it.
   the riskiest new logic and the id-space verification above was a
   spot-check, not exhaustive.
 - Manual/Playwright verification after implementation: Items detail shows
-  DAT icon + flavor text with a "From client DAT" caption; an item/
-  ability/key-item with no DAT match but a real Wiki page shows text
-  labeled "From BG-Wiki" instead; one with neither shows the explicit
+  DAT icon + flavor text with a "From client DAT" caption; an Ability or
+  Key Item with a DAT name-match shows the caption with its id-mismatch
+  caveat (e.g. Provoke: server id 35 vs. DAT id 547); an item/ability/
+  key-item with no DAT match but a real Wiki page shows text labeled
+  "From BG-Wiki" instead; one with neither shows the explicit
   no-description note; Quests detail shows the walkthrough list inline
   (or falls back to Wiki the same way); Client Reference categories
   (especially Dialog's zone selector) work inside the new shell; and the
