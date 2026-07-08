@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { requireAuth } from '../auth';
 import { requirePermission } from '../rbac';
-import { datEnabled, getStrings, stringResourceKeys, getTable, categoryKeys, getItemIcon, getStatusIcon, getDialog, dialogZones } from '../dat';
+import { datEnabled, getStrings, stringResourceKeys, getTable, categoryKeys, getItemIcon, getStatusIcon, getDialog, dialogZones, getItemDatById, getAbilityDatByName, getKeyItemDatByName } from '../dat';
 
 export function createDatRouter(): Router {
   const router = Router();
@@ -9,6 +9,32 @@ export function createDatRouter(): Router {
   // Feature status + available string resources / categories.
   router.get('/api/dat/status', requireAuth, (_req, res) => {
     res.json({ enabled: datEnabled(), resources: stringResourceKeys(), categories: categoryKeys() });
+  });
+
+  // Cross-source enrichment: DAT icon/flavor text for a DB row. `key` is an
+  // id for items (DB item_basic.itemid == DAT item id) or a name for
+  // abilities/key items (those don't share an id space with the DB — see
+  // src/dat/index.ts). Returns null on no match; never a loud 404, since
+  // "no DAT match" is an expected, common outcome the client falls back
+  // from (see docs/superpowers/specs/2026-07-07-gamedata-database-merge-design.md).
+  router.get('/api/dat/enrich/:cat/:key', requireAuth, requirePermission('view:db'), (req, res) => {
+    if (!datEnabled()) { res.json(null); return; }
+    const cat = String(req.params.cat);
+    const key = String(req.params.key);
+    let row: { id: number; name: string; description?: string } | null = null;
+    if (cat === 'items') {
+      const id = parseInt(key);
+      row = Number.isFinite(id) ? getItemDatById(id) : null;
+    } else if (cat === 'abilities') {
+      row = getAbilityDatByName(key);
+    } else if (cat === 'key_items') {
+      row = getKeyItemDatByName(key);
+    } else {
+      res.status(404).json({ error: 'unknown enrichment category' });
+      return;
+    }
+    if (!row || !row.description) { res.json(null); return; }
+    res.json({ name: row.name, description: row.description, datId: row.id });
   });
 
   // Joined id/name/description table for a display category (paginated + search).

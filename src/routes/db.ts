@@ -3,7 +3,7 @@ import { Pool, RowDataPacket } from 'mysql2/promise';
 import { requireAuth } from '../auth';
 import {
   MOB_CATALOG, NPC_CATALOG, DB_PAGE,
-  QUEST_CATALOG, QUEST_REWARDS, QUEST_LOG_NAMES, QUEST_NAME_INDEX,
+  QUEST_CATALOG, QUEST_REWARDS, QUEST_LOG_NAMES,
   QUEST_SETTINGS,
   ROE_RECORDS,
   _mobRegionMatch,
@@ -292,6 +292,48 @@ export function createDbRouter(pool: Pool): Router {
     } catch (e) { res.json({ error: (e as Error).message }); }
   });
 
+  // Shared by the abilities/key-items Wiki routes below: title-cases the
+  // name into a BG-Wiki slug and pulls the first substantial <p> as the
+  // description — same pattern already used by /api/db/zones/wiki
+  // (src/routes/zones.ts), just factored out since two new routes need it.
+  async function fetchSimpleWikiDescription(rawName: string, cachePrefix: string) {
+    const cacheKey = cachePrefix + rawName.toLowerCase();
+    const cached = await cacheGetJSON(cacheKey);
+    if (cached) return cached;
+    try {
+      const wikiName = rawName.split(/[\s_]+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join('_');
+      const url = `https://www.bg-wiki.com/ffxi/${encodeURIComponent(wikiName)}`;
+      const resp = await fetch(url, { headers: { 'User-Agent': 'FFXI-Dashboard/1.0' }, signal: AbortSignal.timeout(7000) });
+      if (!resp.ok) {
+        const out = { description: null, wikiUrl: url, notFound: true };
+        await cacheSetJSON(cacheKey, out, WIKI_TTL);
+        return out;
+      }
+      const html = await resp.text();
+      const strip = (s: string) => s.replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&apos;|&#039;/g, "'").replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/\s+/g, ' ').trim();
+      let description: string | null = null;
+      for (const [, p] of html.matchAll(/<p>([\s\S]*?)<\/p>/g)) {
+        const t = strip(p);
+        if (t.length > 20) { description = t; break; }
+      }
+      const out = { description, wikiUrl: url, notFound: !description, cachedAt: Date.now() };
+      await cacheSetJSON(cacheKey, out, WIKI_TTL);
+      return out;
+    } catch (e) { void e; return null; }
+  }
+
+  router.get('/api/db/abilities/wiki', requireAuth, async (req, res) => {
+    const rawName = ((req.query.name as string) || '').trim();
+    if (!rawName) { res.json(null); return; }
+    res.json(await fetchSimpleWikiDescription(rawName, 'wiki:ability:'));
+  });
+
+  router.get('/api/db/keyitems/wiki', requireAuth, async (req, res) => {
+    const rawName = ((req.query.name as string) || '').trim();
+    if (!rawName) { res.json(null); return; }
+    res.json(await fetchSimpleWikiDescription(rawName, 'wiki:keyitem:'));
+  });
+
   router.get('/api/db/quest-logs', requireAuth, (_req, res) => {
     const counts = [];
     for (let i = 0; i < 11; i++) {
@@ -300,18 +342,6 @@ export function createDbRouter(pool: Pool): Router {
       counts.push({ logId: i, name: QUEST_LOG_NAMES[i], total, scripted });
     }
     res.json(counts);
-  });
-
-  // Local walkthrough steps parsed from the LSB quest scripts (see
-  // _extractWalkthrough in catalog.ts) — checked before falling back to the
-  // BG-Wiki fetch, since it's instant and needs no network round-trip.
-  router.get('/api/db/quests/walkthrough', requireAuth, (req, res) => {
-    const questName = ((req.query.name as string) || '').trim();
-    const norm = questName.toLowerCase().replace(/[^a-z0-9]/g, '');
-    const loc = norm ? QUEST_NAME_INDEX[norm] : undefined;
-    const reward = loc ? QUEST_REWARDS[loc.logId]?.[loc.questId] : null;
-    const steps = (reward?.walkthrough as string[] | undefined) || [];
-    res.json({ steps, logId: loc?.logId ?? null, questId: loc?.questId ?? null, reward: reward || null });
   });
 
   router.get('/api/db/quests/wiki', requireAuth, async (req, res) => {

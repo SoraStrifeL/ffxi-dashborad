@@ -562,20 +562,6 @@ export function buildQuestCatalog(): QuestCatalogWithMeta {
 export const QUEST_CATALOG = buildQuestCatalog();
 export const QUEST_CONST_TO_ID = QUEST_CATALOG._constToId;
 
-// name → {logId, questId}, keyed by the same normalization quest-names.ts
-// uses for its client-title dictionary, so a DAT-sourced quest title (Game
-// Data tab) can be matched back to its LSB script for walkthrough/reward text.
-const _normQuestName = (s: string): string => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-export const QUEST_NAME_INDEX: Record<string, { logId: number; questId: number }> = (() => {
-  const idx: Record<string, { logId: number; questId: number }> = {};
-  for (let logId = 0; logId < QUEST_CATALOG.length; logId++) {
-    for (const [qidStr, name] of Object.entries(QUEST_CATALOG[logId])) {
-      idx[_normQuestName(name as string)] = { logId, questId: parseInt(qidStr) };
-    }
-  }
-  return idx;
-})();
-
 // ── Fame / job lookup tables ───────────────────────────────────────────────────
 export const FAME_AREA_NAMES: Record<number, string> = {
   0: "San d'Oria", 1: 'Bastok', 2: 'Windurst', 3: 'Jeuno', 4: 'Selbina/Rabao',
