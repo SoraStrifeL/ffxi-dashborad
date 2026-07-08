@@ -149,6 +149,7 @@ export function Database() {
   const [typeFilter, setTypeFilter] = useState<number | null>(null);
   const [slotFilter, setSlotFilter] = useState<number | null>(null);
   const [skillFilter, setSkillFilter] = useState<number | null>(null);
+  const [rareExFilter, setRareExFilter] = useState(false);
   const [questLogFilter, setQuestLogFilter] = useState<number | null>(null);
   const [zones, setZones] = useState<{ zoneid: number; name: string }[]>([]);
   const [itemTypes, setItemTypes] = useState<{ type: number; cnt: number }[]>([]);
@@ -198,6 +199,7 @@ export function Database() {
     if (cat === 'items' && typeFilter !== null) params.type = typeFilter;
     if (cat === 'items' && typeFilter === 6 && slotFilter !== null) params.slot = slotFilter;
     if (cat === 'items' && typeFilter === 7 && skillFilter !== null) params.skill = skillFilter;
+    if (cat === 'items' && rareExFilter) params.rareex = 1;
     if (cat === 'quests' && questLogFilter !== null) params.log = questLogFilter;
     try {
       // All server DB endpoints return plain arrays (not { rows, hasMore }).
@@ -240,9 +242,9 @@ export function Database() {
       }
     } catch (_) {}
     if (seq === loadSeq.current) setLoading(false);
-  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, slotFilter, skillFilter, questLogFilter, sortKey, sortDir, dialogZone]);
+  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
 
-  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, slotFilter, skillFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); load(true); };
 
@@ -402,7 +404,7 @@ export function Database() {
   }
 
   function selectCat(key: Category) {
-    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
+    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
   }
 
   function selectTypeFilter(v: number | null) {
@@ -439,6 +441,7 @@ export function Database() {
               {dzones.map((z) => <option key={z.id} value={z.id}>{z.name.replace(/_/g, ' ')}</option>)}
             </select>
           )}
+          {cat === 'items' && chipBtn('Rare/Ex', 1, rareExFilter ? 1 : null, (v) => setRareExFilter(v === 1))}
           <span style={{ fontSize: 11, color: 'var(--color-text3)' }}>{rows.length} rows</span>
         </div>
         {hasJobFilter && (
