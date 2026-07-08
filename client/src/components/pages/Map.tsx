@@ -726,7 +726,7 @@ export function MapPage() {
 
       drawEntities(updatedMobs, updatedNpcs, layers, detectFilter);
     }
-  }, [zone, dbNpcs, layers, detectFilter, watchList, evtDefs]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [zone, layers, detectFilter, watchList, evtDefs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const { send } = useWS(wsHandler);
 
