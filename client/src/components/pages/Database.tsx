@@ -147,6 +147,8 @@ export function Database() {
   const [zoneFilter, setZoneFilter] = useState('');
   const [jobFilter, setJobFilter] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<number | null>(null);
+  const [slotFilter, setSlotFilter] = useState<number | null>(null);
+  const [skillFilter, setSkillFilter] = useState<number | null>(null);
   const [questLogFilter, setQuestLogFilter] = useState<number | null>(null);
   const [zones, setZones] = useState<{ zoneid: number; name: string }[]>([]);
   const [itemTypes, setItemTypes] = useState<{ type: number; cnt: number }[]>([]);
@@ -194,6 +196,8 @@ export function Database() {
     if (sortKey && !NON_PAGED.includes(cat)) { params.sort = sortKey; params.dir = sortDir; }
     if (cat === 'abilities' && jobFilter !== null) params.job = jobFilter;
     if (cat === 'items' && typeFilter !== null) params.type = typeFilter;
+    if (cat === 'items' && typeFilter === 6 && slotFilter !== null) params.slot = slotFilter;
+    if (cat === 'items' && typeFilter === 7 && skillFilter !== null) params.skill = skillFilter;
     if (cat === 'quests' && questLogFilter !== null) params.log = questLogFilter;
     try {
       // All server DB endpoints return plain arrays (not { rows, hasMore }).
@@ -236,9 +240,9 @@ export function Database() {
       }
     } catch (_) {}
     if (seq === loadSeq.current) setLoading(false);
-  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir, dialogZone]);
+  }, [cat, page, search, zoneFilter, jobFilter, typeFilter, slotFilter, skillFilter, questLogFilter, sortKey, sortDir, dialogZone]);
 
-  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(true); }, [cat, zoneFilter, jobFilter, typeFilter, slotFilter, skillFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); load(true); };
 
@@ -398,7 +402,11 @@ export function Database() {
   }
 
   function selectCat(key: Category) {
-    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
+    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
+  }
+
+  function selectTypeFilter(v: number | null) {
+    setTypeFilter(v); setSlotFilter(null); setSkillFilter(null);
   }
 
   return (
@@ -441,8 +449,20 @@ export function Database() {
         )}
         {hasTypeFilter && itemTypes.length > 0 && (
           <div style={{ padding: '6px 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-            {chipBtn('All', null, typeFilter, setTypeFilter)}
-            {itemTypes.map(t => chipBtn(ITEM_TYPE[t.type] ?? `Type ${t.type}`, t.type, typeFilter, setTypeFilter))}
+            {chipBtn('All', null, typeFilter, selectTypeFilter)}
+            {itemTypes.map(t => chipBtn(ITEM_TYPE[t.type] ?? `Type ${t.type}`, t.type, typeFilter, selectTypeFilter))}
+          </div>
+        )}
+        {hasTypeFilter && typeFilter === 6 && (
+          <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {chipBtn('All', null, slotFilter, setSlotFilter)}
+            {SLOT_NAMES.map((name, i) => chipBtn(name, 1 << i, slotFilter, setSlotFilter))}
+          </div>
+        )}
+        {hasTypeFilter && typeFilter === 7 && (
+          <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {chipBtn('All', null, skillFilter, setSkillFilter)}
+            {Object.entries(WEAPON_SKILL_NAMES).map(([id, name]) => chipBtn(name, Number(id), skillFilter, setSkillFilter))}
           </div>
         )}
         {hasQuestLogFilter && questLogs.length > 0 && (
