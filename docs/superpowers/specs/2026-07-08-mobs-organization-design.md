@@ -20,14 +20,15 @@ aggressive mobs — every row looks the same regardless of type.
   spawn-point rows with no species/pool match at all (`ecosystem IS NULL`
   — placeholder/unused spawns) which must never surface as a filter
   option.
-- **No `aggro` filter exists yet.** `aggro` is already shown as a column
-  (checkmark) in the Mobs table, sourced from the `/api/db/mobs/detail`
-  per-row query — but `MOB_CATALOG` (the in-memory list `/api/db/mobs`
-  serves from) doesn't carry it at all today; `loadMobCatalog()`'s SQL
-  needs one more aggregate column.
-- Confirmed live: `mob_pools.aggro` is a plain `0`/`1`/`NULL` flag,
-  aggregated the same way (`MIN(mp.aggro)`) as every other per-mob stat
-  already in this query (`family`, `ecosystem`, `links`).
+- **No `aggro` *filter* exists yet, but the column already does.**
+  Re-checked directly against `src/catalog.ts`'s `loadMobCatalog()`
+  (unchanged since the original TypeScript conversion): its SQL already
+  selects `MIN(mp.aggro) AS aggro`, and `MOB_CATALOG` — the in-memory list
+  `/api/db/mobs` serves from — already carries it on every row (it's what
+  powers the existing Aggro checkmark column in the Mobs table). No
+  `catalog.ts`/SQL change is needed at all — this is purely a new
+  `?aggro=1` query-param filter on the existing route, the same shape as
+  wiring up `region`/`ecosystem`.
 
 ## Decisions (confirmed with user)
 
@@ -47,12 +48,6 @@ aggressive mobs — every row looks the same regardless of type.
    duplicating an identical constant.
 
 ## Backend changes
-
-### `src/catalog.ts`
-
-- `loadMobCatalog()`'s SQL gains `MIN(mp.aggro) AS aggro` to the existing
-  `SELECT`/`GROUP BY` (which already joins `mob_pools mp`) — one line, no
-  new join.
 
 ### `src/routes/db.ts`
 
@@ -90,11 +85,10 @@ aggressive mobs — every row looks the same regardless of type.
 
 ## Data flow
 
-`loadMobCatalog()` (startup + existing 5-min refresh, one new aggregate
-column, no new scanning step) → `GET /api/db/mobs?region=&ecosystem=&aggro=`
-filters `MOB_CATALOG` → client renders. `GET /api/db/mob-ecosystems`
-computed fresh from `MOB_CATALOG` per call. No changes to the Mobs detail
-panel, Wiki button, or Map link.
+`loadMobCatalog()` (unchanged — `aggro` was already selected) →
+`GET /api/db/mobs?region=&ecosystem=&aggro=` filters `MOB_CATALOG` → client
+renders. `GET /api/db/mob-ecosystems` computed fresh from `MOB_CATALOG` per
+call. No changes to the Mobs detail panel, Wiki button, or Map link.
 
 ## Error handling
 
