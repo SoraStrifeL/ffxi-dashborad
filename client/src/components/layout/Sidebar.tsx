@@ -10,7 +10,6 @@ const NAV = [
   { to: '/chars',    icon: '⚔',  label: 'Characters', perm: 'view:characters' },
   { to: '/map',      icon: '🗺',  label: 'Map',        perm: 'view:characters' },
   { to: '/db',       icon: '📚', label: 'Database',   perm: 'view:db' },
-  { to: '/gamedata', icon: '🎮', label: 'Game Data',  perm: 'view:db' },
   { to: '/timers',   icon: '⏱',  label: 'Timers' },
   { to: '/roe',      icon: '📜', label: 'RoE Records' },
   { to: '/console',  icon: '⌨',  label: 'Console',    perm: 'run:console' },
