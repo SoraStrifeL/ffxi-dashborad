@@ -693,7 +693,7 @@ export const QUEST_SETTINGS = _loadQuestSettings();
 // and some are just section labels ("Section: Begin quest") rather than
 // prose — but when present they're a free, always-current walkthrough with
 // no external fetch. Used as the primary description source, with BG-Wiki
-// as fallback for the rest (see /api/db/quests/walkthrough).
+// as fallback for the rest (see reward.walkthrough on GET /api/db/quests).
 function _extractWalkthrough(text: string): string[] {
   const steps: string[] = [];
   const stepRe = /((?:^[ \t]*--[^\n]*\n)+)[ \t]*\{\s*check\s*=\s*function/gm;

@@ -370,7 +370,6 @@ export function Database() {
       let result: { description?: string; wikiUrl?: string; notFound?: boolean } | null = null;
       if (cat === 'npcs') result = await api.dbNpcWiki(String(detailRow.name ?? ''));
       else if (cat === 'mobs') result = await api.dbNpcWiki(String(detailRow.name ?? ''));
-      else if (cat === 'quests') result = await api.dbQuestWiki(String(detailRow.name ?? ''));
       else if (cat === 'zones') result = await api.dbZoneWiki(String(detailRow.name ?? ''));
       setWikiData(result);
     } catch (_) { setWikiData({ notFound: true }); }
@@ -629,12 +628,12 @@ function DRow({ k, v }: { k: string; v: React.ReactNode }) {
 // caption naming the source. `idMismatchCaveat`, when non-null, is
 // appended to the DAT caption — used by Abilities/Key Items, which match
 // by name across two different id spaces (see enrichment fetch functions).
-function EnrichedDescription({ enrichment, idMismatchCaveat }: { enrichment: Enrichment; idMismatchCaveat: string | null }) {
+function EnrichedDescription({ enrichment, idMismatchCaveat, noneMessage }: { enrichment: Enrichment; idMismatchCaveat: string | null; noneMessage?: string }) {
   if (enrichment.loading) {
     return <div style={{ fontSize: 12, color: 'var(--color-text3)', marginBottom: 8 }}>Loading…</div>;
   }
   if (enrichment.source === 'none' || enrichment.source === null) {
-    return <div style={{ fontSize: 12, color: 'var(--color-text3)', marginBottom: 8 }}>No description available — not on this server's DAT or BG-Wiki.</div>;
+    return <div style={{ fontSize: 12, color: 'var(--color-text3)', marginBottom: 8 }}>{noneMessage ?? "No description available — not on this server's DAT or BG-Wiki."}</div>;
   }
   const caption = enrichment.source === 'dat'
     ? (idMismatchCaveat ? `From client DAT (${idMismatchCaveat})` : 'From client DAT')
@@ -821,7 +820,7 @@ function DetailView({ data, cat, itemImageUrl, enrichment }: { data: Record<stri
   if (cat === 'quests') {
     return (
       <div>
-        <EnrichedDescription enrichment={enrichment} idMismatchCaveat={null} />
+        <EnrichedDescription enrichment={enrichment} idMismatchCaveat={null} noneMessage="No walkthrough available — not in the quest script or BG-Wiki." />
         {data.questId  != null && <DRow k="Quest ID" v={String(data.questId)} />}
         {data.logName  != null && <DRow k="Area" v={String(data.logName)} />}
         {data.logId    != null && <DRow k="Log ID" v={String(data.logId)} />}
