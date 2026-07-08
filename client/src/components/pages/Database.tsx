@@ -295,7 +295,15 @@ export function Database() {
         const detail = await api.dbMobDetail(String(row.name ?? ''), Number(row.zoneid ?? 0));
         setDetailData({ zone: row.zone, min_lvl: row.min_lvl, max_lvl: row.max_lvl, spawns: row.spawns, ...detail });
       }
-      else if (cat === 'npcs' || cat === 'zones' || cat === 'quests' || cat === 'trusts' || cat === 'mounts' || cat === 'abilities' || cat === 'keyitems' || cat === 'gmcmds' || DAT_TABLE_CATS.has(cat)) setDetailData(row);
+      else if (cat === 'abilities') {
+        setDetailData(row);
+        fetchNameMatchedEnrichment('abilities', String(row.name ?? ''), api.dbAbilityWiki);
+      }
+      else if (cat === 'keyitems') {
+        setDetailData(row);
+        fetchNameMatchedEnrichment('key_items', String(row.name ?? ''), api.dbKeyItemWiki);
+      }
+      else if (cat === 'npcs' || cat === 'zones' || cat === 'quests' || cat === 'trusts' || cat === 'mounts' || cat === 'gmcmds' || DAT_TABLE_CATS.has(cat)) setDetailData(row);
     } catch (_) {}
     setDetailLoading(false);
   }
@@ -309,6 +317,25 @@ export function Database() {
         return;
       }
       const wiki = await api.dbItemWiki(dbName);
+      if (wiki?.description) {
+        setEnrichment({ loading: false, source: 'wiki', text: wiki.description, wikiUrl: wiki.wikiUrl });
+        return;
+      }
+      setEnrichment({ loading: false, source: 'none', text: null });
+    } catch (_) {
+      setEnrichment({ loading: false, source: 'none', text: null });
+    }
+  }
+
+  async function fetchNameMatchedEnrichment(datCat: 'abilities' | 'key_items', dbName: string, wikiFetch: (name: string) => Promise<{ description?: string | null; wikiUrl?: string } | null>) {
+    setEnrichment({ loading: true, source: null, text: null });
+    try {
+      const dat = await api.datEnrich(datCat, dbName);
+      if (dat?.description) {
+        setEnrichment({ loading: false, source: 'dat', text: dat.description, datId: dat.datId });
+        return;
+      }
+      const wiki = await wikiFetch(dbName);
       if (wiki?.description) {
         setEnrichment({ loading: false, source: 'wiki', text: wiki.description, wikiUrl: wiki.wikiUrl });
         return;
@@ -786,8 +813,10 @@ function DetailView({ data, cat, itemImageUrl, enrichment }: { data: Record<stri
   if (cat === 'abilities') {
     const ACTION_TYPE_MAP: Record<number, string> = { 3: 'Ranged', 6: 'Job Ability', 13: 'Pet Command' };
     const fmtTicks = (t: number) => t >= 3600 ? `${t/3600}h` : t >= 60 ? `${Math.floor(t/60)}m${t%60 ? ` ${t%60}s` : ''}` : `${t}s`;
+    const abilityCaveat = enrichment.source === 'dat' && enrichment.datId != null ? `id ${enrichment.datId}, matched by name — server id is ${data.abilityId}` : null;
     return (
       <div>
+        <EnrichedDescription enrichment={enrichment} idMismatchCaveat={abilityCaveat} />
         {data.job       != null && <DRow k="Job" v={JOB_ABBR[Number(data.job)] ?? String(data.job)} />}
         {data.level     != null && <DRow k="Level" v={String(data.level)} />}
         {data.actionType != null && <DRow k="Type" v={ACTION_TYPE_MAP[Number(data.actionType)] ?? String(data.actionType)} />}
@@ -799,8 +828,10 @@ function DetailView({ data, cat, itemImageUrl, enrichment }: { data: Record<stri
     );
   }
   if (cat === 'keyitems') {
+    const keyItemCaveat = enrichment.source === 'dat' && enrichment.datId != null ? `id ${enrichment.datId}, matched by name — server id is ${data.id}` : null;
     return (
       <div>
+        <EnrichedDescription enrichment={enrichment} idMismatchCaveat={keyItemCaveat} />
         {data.id   != null && <DRow k="Key Item ID" v={String(data.id)} />}
         {data.name != null && <DRow k="Name" v={fmtName(String(data.name))} />}
       </div>
