@@ -232,6 +232,8 @@ export function createDbRouter(pool: Pool): Router {
     const region    = (req.query.region as string) || null;
     const ecosystem = (req.query.ecosystem as string) || null;
     const aggro     = req.query.aggro === '1';
+    const minLv     = req.query.minLv ? parseInt(req.query.minLv as string) : null;
+    const maxLv     = req.query.maxLv ? parseInt(req.query.maxLv as string) : null;
     const sort      = (req.query.sort as string) || '';
     const page      = Math.max(0, parseInt((req.query.page as string) || '0'));
     let rows = MOB_CATALOG;
@@ -240,6 +242,8 @@ export function createDbRouter(pool: Pool): Router {
     if (region)    rows = rows.filter(r => _mobRegionMatch((r.zone as string) || '', region));
     if (ecosystem) rows = rows.filter(r => r.ecosystem === ecosystem);
     if (aggro)     rows = rows.filter(r => r.aggro === 1);
+    if (minLv !== null && !isNaN(minLv)) rows = rows.filter(r => (r.max_lvl as number) >= minLv);
+    if (maxLv !== null && !isNaN(maxLv)) rows = rows.filter(r => (r.min_lvl as number) <= maxLv);
     const MOB_SORT = new Set(['name', 'zone', 'min_lvl', 'max_lvl', 'family', 'aggro', 'spawns', 'ecosystem']);
     if (sort === 'level') rows = [...rows].sort(cmpBy('max_lvl', sortDir(req)));
     else if (MOB_SORT.has(sort)) rows = [...rows].sort(cmpBy(sort, sortDir(req)));

@@ -151,6 +151,8 @@ export function Database() {
   const [mobsRegionFilter, setMobsRegionFilter] = useState<string | null>(null);
   const [mobsEcosystemFilter, setMobsEcosystemFilter] = useState<string | null>(null);
   const [aggroFilter, setAggroFilter] = useState(false);
+  const [mobsMinLv, setMobsMinLv] = useState<number | null>(null);
+  const [mobsMaxLv, setMobsMaxLv] = useState<number | null>(null);
   const [jobFilter, setJobFilter] = useState<number | null>(null);
   const [typeFilter, setTypeFilter] = useState<number | null>(null);
   const [slotFilter, setSlotFilter] = useState<number | null>(null);
@@ -218,6 +220,8 @@ export function Database() {
     if (cat === 'mobs' && mobsRegionFilter) params.region = mobsRegionFilter;
     if (cat === 'mobs' && mobsEcosystemFilter) params.ecosystem = mobsEcosystemFilter;
     if (cat === 'mobs' && aggroFilter) params.aggro = 1;
+    if (cat === 'mobs' && mobsMinLv !== null) params.minLv = mobsMinLv;
+    if (cat === 'mobs' && mobsMaxLv !== null) params.maxLv = mobsMaxLv;
     if (cat === 'quests' && questLogFilter !== null) params.log = questLogFilter;
     try {
       // All server DB endpoints return plain arrays (not { rows, hasMore }).
@@ -260,9 +264,9 @@ export function Database() {
       }
     } catch (_) {}
     if (seq === loadSeq.current) setLoading(false);
-  }, [cat, page, search, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, jobFilter, typeFilter, slotFilter, skillFilter, jobFilterItems, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
+  }, [cat, page, search, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, mobsMinLv, mobsMaxLv, jobFilter, typeFilter, slotFilter, skillFilter, jobFilterItems, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
 
-  useEffect(() => { load(true); }, [cat, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, jobFilter, typeFilter, slotFilter, skillFilter, jobFilterItems, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(true); }, [cat, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, mobsMinLv, mobsMaxLv, jobFilter, typeFilter, slotFilter, skillFilter, jobFilterItems, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); load(true); };
 
@@ -433,7 +437,7 @@ export function Database() {
   }
 
   function selectCat(key: Category) {
-    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setRegionFilter(null); setRoleFilter(null); setMobsRegionFilter(null); setMobsEcosystemFilter(null); setAggroFilter(false); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setJobFilterItems(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
+    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setRegionFilter(null); setRoleFilter(null); setMobsRegionFilter(null); setMobsEcosystemFilter(null); setAggroFilter(false); setMobsMinLv(null); setMobsMaxLv(null); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setJobFilterItems(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
   }
 
   function selectTypeFilter(v: number | null) {
@@ -472,6 +476,16 @@ export function Database() {
           )}
           {cat === 'items' && chipBtn('Rare/Ex', 1, rareExFilter ? 1 : null, (v) => setRareExFilter(v === 1))}
           {cat === 'mobs' && chipBtn('Aggro only', 1, aggroFilter ? 1 : null, (v) => setAggroFilter(v === 1))}
+          {cat === 'mobs' && (
+            <>
+              <input type="number" placeholder="Min Lv" value={mobsMinLv ?? ''}
+                onChange={(e) => setMobsMinLv(e.target.value === '' ? null : Number(e.target.value))}
+                style={{ background: 'var(--color-surface2)', border: '1px solid var(--color-border)', color: 'var(--color-text1)', padding: '7px 9px', borderRadius: 7, fontSize: 12, width: 64 }} />
+              <input type="number" placeholder="Max Lv" value={mobsMaxLv ?? ''}
+                onChange={(e) => setMobsMaxLv(e.target.value === '' ? null : Number(e.target.value))}
+                style={{ background: 'var(--color-surface2)', border: '1px solid var(--color-border)', color: 'var(--color-text1)', padding: '7px 9px', borderRadius: 7, fontSize: 12, width: 64 }} />
+            </>
+          )}
           <span style={{ fontSize: 11, color: 'var(--color-text3)' }}>{rows.length} rows</span>
         </div>
         {hasJobFilter && (
