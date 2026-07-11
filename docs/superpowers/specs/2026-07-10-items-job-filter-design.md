@@ -6,7 +6,7 @@ The Database tab's Items category has Type, Slot (Main/Sub/etc), Weapon-skill,
 and Rare/Ex filter chips, but no way to narrow equipment to "what my job can
 wear" — despite the data already being fully present. `GET /api/db/items`
 already selects `ie.jobs` (a per-item bitmask of equippable jobs) on every
-row, and the detail panel already parses it correctly:
+row, and the detail panel already attempts to parse it:
 
 ```ts
 const jobsMask = Number(data.jobs ?? 0);
@@ -14,10 +14,26 @@ const jobList = JOB_ABBR.slice(1).filter((_, i) => (jobsMask >> (i + 1)) & 1);
 ```
 
 (`JOB_ABBR[0]` is an unused placeholder — FFXI job ids start at 1 for WAR;
-`JOB_ABBR.slice(1)` walks real jobs 1-22, checking bit `i+1` of the mask.)
-This is exactly the same shape as every other filter added this session
-(NPC region/role, Mobs region/ecosystem/aggro, Items slot/skill): backend
-data already exists, just never wired into a filter chip or query param.
+`JOB_ABBR.slice(1)` walks real jobs 1-22.) This is exactly the same shape as
+every other filter added this session (NPC region/role, Mobs
+region/ecosystem/aggro, Items slot/skill): backend data already exists,
+just never wired into a filter chip or query param.
+
+> **Correction (post-implementation, 2026-07-10):** the detail panel's
+> `(jobsMask >> (i + 1)) & 1` formula above is **wrong**, not "already
+> correct" as originally claimed here — this was only caught by deep live
+> verification of the new filter, not by writing this spec. LSB's actual
+> equip-permission check (`charutils.cpp:2368`) is
+> `PItem->getJobs() & (1 << (PChar->GetMJob() - 1))` — bit position is
+> **job_id − 1**, not `i + 1` against the sliced array (which equals
+> `job_id` for `JOB_ABBR.slice(1)`, i.e. off by one). Verified against the
+> live DB: Chevalier's Armet (PLD-exclusive AF) has `jobs = 64` = bit 6;
+> PLD's job id is 7; `1 << (7-1) = 64` matches exactly, `1 << 7 = 128` does
+> not. The correct formula, for both the detail panel and the new filter
+> below, is bit index `job_id - 1` (equivalently, sliced-array index `i`
+> with no `+1`). Every `?job=N`/bit-shift value below that assumed `i + 1`
+> or `>> job` must be read as corrected to `i`/`>> (job - 1)` — see the
+> Backend and Client sections, both updated in place.
 
 ## Decision (confirmed with user)
 
@@ -32,17 +48,21 @@ detail panel.
 
 ### `src/routes/db.ts` — `GET /api/db/items`
 
-New `?job=N` param (N = real job id 1-22, matching `JOB_ABBR` index):
+New `?job=N` param (N = real job id 1-22, matching FFXI's job id convention
+— WAR=1 … PLD=7 … RUN=22 — the same ids `JOBS_LIST` and `JOB_ABBR` already
+use elsewhere in this codebase). The client keeps sending the real job id;
+the bit tested is `job - 1` (LSB's actual convention, see the Problem
+section's correction):
 
 ```ts
 const job = req.query.job ? parseInt(req.query.job as string) : null;
 // ...
-if (job !== null && !isNaN(job)) { extra.push('AND (ie.jobs >> ?) & 1 = 1'); params.push(job); }
+if (job !== null && !isNaN(job)) { extra.push('AND (ie.jobs >> ?) & 1 = 1'); params.push(job - 1); }
 ```
 
 Same shape as the existing `slotBit`/`skill` filters — one more `extra.push`
-line, one more bound param. No SQL/catalog changes elsewhere; `ie.jobs` is
-already selected.
+line, one more bound param (now `job - 1`, not `job`, per the correction
+above). No SQL/catalog changes elsewhere; `ie.jobs` is already selected.
 
 ## Client change (`Database.tsx`)
 
@@ -52,21 +72,28 @@ already selected.
   pattern from Mobs' `mobsRegionFilter` vs NPCs' `regionFilter`.
 - New toolbar row (Items only, gated `typeFilter === 6 || typeFilter === 7`,
   placed alongside the existing Slot/Weapon-skill rows): `JOB_ABBR.slice(1)`
-  mapped to chips, each sending `job = i + 1` (real job id) — mirrors the
-  detail panel's own indexing exactly, so "PLD chip selected" and "PLD in
-  this item's detail panel job list" agree by construction.
+  mapped to chips, each sending `job = i + 1` (the real FFXI job id — this
+  send-side value is unchanged by the correction; only the *bit tested*
+  server-side and in the detail-panel fix changes, per above).
 - Wired into `load()`'s params (gated `cat === 'items' && (typeFilter === 6
   || typeFilter === 7)`) and both dependency arrays; reset in `selectCat`
   and `selectTypeFilter` (which already resets `slotFilter`/`skillFilter`
   on type switch — `jobFilterItems` joins that reset).
-- No detail-panel changes — the job list is already shown there today.
+- **Detail-panel fix (added by the correction above):** change
+  `(jobsMask >> (i + 1)) & 1` to `(jobsMask >> i) & 1` at
+  `client/src/components/pages/Database.tsx:769` — this is a pre-existing
+  bug this task's live verification exposed, not new-filter scope, but
+  leaving it unfixed would mean the filter (once corrected) shows accurate
+  results while the detail panel opened from those same results still
+  displays the wrong job list. Fixed together per explicit user decision.
 
 ## Data flow
 
-`GET /api/db/items?type=6&job=8` (PLD) → SQL adds
-`AND (ie.jobs >> 8) & 1 = 1` → client renders. No changes to
-`loadCatalogs()`/startup, since this route already queries the live DB per
-request (Items, unlike Mobs/NPCs, isn't served from an in-memory catalog).
+`GET /api/db/items?type=6&job=7` (PLD) → SQL adds
+`AND (ie.jobs >> 6) & 1 = 1` (bit `job - 1 = 6`) → client renders. No
+changes to `loadCatalogs()`/startup, since this route already queries the
+live DB per request (Items, unlike Mobs/NPCs, isn't served from an
+in-memory catalog).
 
 ## Error handling
 
