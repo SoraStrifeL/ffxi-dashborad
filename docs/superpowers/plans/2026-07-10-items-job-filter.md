@@ -4,6 +4,8 @@
 
 **Goal:** Add a Job filter chip row to the Database tab's Items category (Equipment + Weapon types), using the `ie.jobs` bitmask that's already selected by `GET /api/db/items` and already parsed correctly in the item detail panel, but never exposed as a filter.
 
+> **Correction (post-implementation, 2026-07-10):** this plan's code — `params.push(job)` in Step 1, the `job=8` test expectations in Step 2, and the "already parsed correctly" claim above — used a wrong job-mask bit index (`job_id`, not LSB's real `job_id - 1`). See `docs/superpowers/specs/2026-07-10-items-job-filter-design.md`'s "Correction" callout and commit `2177ba6` for the actual fix that shipped. This plan document is left as-executed (a historical record of what was actually run, including the bug); it is not a live reference — do not copy code from it without checking the spec's correction first.
+
 **Architecture:** One new `?job=N` query param on the existing `GET /api/db/items` route (bitwise check against `ie.jobs`, same shape as the existing `slot`/`skill` params), one new chip row in `Database.tsx` gated the same way the existing Slot/Weapon-skill rows are, reusing the already-defined `JOB_ABBR` constant.
 
 **Tech Stack:** Express route (`src/routes/db.ts`), React 18 + TypeScript (`client/src/components/pages/Database.tsx`), Vitest + supertest integration test.
