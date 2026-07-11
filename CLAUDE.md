@@ -54,6 +54,20 @@ to enable those features (see `.env.example`).
 mariadb -u xiadmin -p xidb < sql/dashboard_queue.sql
 ```
 
+Also apply `sql/char_jobs_peak.sql` once — it creates `char_jobs_peak` and a
+MariaDB `EVENT` (`ev_char_jobs_peak_sync`) that keeps it in sync every
+minute. **This requires the MariaDB event scheduler to be `ON`**, which is
+not a default (`SHOW VARIABLES LIKE 'event_scheduler';`). On the LSB stack
+this is enabled via `--event-scheduler=ON` in the `database` service's
+`command:` in the LSB repo's own `compose.yaml` (outside this repo, e.g.
+`/opt/stacks/ffxi/compose.yaml`) — applied live once already, but if that
+container is ever recreated from an un-edited/older compose file, the
+scheduler silently reverts to off and `char_jobs_peak` silently stops
+updating (no error surfaced anywhere the dashboard would notice — the
+Jobs tab's "Max Level" column just quietly freezes at whatever it last
+synced). Re-check the event scheduler is `ON` after any `database`
+container recreate on that stack.
+
 **Required env:** `DASHBOARD_JWT_SECRET` must be set or the server exits immediately. `WINDOWER_API_KEY` must be set for the Windower position endpoint. Copy `.env.example` → `.env` and fill it in.
 
 ## Architecture
