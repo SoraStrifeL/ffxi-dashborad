@@ -155,6 +155,7 @@ export function Database() {
   const [typeFilter, setTypeFilter] = useState<number | null>(null);
   const [slotFilter, setSlotFilter] = useState<number | null>(null);
   const [skillFilter, setSkillFilter] = useState<number | null>(null);
+  const [jobFilterItems, setJobFilterItems] = useState<number | null>(null);
   const [rareExFilter, setRareExFilter] = useState(false);
   const [questLogFilter, setQuestLogFilter] = useState<number | null>(null);
   const [zones, setZones] = useState<{ zoneid: number; name: string }[]>([]);
@@ -210,6 +211,7 @@ export function Database() {
     if (cat === 'items' && typeFilter !== null) params.type = typeFilter;
     if (cat === 'items' && (typeFilter === 6 || typeFilter === 7) && slotFilter !== null) params.slot = slotFilter;
     if (cat === 'items' && (typeFilter === 6 || typeFilter === 7) && skillFilter !== null) params.skill = skillFilter;
+    if (cat === 'items' && (typeFilter === 6 || typeFilter === 7) && jobFilterItems !== null) params.job = jobFilterItems;
     if (cat === 'items' && rareExFilter) params.rareex = 1;
     if (cat === 'npcs' && regionFilter) params.region = regionFilter;
     if (cat === 'npcs' && roleFilter) params.role = roleFilter;
@@ -258,9 +260,9 @@ export function Database() {
       }
     } catch (_) {}
     if (seq === loadSeq.current) setLoading(false);
-  }, [cat, page, search, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
+  }, [cat, page, search, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, jobFilter, typeFilter, slotFilter, skillFilter, jobFilterItems, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]);
 
-  useEffect(() => { load(true); }, [cat, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, jobFilter, typeFilter, slotFilter, skillFilter, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { load(true); }, [cat, zoneFilter, regionFilter, roleFilter, mobsRegionFilter, mobsEcosystemFilter, aggroFilter, jobFilter, typeFilter, slotFilter, skillFilter, jobFilterItems, rareExFilter, questLogFilter, sortKey, sortDir, dialogZone]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const onSearch = (e: React.FormEvent) => { e.preventDefault(); load(true); };
 
@@ -431,11 +433,11 @@ export function Database() {
   }
 
   function selectCat(key: Category) {
-    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setRegionFilter(null); setRoleFilter(null); setMobsRegionFilter(null); setMobsEcosystemFilter(null); setAggroFilter(false); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
+    setCat(key); setSearch(''); setSortKey(''); setSortDir('asc'); setZoneFilter(''); setRegionFilter(null); setRoleFilter(null); setMobsRegionFilter(null); setMobsEcosystemFilter(null); setAggroFilter(false); setJobFilter(null); setTypeFilter(null); setSlotFilter(null); setSkillFilter(null); setJobFilterItems(null); setRareExFilter(false); setQuestLogFilter(null); setDetailRow(null); setDetailData(null);
   }
 
   function selectTypeFilter(v: number | null) {
-    setTypeFilter(v); setSlotFilter(null); setSkillFilter(null);
+    setTypeFilter(v); setSlotFilter(null); setSkillFilter(null); setJobFilterItems(null);
   }
 
   return (
@@ -494,6 +496,12 @@ export function Database() {
           <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {chipBtn('All', null, skillFilter, setSkillFilter)}
             {Object.entries(WEAPON_SKILL_NAMES).map(([id, name]) => chipBtn(name, Number(id), skillFilter, setSkillFilter))}
+          </div>
+        )}
+        {hasTypeFilter && (typeFilter === 6 || typeFilter === 7) && (
+          <div style={{ padding: '0 16px 10px', display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {chipBtn('All', null, jobFilterItems, setJobFilterItems)}
+            {JOB_ABBR.slice(1).map((abbr, i) => chipBtn(abbr, i + 1, jobFilterItems, setJobFilterItems))}
           </div>
         )}
         {hasQuestLogFilter && questLogs.length > 0 && (

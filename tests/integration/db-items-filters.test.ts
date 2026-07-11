@@ -110,6 +110,41 @@ describe('GET /api/db/items filters', () => {
     expect(params).toEqual(['%Ridill%', 50, 0]);
   });
 
+  it('applies the job filter when type=6 (Equipment)', async () => {
+    const res = await request(app)
+      .get('/api/db/items?type=6&job=8')
+      .set('Authorization', `Bearer ${TOKEN}`);
+    expect(res.status).toBe(200);
+    const [sql, params] = lastCall();
+    expect(sql).toContain('ib.type=?');
+    expect(sql).toContain('(ie.jobs >> ?) & 1 = 1');
+    expect(params).toEqual(['%%', 6, 8, 50, 0]);
+  });
+
+  it('applies the job filter when type=7 (Weapon)', async () => {
+    const res = await request(app)
+      .get('/api/db/items?type=7&job=8')
+      .set('Authorization', `Bearer ${TOKEN}`);
+    expect(res.status).toBe(200);
+    const [sql, params] = lastCall();
+    expect(sql).toContain('ib.type=?');
+    expect(sql).toContain('(ie.jobs >> ?) & 1 = 1');
+    expect(params).toEqual(['%%', 7, 8, 50, 0]);
+  });
+
+  it('combines the job filter with slot and weapon-skill filters together', async () => {
+    const res = await request(app)
+      .get('/api/db/items?type=7&slot=1&skill=1&job=8')
+      .set('Authorization', `Bearer ${TOKEN}`);
+    expect(res.status).toBe(200);
+    const [sql, params] = lastCall();
+    expect(sql).toContain('ib.type=?');
+    expect(sql).toContain('iw.skill=?');
+    expect(sql).toContain('(ie.slot & ?) != 0');
+    expect(sql).toContain('(ie.jobs >> ?) & 1 = 1');
+    expect(params).toEqual(['%%', 7, 1, 1, 8, 50, 0]);
+  });
+
   it('rejects unauthenticated requests', async () => {
     const res = await request(app).get('/api/db/items?slot=1');
     expect(res.status).toBe(401);

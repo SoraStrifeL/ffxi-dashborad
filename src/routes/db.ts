@@ -49,6 +49,7 @@ export function createDbRouter(pool: Pool): Router {
       const flagVal  = req.query.flagval  !== undefined ? parseInt((req.query.flagval as string) || '0') : null;
       const skill = req.query.skill !== undefined && req.query.skill !== '' ? parseInt(req.query.skill as string) : null;
       const slotBit = req.query.slot ? parseInt(req.query.slot as string) : null;
+      const job     = req.query.job  ? parseInt(req.query.job as string)  : null;
       const page = Math.max(0, parseInt((req.query.page as string) || '0'));
       const SORT_COLS: Record<string, string> = {
         itemid: 'ib.itemid', name: 'ib.name', type: 'ib.type', stackSize: 'ib.stackSize',
@@ -79,6 +80,7 @@ export function createDbRouter(pool: Pool): Router {
       }
       if (skill !== null && !isNaN(skill)) { extra.push('AND iw.skill=?'); params.push(skill); }
       if (slotBit !== null && !isNaN(slotBit)) { extra.push('AND (ie.slot & ?) != 0'); params.push(slotBit); }
+      if (job !== null && !isNaN(job)) { extra.push('AND (ie.jobs >> ?) & 1 = 1'); params.push(job); }
       params.push(DB_PAGE, page * DB_PAGE);
       const [rows] = await pool.execute<RowDataPacket[]>(
         `SELECT ib.itemid, CONVERT(ib.name USING utf8) AS name, ib.type, ib.flags, ib.stackSize, ib.BaseSell,
