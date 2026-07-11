@@ -485,12 +485,16 @@ export function createDbRouter(pool: Pool): Router {
 
   router.get('/api/db/jobs', requireAuth, async (_req, res) => {
     try {
-      // Aggregate in SQL instead of pulling every char_jobs row into Node.
-      // "leveled" = above the level-1 default; MAX over only those rows.
+      // Aggregate in SQL instead of pulling every char_jobs_peak row into
+      // Node. "leveled" = above the level-1 default; MAX over only those
+      // rows. char_jobs_peak (not char_jobs) is used specifically because
+      // char_jobs is LSB's live current-standing value and can decrease
+      // via exp-loss-on-death deleveling — see
+      // docs/superpowers/specs/2026-07-11-jobs-max-level-history-design.md.
       const sel = JOBS_LIST.map(j =>
         `MAX(CASE WHEN cj.${j} > 1 THEN cj.${j} ELSE 0 END) AS ${j}_max, SUM(cj.${j} > 1) AS ${j}_count`).join(', ');
       const [[r]] = await pool.execute<RowDataPacket[]>(
-        `SELECT ${sel} FROM chars c JOIN char_jobs cj ON cj.charid = c.charid`);
+        `SELECT ${sel} FROM chars c JOIN char_jobs_peak cj ON cj.charid = c.charid`);
       const stats = JOBS_LIST.map(job => ({
         job, max: Number(r?.[`${job}_max`] ?? 0), count: Number(r?.[`${job}_count`] ?? 0),
       }));
