@@ -118,7 +118,7 @@ describe('GET /api/db/items filters', () => {
     const [sql, params] = lastCall();
     expect(sql).toContain('ib.type=?');
     expect(sql).toContain('(ie.jobs >> ?) & 1 = 1');
-    expect(params).toEqual(['%%', 6, 8, 50, 0]);
+    expect(params).toEqual(['%%', 6, 7, 50, 0]);
   });
 
   it('applies the job filter when type=7 (Weapon)', async () => {
@@ -129,7 +129,19 @@ describe('GET /api/db/items filters', () => {
     const [sql, params] = lastCall();
     expect(sql).toContain('ib.type=?');
     expect(sql).toContain('(ie.jobs >> ?) & 1 = 1');
-    expect(params).toEqual(['%%', 7, 8, 50, 0]);
+    expect(params).toEqual(['%%', 7, 7, 50, 0]);
+  });
+
+  it('job filter bit-index matches LSB\'s real equip-permission convention (job_id - 1)', async () => {
+    const res = await request(app)
+      .get('/api/db/items?type=6&job=7')
+      .set('Authorization', `Bearer ${TOKEN}`);
+    expect(res.status).toBe(200);
+    const [, params] = lastCall();
+    // PLD is job id 7; LSB's charutils.cpp tests bit (job_id - 1) = 6.
+    // Chevalier's Armet (a real PLD-exclusive item) has jobs=64 = 1<<6,
+    // confirming this is the bit LSB actually checks.
+    expect(params).toContain(6);
   });
 
   it('combines the job filter with slot and weapon-skill filters together', async () => {
@@ -142,7 +154,7 @@ describe('GET /api/db/items filters', () => {
     expect(sql).toContain('iw.skill=?');
     expect(sql).toContain('(ie.slot & ?) != 0');
     expect(sql).toContain('(ie.jobs >> ?) & 1 = 1');
-    expect(params).toEqual(['%%', 7, 1, 1, 8, 50, 0]);
+    expect(params).toEqual(['%%', 7, 1, 1, 7, 50, 0]);
   });
 
   it('rejects unauthenticated requests', async () => {

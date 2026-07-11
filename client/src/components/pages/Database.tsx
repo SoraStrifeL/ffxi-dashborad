@@ -774,7 +774,7 @@ function DetailView({ data, cat, itemImageUrl, enrichment, npcDialog }: { data: 
     const slots = Number(data.slot ?? 0);
     const equippedSlots = SLOT_NAMES.filter((_, i) => (slots >> i) & 1);
     const jobsMask = Number(data.jobs ?? 0);
-    const jobList = JOB_ABBR.slice(1).filter((_, i) => (jobsMask >> (i + 1)) & 1);
+    const jobList = JOB_ABBR.slice(1).filter((_, i) => (jobsMask >> i) & 1);
     return (
       <div>
         {itemImageUrl ? (

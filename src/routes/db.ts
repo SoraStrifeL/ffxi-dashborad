@@ -80,7 +80,7 @@ export function createDbRouter(pool: Pool): Router {
       }
       if (skill !== null && !isNaN(skill)) { extra.push('AND iw.skill=?'); params.push(skill); }
       if (slotBit !== null && !isNaN(slotBit)) { extra.push('AND (ie.slot & ?) != 0'); params.push(slotBit); }
-      if (job !== null && !isNaN(job)) { extra.push('AND (ie.jobs >> ?) & 1 = 1'); params.push(job); }
+      if (job !== null && !isNaN(job)) { extra.push('AND (ie.jobs >> ?) & 1 = 1'); params.push(job - 1); }
       params.push(DB_PAGE, page * DB_PAGE);
       const [rows] = await pool.execute<RowDataPacket[]>(
         `SELECT ib.itemid, CONVERT(ib.name USING utf8) AS name, ib.type, ib.flags, ib.stackSize, ib.BaseSell,
