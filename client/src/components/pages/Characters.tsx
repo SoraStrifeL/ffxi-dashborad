@@ -113,6 +113,7 @@ export function CharacterDetail() {
   const [char, setChar] = useState<CharBasic | null>(null);
   const [ext, setExt]   = useState<CharExtended | null>(null);
   const [equip, setEquip] = useState<{ slot: number; itemId: number; name: string }[]>([]);
+  const [equipImages, setEquipImages] = useState<Map<number, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState('overview');
 
@@ -126,6 +127,25 @@ export function CharacterDetail() {
       .catch(() => navigate('/chars'))
       .finally(() => setLoading(false));
   }, [id, navigate]);
+
+  // Fetch any custom-uploaded images for the currently-equipped items —
+  // reuses the same /api/upload/check/item endpoint the Database tab's
+  // Items detail panel already uses. Missing/failed checks are treated as
+  // "no image" (matches the Database tab's existing error-handling), never
+  // block rendering the rest of the gear panel.
+  useEffect(() => {
+    if (equip.length === 0) { setEquipImages(new Map()); return; }
+    let cancelled = false;
+    Promise.all(equip.map((i) =>
+      api.uploadCheck('item', i.itemId).catch(() => ({ exists: false, url: null }))
+    )).then((results) => {
+      if (cancelled) return;
+      const m = new Map<number, string>();
+      results.forEach((r, idx) => { if (r.exists && r.url) m.set(equip[idx].itemId, r.url); });
+      setEquipImages(m);
+    });
+    return () => { cancelled = true; };
+  }, [equip]);
 
   if (loading) return <div style={{ padding: 24, color: 'var(--color-text3)' }}>Loading…</div>;
   if (!char) return null;
@@ -164,7 +184,7 @@ export function CharacterDetail() {
 
       <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
         {tab === 'overview' && <CharOverview char={char} ext={ext} setTab={setTab} />}
-        {tab === 'gear'     && <CharGear char={char} equip={equip} />}
+        {tab === 'gear'     && <CharGear char={char} equip={equip} equipImages={equipImages} />}
         {tab === 'progress' && <CharProgress ext={ext} />}
         {tab === 'inventory'&& <CharInventory charId={Number(id)} />}
         {tab === 'bags'     && <CharBags charId={Number(id)} />}
@@ -467,7 +487,7 @@ function CharOverview({ char, ext, setTab }: { char: CharBasic; ext: CharExtende
   );
 }
 
-function CharGear({ char, equip }: { char: CharBasic; equip: { slot: number; itemId: number; name: string }[] }) {
+function CharGear({ char, equip, equipImages }: { char: CharBasic; equip: { slot: number; itemId: number; name: string }[]; equipImages: Map<number, string> }) {
   const navigate = useNavigate();
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
@@ -475,13 +495,15 @@ function CharGear({ char, equip }: { char: CharBasic; equip: { slot: number; ite
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
           {(Object.entries(SLOT) as [string, string][]).map(([slotKey, label]) => {
             const item = equip.find((i) => i.slot === Number(slotKey));
+            const imgUrl = item ? equipImages.get(item.itemId) : undefined;
             return (
               <div key={slotKey} style={{ display: 'flex', gap: 8, padding: '5px 2px', borderBottom: '1px solid var(--color-border)', fontSize: 12, alignItems: 'center' }}>
                 <span style={{ color: 'var(--color-text3)', fontSize: 10, width: 56, flexShrink: 0, textAlign: 'right', paddingRight: 6 }}>{label}</span>
                 {item
                   ? <button onClick={() => navigate('/database', { state: { cat: 'items', search: item.name } })}
-                      className="btn btn-ghost btn-xs" style={{ padding: '1px 4px', fontSize: 11, color: 'var(--color-text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120 }}>
-                      {item.name}
+                      className="btn btn-ghost btn-xs" style={{ padding: '1px 4px', fontSize: 11, color: 'var(--color-text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 120, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      {imgUrl && <img src={imgUrl} alt="" style={{ width: 20, height: 20, borderRadius: 4, border: '1px solid var(--color-border)', objectFit: 'cover', flexShrink: 0 }} />}
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
                     </button>
                   : <span style={{ color: 'var(--color-text3)' }}>—</span>
                 }
