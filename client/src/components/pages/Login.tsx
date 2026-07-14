@@ -1,15 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, setTokens } from '../../api';
 import { useStore } from '../../store';
+import type { LoginMessagePublic } from '../../types';
 
 export function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
+  const [messages, setMessages] = useState<LoginMessagePublic[]>([]);
   const setToken = useStore((s) => s.setToken);
   const navigate = useNavigate();
+
+  useEffect(() => { api.loginMessages().then(setMessages).catch(() => {}); }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -31,10 +35,34 @@ export function Login() {
     <div style={{
       height: '100%',
       display: 'flex',
+      flexWrap: 'wrap',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: 24,
+      overflowY: 'auto',
+      padding: 24,
       background: 'radial-gradient(ellipse at 50% 30%, #16162a, #0a0a12)',
     }}>
+      {messages.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, width: 360 }}>
+          {messages.map((m) => (
+            <div key={m.id} style={{
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border)',
+              borderRadius: 16,
+              padding: '20px 22px',
+              boxShadow: '0 20px 60px rgba(0,0,0,.6)',
+            }}>
+              {m.imageUrl && (
+                <img src={m.imageUrl} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 10, marginBottom: 12 }} />
+              )}
+              <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--color-text1)', marginBottom: 6 }}>{m.title}</h2>
+              <p style={{ fontSize: 13, color: 'var(--color-text2)', whiteSpace: 'pre-wrap', margin: 0 }}>{m.body}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div style={{
         background: 'var(--color-surface)',
         border: '1px solid var(--color-border)',
