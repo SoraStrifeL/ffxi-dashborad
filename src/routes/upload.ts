@@ -7,6 +7,7 @@ import { requireAuth } from '../auth';
 import { requirePermission } from '../rbac';
 import { audit } from '../audit';
 import { MAPS_DIR, UPLOADS_DIR, normZoneName, buildZoneMaps } from '../catalog';
+import { readLoginMessages, setLoginMessageImage } from '../loginMessages';
 
 const ALLOWED_IMG_MIME = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
 // buildZoneMaps() and the whole map pipeline are PNG-only — see CLAUDE.md "Map images"
@@ -161,6 +162,26 @@ export function createUploadRouter(pool: Pool): Router {
       removeStaleVariants(path.join(UPLOADS_DIR, 'mobs'), key, ext);
       audit(req.user!.login, 'upload.mob', `mob:${key}`);
       res.json({ ok: true, url: `/uploads/mobs/${newName}`, key });
+    });
+  });
+
+  router.post('/api/upload/login-message/:id', requireAuth, requirePermission('upload:images'), (req: any, res) => {
+    const id = req.params.id as string;
+    if (!readLoginMessages().some(m => m.id === id)) return void res.status(404).json({ error: 'message not found' });
+    req._uploadFilename = `${id}.png`;
+    makeUploader(path.join(UPLOADS_DIR, 'login-messages'))(req, res, (err: any) => {
+      if (err) return void res.status(400).json({ error: err.message });
+      if (!req.file) return void res.status(400).json({ error: 'image file required' });
+      const ext = MIME_EXT[req.file.mimetype] || 'png';
+      const newName = `${id}.${ext}`;
+      if (newName !== req.file.filename) {
+        fs.renameSync(req.file.path, path.join(UPLOADS_DIR, 'login-messages', newName));
+      }
+      removeStaleVariants(path.join(UPLOADS_DIR, 'login-messages'), id, ext);
+      const url = `/uploads/login-messages/${newName}`;
+      setLoginMessageImage(id, url);
+      audit(req.user!.login, 'upload.loginMessage', `loginMessage:${id}`);
+      res.json({ ok: true, url });
     });
   });
 

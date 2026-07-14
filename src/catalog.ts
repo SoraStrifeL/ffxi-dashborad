@@ -24,7 +24,7 @@ function _resolvePath(key: string, envKey: string, def: string): string {
 export const LSB_SCRIPTS_DIR  = _resolvePath('LSB_SCRIPTS_DIR',  'LSB_SCRIPTS_DIR',  '/ffxi-scripts');
 export const LSB_SETTINGS_DIR = _resolvePath('LSB_SETTINGS_DIR', 'LSB_SETTINGS_DIR', '/ffxi-settings');
 export const LSB_LOG_DIR      = _resolvePath('LSB_LOG_DIR',      'LSB_LOG_DIR',      '/ffxi-log');
-['items', 'npcs', 'mobs'].forEach(d => fs.mkdirSync(path.join(UPLOADS_DIR, d), { recursive: true }));
+['items', 'npcs', 'mobs', 'login-messages'].forEach(d => fs.mkdirSync(path.join(UPLOADS_DIR, d), { recursive: true }));
 
 // ── Calibration store ─────────────────────────────────────────────────────────
 export const CAL_FILE = path.join(__dirname, '..', 'data', 'calibrations.json');

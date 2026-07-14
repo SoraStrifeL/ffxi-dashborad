@@ -1,7 +1,10 @@
+import fs from 'fs';
+import path from 'path';
 import { Router } from 'express';
 import { requireAuth } from '../auth';
 import { requirePermission } from '../rbac';
 import { audit } from '../audit';
+import { UPLOADS_DIR } from '../catalog';
 import {
   readLoginMessages, createLoginMessage, updateLoginMessage,
   deleteLoginMessage, moveLoginMessage, toPublic,
@@ -39,9 +42,12 @@ export function createLoginMessagesRouter(): Router {
   });
 
   router.delete('/api/dashboard/login-messages/:id', requireAuth, requirePermission('manage:settings'), (req, res) => {
-    const id = req.params.id as string;
-    const removed = deleteLoginMessage(id);
+    const removed = deleteLoginMessage(req.params.id as string);
     if (!removed) { res.status(404).json({ error: 'not found' }); return; }
+    if (removed.imageUrl) {
+      const file = path.join(UPLOADS_DIR, 'login-messages', path.basename(removed.imageUrl));
+      try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch (_) {}
+    }
     audit(req.user!.login, 'settings.loginMessage.delete', removed.id, { title: removed.title });
     res.json({ ok: true });
   });
