@@ -170,6 +170,16 @@ export const api = {
   dashboardSettings:     () => req<Record<string, unknown>>('/api/dashboard/settings'),
   saveDashboardSettings: (d: object) => req<{ ok: boolean; settings: Record<string, unknown> }>('/api/dashboard/settings', { method: 'POST', body: JSON.stringify(d) }),
 
+  loginMessages:      () => req<import('./types').LoginMessagePublic[]>('/api/login-messages'),
+  loginMessagesAdmin: () => req<import('./types').LoginMessage[]>('/api/dashboard/login-messages'),
+  createLoginMessage: (d: { title: string; body: string; active: boolean }) =>
+    req<{ ok: boolean; message: import('./types').LoginMessage }>('/api/dashboard/login-messages', { method: 'POST', body: JSON.stringify(d) }),
+  updateLoginMessage: (id: string, d: Partial<{ title: string; body: string; active: boolean }>) =>
+    req<{ ok: boolean; message: import('./types').LoginMessage }>(`/api/dashboard/login-messages/${id}`, { method: 'PUT', body: JSON.stringify(d) }),
+  deleteLoginMessage: (id: string) => req<{ ok: boolean }>(`/api/dashboard/login-messages/${id}`, { method: 'DELETE' }),
+  moveLoginMessage:   (id: string, direction: 'up' | 'down') =>
+    req<{ ok: boolean; messages: import('./types').LoginMessage[] }>(`/api/dashboard/login-messages/${id}/move`, { method: 'POST', body: JSON.stringify({ direction }) }),
+
   // Character extra endpoints
   charBlobs:      (id: number) => req<Record<string, unknown>>(`/api/character/${id}/blobs`),
   charEffects:    (id: number) => req<unknown[]>(`/api/character/${id}/effects`),
@@ -238,6 +248,7 @@ export const api = {
   uploadItemImage: (itemId: number, file: File) => { const f = new FormData(); f.append('image', file); const token = getToken(); return fetch(`/api/upload/item/${itemId}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
   uploadNpcImage:  (npcId: number, file: File) => { const f = new FormData(); f.append('image', file); const token = getToken(); return fetch(`/api/upload/npc/${npcId}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
   uploadMobImage:  (name: string, file: File) => { const f = new FormData(); f.append('image', file); const token = getToken(); return fetch(`/api/upload/mob?name=${encodeURIComponent(name)}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
+  uploadLoginMessageImage: (id: string, file: File) => { const f = new FormData(); f.append('image', file); const token = getToken(); return fetch(`/api/upload/login-message/${id}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {}, body: f }).then(r => r.ok ? r.json() : r.json().then((e: {error?:string}) => Promise.reject(new Error(e.error)))); },
   uploadCheck: (type: 'item'|'npc'|'mob', id?: number, name?: string) =>
     req<{ exists: boolean; url: string | null }>(`/api/upload/check/${type}?${id != null ? `id=${id}` : `name=${encodeURIComponent(name ?? '')}`}`),
 

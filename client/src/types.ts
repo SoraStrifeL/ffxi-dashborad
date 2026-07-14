@@ -167,6 +167,17 @@ export interface NpcEntry {
   pos_z: number;
 }
 
+export interface LoginMessage {
+  id: string;
+  title: string;
+  body: string;
+  imageUrl: string | null;
+  active: boolean;
+  createdAt: number;
+}
+
+export type LoginMessagePublic = Pick<LoginMessage, 'id' | 'title' | 'body' | 'imageUrl'>;
+
 export interface CalibrationBounds {
   minX: number; maxX: number; minZ: number; maxZ: number;
 }

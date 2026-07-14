@@ -1,12 +1,13 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../../api';
 import { useStore } from '../../store';
+import type { LoginMessage } from '../../types';
 
 type RateEntry = { group: string; key: string; label: string; file: string; step?: number; type?: string; value: number | boolean | null };
 type ScanEntry = { key: string; value: unknown; curated: boolean };
 type Var = { varname: string; value: number };
 
-const TABS = ['Rates', 'Dashboard', 'Server Vars', 'Settings Scan', 'DB Config', 'Paths', 'Crash Log', 'Quest Settings', 'FS Browser'] as const;
+const TABS = ['Rates', 'Dashboard', 'Server Vars', 'Settings Scan', 'DB Config', 'Paths', 'Crash Log', 'Quest Settings', 'FS Browser', 'Login Messages'] as const;
 type Tab = typeof TABS[number];
 
 // ── Rates panel ───────────────────────────────────────────────────────────────
@@ -405,6 +406,119 @@ function CrashLogPanel() {
   );
 }
 
+// ── Login messages panel ──────────────────────────────────────────────────────
+function LoginMessagesPanel() {
+  const [messages, setMessages] = useState<LoginMessage[]>([]);
+  const [loading,  setLoading]  = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [error,    setError]    = useState('');
+  const uploadRef = useRef<HTMLInputElement>(null);
+  const uploadTargetId = useRef<string | null>(null);
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    setLoading(true);
+    try { setMessages(await api.loginMessagesAdmin()); } catch (e) { setError((e as Error).message); }
+    setLoading(false);
+  }
+
+  function patchLocal(id: string, patch: Partial<LoginMessage>) {
+    setMessages(prev => prev.map(m => (m.id === id ? { ...m, ...patch } : m)));
+  }
+
+  async function addMessage() {
+    try {
+      const res = await api.createLoginMessage({ title: '', body: '', active: true });
+      setMessages(prev => [...prev, res.message]);
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function saveMessage(m: LoginMessage) {
+    setSavingId(m.id); setError('');
+    try {
+      const res = await api.updateLoginMessage(m.id, { title: m.title, body: m.body, active: m.active });
+      patchLocal(m.id, res.message);
+    } catch (e) { setError((e as Error).message); }
+    setSavingId(null);
+  }
+
+  async function deleteMessage(id: string) {
+    if (!confirm('Delete this login message?')) return;
+    try {
+      await api.deleteLoginMessage(id);
+      setMessages(prev => prev.filter(m => m.id !== id));
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  async function move(id: string, direction: 'up' | 'down') {
+    try {
+      const res = await api.moveLoginMessage(id, direction);
+      setMessages(res.messages);
+    } catch (e) { setError((e as Error).message); }
+  }
+
+  function triggerUpload(id: string) {
+    uploadTargetId.current = id;
+    uploadRef.current?.click();
+  }
+
+  async function handleUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    const id = uploadTargetId.current;
+    if (!file || !id) return;
+    try {
+      const res = await api.uploadLoginMessageImage(id, file);
+      patchLocal(id, { imageUrl: res.url });
+    } catch (err) { alert((err as Error).message); }
+    e.target.value = '';
+  }
+
+  return (
+    <div>
+      <input ref={uploadRef} type="file" accept="image/*" onChange={handleUpload} style={{ display: 'none' }} />
+      <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 14 }}>
+        <span style={{ fontSize: 13, fontWeight: 600 }}>Login Messages</span>
+        <span className="pill pill-muted" style={{ fontSize: 11 }}>{messages.length}</span>
+        <button onClick={load} className="btn btn-ghost btn-sm" style={{ marginLeft: 'auto' }}>{loading ? '…' : 'Refresh'}</button>
+        <button onClick={addMessage} className="btn btn-primary btn-sm">+ Add message</button>
+      </div>
+      {error && <div style={{ color: 'var(--color-red)', fontSize: 12, marginBottom: 10 }}>{error}</div>}
+      {messages.length === 0 && !loading && <div style={{ color: 'var(--color-text3)', fontSize: 13 }}>No login messages configured.</div>}
+      {messages.map((m, i) => (
+        <div key={m.id} className="card" style={{ marginBottom: 10, padding: '12px 16px' }}>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <div style={{ width: 72, flexShrink: 0 }}>
+              {m.imageUrl
+                ? <img src={m.imageUrl} alt="" style={{ width: 72, height: 72, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--color-border)' }} />
+                : <div style={{ width: 72, height: 72, borderRadius: 6, background: 'var(--color-surface2)', border: '1px dashed var(--color-border)' }} />}
+              <button onClick={() => triggerUpload(m.id)} className="btn btn-ghost btn-xs" style={{ fontSize: 10, padding: '3px 7px', marginTop: 6, width: '100%' }}>Upload</button>
+            </div>
+            <div style={{ flex: 1 }}>
+              <input className="input" style={{ width: '100%', marginBottom: 8, fontSize: 13 }} placeholder="Title" value={m.title}
+                onChange={e => patchLocal(m.id, { title: e.target.value })} />
+              <textarea className="input" style={{ width: '100%', marginBottom: 8, fontSize: 13, minHeight: 60, resize: 'vertical' }} placeholder="Body" value={m.body}
+                onChange={e => patchLocal(m.id, { body: e.target.value })} />
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <label style={{ display: 'flex', gap: 6, alignItems: 'center', fontSize: 12, color: 'var(--color-text2)', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={m.active} onChange={e => patchLocal(m.id, { active: e.target.checked })} />
+                  Active
+                </label>
+                <button onClick={() => saveMessage(m)} disabled={savingId === m.id} className="btn btn-primary btn-sm">
+                  {savingId === m.id ? '…' : 'Save'}
+                </button>
+                <button onClick={() => move(m.id, 'up')} disabled={i === 0} className="btn btn-ghost btn-sm">↑</button>
+                <button onClick={() => move(m.id, 'down')} disabled={i === messages.length - 1} className="btn btn-ghost btn-sm">↓</button>
+                <button onClick={() => deleteMessage(m.id)} className="btn btn-ghost btn-sm" style={{ color: 'var(--color-red)', marginLeft: 'auto' }}>Delete</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // ── Main Settings page ────────────────────────────────────────────────────────
 
 // ── Quest settings panel ──────────────────────────────────────────────────────
@@ -511,6 +625,7 @@ export function Settings() {
         {tab === 'Crash Log'    && <CrashLogPanel />}
         {tab === 'Quest Settings' && <QuestSettingsPanel />}
         {tab === 'FS Browser'    && <FsBrowserPanel />}
+        {tab === 'Login Messages'  && <LoginMessagesPanel />}
       </div>
     </div>
   );
