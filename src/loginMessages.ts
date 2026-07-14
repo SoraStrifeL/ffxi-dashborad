@@ -17,8 +17,10 @@ export interface LoginMessage {
 export type LoginMessagePublic = Pick<LoginMessage, 'id' | 'title' | 'body' | 'imageUrl'>;
 
 export function readLoginMessages(): LoginMessage[] {
-  try { return JSON.parse(fs.readFileSync(LOGIN_MESSAGES_FILE, 'utf8')) as LoginMessage[]; }
-  catch { return []; }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(LOGIN_MESSAGES_FILE, 'utf8'));
+    return Array.isArray(parsed) ? parsed as LoginMessage[] : [];
+  } catch { return []; }
 }
 
 export function writeLoginMessages(messages: LoginMessage[]): void {
