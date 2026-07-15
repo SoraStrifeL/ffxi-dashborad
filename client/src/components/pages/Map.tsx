@@ -1467,16 +1467,16 @@ export function MapPage() {
           }}>
             <button
               onPointerDown={() => startPanRepeat('up')} onPointerUp={stopPanRepeat} onPointerLeave={stopPanRepeat}
-              style={{ gridColumn: 2, gridRow: 1, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>▲</button>
+              style={{ gridColumn: 2, gridRow: 1, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1, touchAction: 'manipulation' }}>▲</button>
             <button
               onPointerDown={() => startPanRepeat('left')} onPointerUp={stopPanRepeat} onPointerLeave={stopPanRepeat}
-              style={{ gridColumn: 1, gridRow: 2, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>◀</button>
+              style={{ gridColumn: 1, gridRow: 2, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1, touchAction: 'manipulation' }}>◀</button>
             <button
               onPointerDown={() => startPanRepeat('right')} onPointerUp={stopPanRepeat} onPointerLeave={stopPanRepeat}
-              style={{ gridColumn: 3, gridRow: 2, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>▶</button>
+              style={{ gridColumn: 3, gridRow: 2, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1, touchAction: 'manipulation' }}>▶</button>
             <button
               onPointerDown={() => startPanRepeat('down')} onPointerUp={stopPanRepeat} onPointerLeave={stopPanRepeat}
-              style={{ gridColumn: 2, gridRow: 3, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>▼</button>
+              style={{ gridColumn: 2, gridRow: 3, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1, touchAction: 'manipulation' }}>▼</button>
           </div>
         )}
 
