@@ -16,9 +16,11 @@
  *   - src/map/utils/charutils.h                   (AddItem(PChar, loc, itemID, qty))
  *   - src/map/utils/charutils.h                   (UpdateItem(PChar, loc, slot, qty))
  *   - src/map/item_container.h                    (LOC_INVENTORY = 0)
- *   - src/map/entities/char_entity.h              (renamed from charentity.h)
- *   - src/map/entities/mob_entity.h               (renamed from mobentity.h)
- *   - src/map/entities/npc_entity.h               (renamed from npcentity.h)
+ *   - src/map/entities/charentity.h, mobentity.h, npcentity.h
+ *     (NOT renamed in this LSB checkout as of 2026-07-15 — a prior version of
+ *     this file referenced char_entity.h/mob_entity.h/npc_entity.h, which do
+ *     not exist here and would fail to compile; verified directly against
+ *     /opt/stacks/ffxi/src/map/entities/ before restoring these names)
  *
  * v2 SCOPE: additem / delitem / setgil / addgil.
  *   Gil lives at LOC_INVENTORY slot 0, itemId 65535.
@@ -38,9 +40,9 @@
  ************************************************************************/
 
 #include "common/database.h"
-#include "map/entities/char_entity.h"
-#include "map/entities/mob_entity.h"
-#include "map/entities/npc_entity.h"
+#include "map/entities/charentity.h"
+#include "map/entities/mobentity.h"
+#include "map/entities/npcentity.h"
 #include "map/items/item.h"
 #include "map/lua/luautils.h"
 #include "map/packets/s2c/0x062_clistatus2.h"
