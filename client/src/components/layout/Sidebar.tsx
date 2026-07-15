@@ -2,28 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useStore } from '../../store';
 import { api } from '../../api';
-
-// perm: required permission from /api/me/permissions; entries without one are
-// visible to everyone (their read endpoints only need auth)
-const NAV = [
-  { to: '/',         icon: '⬡',  label: 'Dashboard' },
-  { to: '/chars',    icon: '⚔',  label: 'Characters', perm: 'view:characters' },
-  { to: '/map',      icon: '🗺',  label: 'Map',        perm: 'view:characters' },
-  { to: '/db',       icon: '📚', label: 'Database',   perm: 'view:db' },
-  { to: '/timers',   icon: '⏱',  label: 'Timers' },
-  { to: '/roe',      icon: '📜', label: 'RoE Records' },
-  { to: '/console',  icon: '⌨',  label: 'Console',    perm: 'run:console' },
-  { to: '/settings', icon: '⚙',  label: 'Settings',   perm: 'manage:settings' },
-];
-
-const ADMIN_NAV = [
-  { to: '/admin',    icon: '🛡',  label: 'Admin' },
-  { to: '/accounts', icon: '👤', label: 'Accounts' },
-  { to: '/scripts',  icon: '📝', label: 'Scripts' },
-  { to: '/docker',   icon: '🐳', label: 'Docker' },
-  { to: '/github',   icon: '🐙', label: 'GitHub' },
-  { to: '/lsb',      icon: '🔄', label: 'LSB' },
-];
+import { NAV, ADMIN_NAV } from '../../navConfig';
 
 export function Sidebar() {
   const user   = useStore((s) => s.user);
