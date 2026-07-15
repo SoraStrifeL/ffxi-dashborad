@@ -881,11 +881,19 @@ export function MapPage() {
         stopPanRepeat();
       }
     }
+    // If the window loses focus mid-hold (e.g. Alt-Tab), no keyup is ever
+    // delivered to this page — stop the repeat so it doesn't pan forever.
+    function onBlur() {
+      activePanKeyRef.current = null;
+      stopPanRepeat();
+    }
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
+    window.addEventListener('blur', onBlur);
     return () => {
       window.removeEventListener('keydown', onKeyDown);
       window.removeEventListener('keyup', onKeyUp);
+      window.removeEventListener('blur', onBlur);
     };
   }, []);
 
