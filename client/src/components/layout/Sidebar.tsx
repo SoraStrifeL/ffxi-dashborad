@@ -68,7 +68,7 @@ export function Sidebar({ variant, open = false, onClose, onNavigate }: SidebarP
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 99 }}
         />
       )}
-      <aside style={asideStyle}>
+      <aside style={asideStyle} aria-hidden={isDrawer && !open}>
         {/* Brand */}
         <div style={{
           padding: isRail ? '18px 8px 14px' : '18px 16px 14px',
