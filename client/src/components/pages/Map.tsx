@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../api';
 import { useWS } from '../../hooks/useWS';
 import { useStore } from '../../store';
+import { useBreakpoint } from '../../hooks/useBreakpoint';
 import type { MobEntry, NpcEntry, PosEntry, Zone, CalibrationBounds, PopEntry, EvtTriggerDef, EvtTimer } from '../../types';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -87,6 +88,7 @@ function usePixi(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
 export function MapPage() {
   const location = useLocation();
   const navigate = useNavigate();
+  const breakpoint = useBreakpoint();
   const [zones, setZones] = useState<Zone[]>([]);
   const [zone, setZone]   = useState<number | null>(null);
   const [floor, setFloor] = useState(0);
@@ -98,7 +100,7 @@ export function MapPage() {
   const [dbNpcs, setDbNpcs]  = useState<NpcEntry[]>([]);
   const [layers, setLayers]  = useState<Layers>({ players:true, npcs:true, mobs:true, teleports:true, bounds:false, aggroonly:false, labels:false, offlineplayers:false, hidezero:true, grid:false });
   const [detectFilter, setDetectFilter] = useState(0);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(() => breakpoint !== 'phone');
   const [calForm, setCalForm] = useState({ minX: -512, maxX: 512, minZ: -512, maxZ: 512 });
   const [calSaving, setCalSaving] = useState(false);
   const [calMsg, setCalMsg] = useState("");
