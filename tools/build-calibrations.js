@@ -26,10 +26,19 @@
 // a cross-check: when the geometry box is vastly larger than the robust
 // entity extent (city districts like the Jeuno zones share one whole-city
 // model across their DATs), the padded entity box is used instead.
+//
+// If FFXiMain.dll is present alongside FTABLE.DAT (the retail exe ships next
+// to it), its embedded per-zone ZoneMapRecord table (tools/zone-map-record.js
+// — retail's own automap framing data, size+offset per zone/floor) is used
+// as a fallback when DAT geometry can't be decoded at all, and logged as a
+// cross-check note when geometry disagrees with it by >1.5x area — spot
+// checks showed the DLL box is directionally correct but sometimes ~2x off
+// for small zones, so it does not override working geometry-derived boxes.
 
 const fs   = require('fs');
 const path = require('path');
 const { decodeDat, computeBounds } = require('./decode-dat.js');
+const { loadZoneMapTable, recordToBox } = require('./zone-map-record.js');
 
 const args    = process.argv.slice(2);
 const baseDir = args.find(a => !a.startsWith('--'));
@@ -71,6 +80,21 @@ function resolveDat(id) {
 }
 
 const datIdForZone = z => z < 256 ? z + 100 : z + 83635;
+
+// ── FFXiMain.dll ZoneMapRecord table (optional; fallback + cross-check) ─────
+
+let dllZoneMap = new Map();
+const dllPath = path.join(baseDir, 'FFXiMain.dll');
+if (fs.existsSync(dllPath)) {
+  try {
+    dllZoneMap = loadZoneMapTable(dllPath);
+    console.log(`loaded ${dllZoneMap.size} ZoneMapRecord entries from ${dllPath}`);
+  } catch (e) {
+    console.error(`could not parse ${dllPath}: ${e.message}`);
+  }
+} else {
+  console.log(`no FFXiMain.dll found at ${dllPath} — DLL fallback/cross-check disabled`);
+}
 
 // ── entity extents (optional cross-check via dashboard API) ─────────────────
 
@@ -138,7 +162,7 @@ const area = b => Math.max(1e-6, (b.maxX - b.minX) * (b.maxZ - b.minZ));
 
 (async () => {
   const token = apiUrl ? await apiLogin() : null;
-  let written = 0, kept = 0, failed = 0, entityFallback = 0;
+  let written = 0, kept = 0, failed = 0, entityFallback = 0, dllFallback = 0;
 
   for (const zoneStr of Object.keys(maps).sort((a, b) => +a - +b)) {
     const zone = +zoneStr;
@@ -146,21 +170,29 @@ const area = b => Math.max(1e-6, (b.maxX - b.minX) * (b.maxZ - b.minZ));
     const existing = cals[zoneStr];
     if (existing && existing.src !== 'dat' && !force) { kept++; continue; }
 
+    const dllBox = recordToBox(dllZoneMap.get(zone));
+
     const datPath = resolveDat(datIdForZone(zone));
-    if (!datPath || !fs.existsSync(datPath)) {
-      console.error(`  ${zone} ${name}: zone DAT not found (id ${datIdForZone(zone)})`);
-      failed++;
-      continue;
+    let bounds = null;
+    if (datPath && fs.existsSync(datPath)) {
+      try { bounds = computeBounds(decodeDat(datPath)); } catch (e) { bounds = null; }
     }
-    let bounds;
-    try { bounds = computeBounds(decodeDat(datPath)); } catch (e) { bounds = null; }
-    if (!bounds || bounds.maxX - bounds.minX < 10 || bounds.maxZ - bounds.minZ < 10) {
-      console.error(`  ${zone} ${name}: no usable geometry in ${datPath}`);
+    const geometryOk = bounds && bounds.maxX - bounds.minX >= 10 && bounds.maxZ - bounds.minZ >= 10;
+
+    let box, baseline, note;
+    if (geometryOk) {
+      box = baseline = bounds;
+      note = `geometry, ${bounds.matched}/${bounds.total} instances`;
+    } else if (dllBox) {
+      box = baseline = dllBox;
+      note = 'FFXiMain.dll ZoneMapRecord fallback (no usable geometry)';
+      dllFallback++;
+    } else {
+      console.error(`  ${zone} ${name}: no usable geometry in ${datPath || `id ${datIdForZone(zone)}`} and no ZoneMapRecord`);
       failed++;
       continue;
     }
 
-    let box = bounds, note = `geometry, ${bounds.matched}/${bounds.total} instances`;
     if (token) {
       const ent = await fetchEntityBox(zone, token);
       // Geometry >> entity extent means the DAT holds more than this zone's
@@ -174,16 +206,28 @@ const area = b => Math.max(1e-6, (b.maxX - b.minX) * (b.maxZ - b.minZ));
       // extent doesn't describe this zone's map (e.g. Altar Room) — geometry
       // that misses real entities is worse than the entity box.
       const covered = ent
-        ? ent.kept.filter(p => p.x >= bounds.minX - 10 && p.x <= bounds.maxX + 10 &&
-                               p.z >= bounds.minZ - 10 && p.z <= bounds.maxZ + 10).length / ent.kept.length
+        ? ent.kept.filter(p => p.x >= baseline.minX - 10 && p.x <= baseline.maxX + 10 &&
+                               p.z >= baseline.minZ - 10 && p.z <= baseline.maxZ + 10).length / ent.kept.length
         : 1;
-      if (ent && (area(bounds) > ratio * area(ent) || covered < 0.9)) {
+      if (ent && (area(baseline) > ratio * area(ent) || covered < 0.9)) {
         const padX = (ent.maxX - ent.minX) * 0.10, padZ = (ent.maxZ - ent.minZ) * 0.10;
         box = { minX: ent.minX - padX, maxX: ent.maxX + padX, minZ: ent.minZ - padZ, maxZ: ent.maxZ + padZ };
         note = `entity fallback (${ent.n} pts; ` +
           (covered < 0.9 ? `geometry covers only ${(covered * 100).toFixed(0)}% of entities` :
-            `geometry ${Math.sqrt(area(bounds) / area(ent)).toFixed(1)}x oversized`) + ')';
+            `geometry ${Math.sqrt(area(baseline) / area(ent)).toFixed(1)}x oversized`) + ')';
         entityFallback++;
+      }
+    }
+
+    // Cross-check only — does not override a working geometry-derived box.
+    // Spot checks (2026-07-15) showed the DLL box is directionally correct
+    // (right units/sign/center) but sometimes ~2x off for small zones, so it
+    // is logged for visibility rather than auto-applied when geometry works.
+    if (geometryOk && dllBox) {
+      const ratioDll = area(bounds) > area(dllBox) ? area(bounds) / area(dllBox) : area(dllBox) / area(bounds);
+      if (ratioDll > 1.5) {
+        console.log(`    [dll-xcheck] ${zone} ${name}: geometry/DLL area ratio ${ratioDll.toFixed(1)}x` +
+          ` — DLL X[${r1(dllBox.minX)}, ${r1(dllBox.maxX)}] Z[${r1(dllBox.minZ)}, ${r1(dllBox.maxZ)}]`);
       }
     }
 
@@ -192,7 +236,7 @@ const area = b => Math.max(1e-6, (b.maxX - b.minX) * (b.maxZ - b.minZ));
     console.log(`  ${zone} ${name}: X[${cals[zoneStr].minX}, ${cals[zoneStr].maxX}] Z[${cals[zoneStr].minZ}, ${cals[zoneStr].maxZ}] (${note})`);
   }
 
-  console.log(`\ngenerated: ${written} (${entityFallback} entity-fallback)  kept existing: ${kept}  failed: ${failed}  total in file: ${Object.keys(cals).length}`);
+  console.log(`\ngenerated: ${written} (${entityFallback} entity-fallback, ${dllFallback} dll-fallback)  kept existing: ${kept}  failed: ${failed}  total in file: ${Object.keys(cals).length}`);
   if (!dryRun) {
     fs.mkdirSync(path.dirname(calFile), { recursive: true });
     fs.writeFileSync(calFile, JSON.stringify(cals, null, 2) + '\n');
