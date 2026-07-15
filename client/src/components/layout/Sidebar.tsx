@@ -4,7 +4,16 @@ import { useStore } from '../../store';
 import { api } from '../../api';
 import { NAV, ADMIN_NAV } from '../../navConfig';
 
-export function Sidebar() {
+export type SidebarVariant = 'full' | 'rail' | 'drawer';
+
+interface SidebarProps {
+  variant: SidebarVariant;
+  open?: boolean;
+  onClose?: () => void;
+  onNavigate?: () => void;
+}
+
+export function Sidebar({ variant, open = false, onClose, onNavigate }: SidebarProps) {
   const user   = useStore((s) => s.user);
   const perms  = useStore((s) => s.permissions);
   const stats  = useStore((s) => s.stats);
@@ -13,99 +22,161 @@ export function Sidebar() {
   const [ver, setVer] = useState<{ version: string; commit: string; buildDate: string } | null>(null);
   useEffect(() => { api.version().then(setVer).catch(() => {}); }, []);
 
+  const isRail = variant === 'rail';
+  const isDrawer = variant === 'drawer';
   const online = stats?.online_players ?? 0;
 
+  // Close the drawer on Escape while it's open.
+  useEffect(() => {
+    if (!isDrawer || !open) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose?.(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isDrawer, open, onClose]);
+
+  const width = isRail ? 56 : 200;
+
+  const asideStyle: React.CSSProperties = isDrawer
+    ? {
+        position: 'fixed',
+        top: 0,
+        bottom: 0,
+        left: 0,
+        width,
+        background: 'var(--color-surface)',
+        borderRight: '1px solid var(--color-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        zIndex: 100,
+        transform: `translateX(${open ? '0' : '-100%'})`,
+        transition: 'transform .2s ease',
+      }
+    : {
+        width,
+        background: 'var(--color-surface)',
+        borderRight: '1px solid var(--color-border)',
+        display: 'flex',
+        flexDirection: 'column',
+        flexShrink: 0,
+      };
+
   return (
-    <aside style={{
-      width: 200,
-      background: 'var(--color-surface)',
-      borderRight: '1px solid var(--color-border)',
-      display: 'flex',
-      flexDirection: 'column',
-      flexShrink: 0,
-    }}>
-      {/* Brand */}
-      <div style={{ padding: '18px 16px 14px', borderBottom: '1px solid var(--color-border)' }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text1)', marginBottom: 2 }}>
-          ⚔ FFXI Dashboard
-        </div>
-        <div style={{ fontSize: 11, color: 'var(--color-text3)' }}>
-          <span style={{ color: 'var(--color-teal)', fontWeight: 600 }}>{online}</span> online
-        </div>
-      </div>
-
-      {/* Nav */}
-      <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--color-text3)', padding: '8px 8px 6px' }}>
-          General
-        </div>
-        {NAV.filter((item) => !item.perm || perms.includes(item.perm)).map((item) => (
-          <SidebarLink key={item.to} to={item.to} icon={item.icon} label={item.label} />
-        ))}
-
-        {user?.tier === 'admin' && (
-          <>
-            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--color-text3)', padding: '14px 8px 6px' }}>
-              Admin
-            </div>
-            {ADMIN_NAV.map((item) => (
-              <SidebarLink key={item.to} {...item} />
-            ))}
-          </>
-        )}
-      </nav>
-
-      {/* Footer */}
-      <div style={{ padding: '12px 16px', borderTop: '1px solid var(--color-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: '50%',
-            background: user?.tier === 'admin' ? 'rgba(240,160,80,.15)' : 'rgba(124,106,247,.15)',
-            border: `1px solid ${user?.tier === 'admin' ? 'rgba(240,160,80,.3)' : 'rgba(124,106,247,.3)'}`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 13, color: user?.tier === 'admin' ? 'var(--color-gold)' : 'var(--color-accent)',
-          }}>
-            {user?.login?.[0]?.toUpperCase() ?? '?'}
-          </div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {user?.login}
-            </div>
-            <div style={{ fontSize: 10, color: user?.tier === 'admin' ? 'var(--color-gold)' : 'var(--color-accent)' }}>
-              {user?.tier}
-            </div>
-          </div>
-        </div>
-        <button
-          onClick={logout}
-          className="btn btn-ghost btn-sm"
-          style={{ width: '100%', justifyContent: 'center' }}
-        >
-          Log out
-        </button>
-        {ver && (
+    <>
+      {isDrawer && open && (
+        <div
+          onClick={onClose}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 99 }}
+        />
+      )}
+      <aside style={asideStyle}>
+        {/* Brand */}
+        <div style={{
+          padding: isRail ? '18px 8px 14px' : '18px 16px 14px',
+          borderBottom: '1px solid var(--color-border)',
+          textAlign: isRail ? 'center' : 'left',
+        }}>
           <div
-            title={`build ${ver.buildDate}`}
-            style={{ marginTop: 8, textAlign: 'center', fontSize: 10, color: 'var(--color-text3)', fontFamily: 'var(--font-mono)' }}
+            style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text1)', marginBottom: isRail ? 0 : 2 }}
+            title={isRail ? 'FFXI Dashboard' : undefined}
           >
-            v{ver.version} · {ver.commit.slice(0, 7)}
+            {isRail ? '⚔' : '⚔ FFXI Dashboard'}
           </div>
-        )}
-      </div>
-    </aside>
+          {!isRail && (
+            <div style={{ fontSize: 11, color: 'var(--color-text3)' }}>
+              <span style={{ color: 'var(--color-teal)', fontWeight: 600 }}>{online}</span> online
+            </div>
+          )}
+        </div>
+
+        {/* Nav */}
+        <nav style={{ flex: 1, padding: '8px 8px', overflowY: 'auto' }}>
+          {!isRail && (
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--color-text3)', padding: '8px 8px 6px' }}>
+              General
+            </div>
+          )}
+          {NAV.filter((item) => !item.perm || perms.includes(item.perm)).map((item) => (
+            <SidebarLink key={item.to} {...item} isRail={isRail} onNavigate={onNavigate} />
+          ))}
+
+          {user?.tier === 'admin' && (
+            <>
+              {!isRail && (
+                <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.6px', color: 'var(--color-text3)', padding: '14px 8px 6px' }}>
+                  Admin
+                </div>
+              )}
+              {ADMIN_NAV.map((item) => (
+                <SidebarLink key={item.to} {...item} isRail={isRail} onNavigate={onNavigate} />
+              ))}
+            </>
+          )}
+        </nav>
+
+        {/* Footer */}
+        <div style={{ padding: isRail ? '12px 8px' : '12px 16px', borderTop: '1px solid var(--color-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, justifyContent: isRail ? 'center' : 'flex-start' }}>
+            <div
+              title={isRail ? `${user?.login ?? '?'} (${user?.tier ?? ''})` : undefined}
+              style={{
+                width: 28, height: 28, borderRadius: '50%',
+                background: user?.tier === 'admin' ? 'rgba(240,160,80,.15)' : 'rgba(124,106,247,.15)',
+                border: `1px solid ${user?.tier === 'admin' ? 'rgba(240,160,80,.3)' : 'rgba(124,106,247,.3)'}`,
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, color: user?.tier === 'admin' ? 'var(--color-gold)' : 'var(--color-accent)',
+                flexShrink: 0,
+              }}
+            >
+              {user?.login?.[0]?.toUpperCase() ?? '?'}
+            </div>
+            {!isRail && (
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text1)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {user?.login}
+                </div>
+                <div style={{ fontSize: 10, color: user?.tier === 'admin' ? 'var(--color-gold)' : 'var(--color-accent)' }}>
+                  {user?.tier}
+                </div>
+              </div>
+            )}
+          </div>
+          <button
+            onClick={logout}
+            className="btn btn-ghost btn-sm"
+            title={isRail ? 'Log out' : undefined}
+            style={{ width: '100%', justifyContent: 'center' }}
+          >
+            {isRail ? '⏻' : 'Log out'}
+          </button>
+          {ver && !isRail && (
+            <div
+              title={`build ${ver.buildDate}`}
+              style={{ marginTop: 8, textAlign: 'center', fontSize: 10, color: 'var(--color-text3)', fontFamily: 'var(--font-mono)' }}
+            >
+              v{ver.version} · {ver.commit.slice(0, 7)}
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
   );
 }
 
-function SidebarLink({ to, icon, label }: { to: string; icon: string; label: string }) {
+function SidebarLink({ to, icon, label, isRail, onNavigate }: {
+  to: string; icon: string; label: string; isRail: boolean; onNavigate?: () => void;
+}) {
   return (
     <NavLink
       to={to}
       end={to === '/'}
+      onClick={onNavigate}
+      title={isRail ? label : undefined}
       style={({ isActive }) => ({
         display: 'flex',
         alignItems: 'center',
-        gap: 10,
-        padding: '8px 10px',
+        gap: isRail ? 0 : 10,
+        justifyContent: isRail ? 'center' : 'flex-start',
+        padding: isRail ? '10px 4px' : '8px 10px',
         borderRadius: 8,
         fontSize: 13,
         fontWeight: 500,
@@ -117,7 +188,7 @@ function SidebarLink({ to, icon, label }: { to: string; icon: string; label: str
       })}
     >
       <span style={{ fontSize: 15, width: 20, textAlign: 'center' }}>{icon}</span>
-      {label}
+      {!isRail && label}
     </NavLink>
   );
 }
