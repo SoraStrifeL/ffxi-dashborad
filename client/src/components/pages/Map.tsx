@@ -305,6 +305,7 @@ export function MapPage() {
   }
 
   function startPanRepeat(dir: 'up' | 'down' | 'left' | 'right') {
+    stopPanRepeat(); // clear any in-flight handles from another button (e.g. multitouch) first
     const fire = () => {
       const step = panStep();
       if (dir === 'up')    panBy(0, step);
