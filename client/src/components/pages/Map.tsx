@@ -1458,10 +1458,10 @@ export function MapPage() {
           </div>
         )}
 
-        {/* Pan controls */}
+        {/* Pan controls — stacked above the Coordinate HUD, which shares this same bottom-left corner */}
         {zone !== null && (
           <div style={{
-            position: 'absolute', bottom: 16, left: 16, zIndex: 10,
+            position: 'absolute', bottom: 48, left: 16, zIndex: 10,
             display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 28px)', gap: 4,
           }}>
             <button
