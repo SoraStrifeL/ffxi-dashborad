@@ -418,7 +418,6 @@ export function MapPage() {
       npcs.forEach((n) => {
         if (isTeleportNpc(n.name)) return; // drawn by the Teleports layer below
         if (lay.hidezero && isJunkNpc(n)) return;
-        if (n.mapIndex != null && n.mapIndex !== floorRef.current) return;
         if (!isInBounds(n.pos_x, n.pos_z)) return;
         const pos = worldToContainer(n.pos_x, n.pos_z);
         const g = new PIXI.Graphics();
@@ -461,7 +460,6 @@ export function MapPage() {
       let list = lay.aggroonly ? mobs.filter((m) => m.aggro) : mobs;
       if (lay.hidezero) list = list.filter((m) => m.pos_x !== 0 || m.pos_z !== 0);
       if (dFilter) list = list.filter((m) => (m.detects || 0) & dFilter);
-      list = list.filter((m) => m.mapIndex == null || m.mapIndex === floorRef.current);
       list.forEach((m) => {
         if (!isInBounds(m.pos_x, m.pos_z)) return;
         const pos = worldToContainer(m.pos_x, m.pos_z);
@@ -784,7 +782,7 @@ export function MapPage() {
       const liveMobs = (pos.mobs ?? []).filter((m) => m.z_id === zone && (m.x !== 0 || m.z !== 0));
       const updatedMobs: MobEntry[] = liveMobs.map((m) => {
         const st = mobStaticMapRef.current.get(m.i) ?? {};
-        return { mobid: m.i, name: m.n, pos_x: m.x, pos_y: m.y, pos_z: m.z, mapIndex: m.b, ...st } as MobEntry;
+        return { mobid: m.i, name: m.n, pos_x: m.x, pos_y: m.y, pos_z: m.z, ...st } as MobEntry;
       });
       // Pop/kill detection
       if (prevMobIdsRef.current.size > 0) {
@@ -797,7 +795,7 @@ export function MapPage() {
 
       const liveNpcs = (pos.npcs ?? []).filter((n) => n.z_id === zone && (n.x !== 0 || n.z !== 0));
       const updatedNpcs: NpcEntry[] = liveNpcs.map((n) => ({
-        npcid: n.i, name: n.n, pos_x: n.x, pos_y: n.y, pos_z: n.z, mapIndex: n.b,
+        npcid: n.i, name: n.n, pos_x: n.x, pos_y: n.y, pos_z: n.z,
       }));
 
       // Merge (not replace) into the full roster — the live feed only reports
