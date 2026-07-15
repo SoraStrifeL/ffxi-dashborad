@@ -49,7 +49,8 @@ export function Sidebar({ variant, open = false, onClose, onNavigate }: SidebarP
         flexDirection: 'column',
         zIndex: 100,
         transform: `translateX(${open ? '0' : '-100%'})`,
-        transition: 'transform .2s ease',
+        visibility: open ? 'visible' : 'hidden',
+        transition: 'transform .2s ease, visibility .2s ease',
       }
     : {
         width,
