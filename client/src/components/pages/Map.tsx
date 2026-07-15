@@ -179,6 +179,7 @@ export function MapPage() {
   // (auto-calibration from get_map_data depends on this) — inset would shift entities
   const mapAdj = useRef({ ox: 0, oy: 0, sx: 1, sy: 1, pad: 0 });
   const stageTransform = useRef({ zoom: 1, panX: 0, panY: 0 });
+  const panRepeatRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
   const dragRef = useRef({ active: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0, moved: false });
   const layersFlagsRef = useRef(layers);                  // up-to-date layers flags for PIXI ticker (no stale closure)
   const zoneDrawRef   = useRef<number | null>(null);      // mirrors zone for drawOverlay ticker
@@ -288,6 +289,39 @@ export function MapPage() {
     const st = stageTransform.current;
     app.stage.scale.set(st.zoom);
     app.stage.position.set(st.panX, st.panY);
+  }
+
+  function panStep(): number {
+    const app = appRef.current;
+    const dim = app ? Math.min(app.screen.width, app.screen.height) : 400;
+    return Math.max(60, dim * 0.15);
+  }
+
+  function panBy(dx: number, dy: number) {
+    const st = stageTransform.current;
+    st.panX += dx;
+    st.panY += dy;
+    applyContainerTransform();
+  }
+
+  function startPanRepeat(dir: 'up' | 'down' | 'left' | 'right') {
+    const fire = () => {
+      const step = panStep();
+      if (dir === 'up')    panBy(0, step);
+      if (dir === 'down')  panBy(0, -step);
+      if (dir === 'left')  panBy(step, 0);
+      if (dir === 'right') panBy(-step, 0);
+    };
+    fire(); // fire immediately on press
+    panRepeatRef.current.timeout = setTimeout(() => {
+      panRepeatRef.current.interval = setInterval(fire, 60);
+    }, 400);
+  }
+
+  function stopPanRepeat() {
+    if (panRepeatRef.current.timeout)  clearTimeout(panRepeatRef.current.timeout);
+    if (panRepeatRef.current.interval) clearInterval(panRepeatRef.current.interval);
+    panRepeatRef.current = { timeout: null, interval: null };
   }
 
   function fitMap(app: PIXI.Application, sprite: PIXI.Sprite) {
@@ -819,6 +853,9 @@ export function MapPage() {
   useEffect(() => { boundsDrawRef.current = bounds; }, [bounds]);
   useEffect(() => { dbMobsRef.current = dbMobs; }, [dbMobs]);
   useEffect(() => { dbNpcsRef.current = dbNpcs; }, [dbNpcs]);
+
+  // Stop any in-progress pan hold-repeat if the page unmounts mid-press
+  useEffect(() => stopPanRepeat, []);
 
 
   // Re-draw on layer/filter change
@@ -1418,6 +1455,27 @@ export function MapPage() {
         {zone !== null && (
           <div ref={coordDisplayRef} style={{ position: 'absolute', bottom: 16, left: 16, zIndex: 10, fontFamily: 'monospace', fontSize: 11, color: 'var(--color-text3)', background: 'rgba(10,10,18,.75)', padding: '3px 9px', borderRadius: 5, pointerEvents: 'none', border: '1px solid rgba(255,255,255,.06)', letterSpacing: '.03em' }}>
             x: 0.000 z: 0.000
+          </div>
+        )}
+
+        {/* Pan controls */}
+        {zone !== null && (
+          <div style={{
+            position: 'absolute', bottom: 16, left: 16, zIndex: 10,
+            display: 'grid', gridTemplateColumns: 'repeat(3, 28px)', gridTemplateRows: 'repeat(3, 28px)', gap: 4,
+          }}>
+            <button
+              onPointerDown={() => startPanRepeat('up')} onPointerUp={stopPanRepeat} onPointerLeave={stopPanRepeat}
+              style={{ gridColumn: 2, gridRow: 1, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>▲</button>
+            <button
+              onPointerDown={() => startPanRepeat('left')} onPointerUp={stopPanRepeat} onPointerLeave={stopPanRepeat}
+              style={{ gridColumn: 1, gridRow: 2, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>◀</button>
+            <button
+              onPointerDown={() => startPanRepeat('right')} onPointerUp={stopPanRepeat} onPointerLeave={stopPanRepeat}
+              style={{ gridColumn: 3, gridRow: 2, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>▶</button>
+            <button
+              onPointerDown={() => startPanRepeat('down')} onPointerUp={stopPanRepeat} onPointerLeave={stopPanRepeat}
+              style={{ gridColumn: 2, gridRow: 3, width: 28, height: 28, background: 'rgba(10,10,18,.85)', border: '1px solid var(--color-border)', borderRadius: 5, color: 'var(--color-text1)', fontSize: 16, cursor: 'pointer', lineHeight: 1 }}>▼</button>
           </div>
         )}
 
