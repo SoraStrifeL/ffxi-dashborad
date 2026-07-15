@@ -9,7 +9,7 @@ import { hasPermission } from './rbac';
 import { setBroadcastAuditEvent } from './audit';
 import { recentServerLog, onServerLog, offServerLog } from './serverlog';
 
-type PosEntry = { i: number; n: string; x: number; y: number; z: number; z_id: number };
+type PosEntry = { i: number; n: string; x: number; y: number; z: number; z_id: number; b?: number };
 
 // ── WebSocket state ────────────────────────────────────────────────────────────
 export const clients = new Map<WebSocket, WsClientState>();

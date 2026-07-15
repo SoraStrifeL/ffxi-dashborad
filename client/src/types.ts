@@ -143,6 +143,7 @@ export interface PosEntry {
   y: number;
   z: number;
   z_id: number;
+  b?: number;
 }
 
 export interface MobEntry {
@@ -157,6 +158,7 @@ export interface MobEntry {
   ecosystem: number;
   family: number;
   detects: number;
+  mapIndex?: number;
 }
 
 export interface NpcEntry {
@@ -165,6 +167,7 @@ export interface NpcEntry {
   pos_x: number;
   pos_y: number;
   pos_z: number;
+  mapIndex?: number;
 }
 
 export interface LoginMessage {

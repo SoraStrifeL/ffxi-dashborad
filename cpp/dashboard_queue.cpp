@@ -92,31 +92,32 @@ namespace
                 if (!fp) players += ',';
                 fp = false;
                 players += fmt::format(
-                    R"({{"i":{},"n":"{}","x":{:.2f},"y":{:.2f},"z":{:.2f},"z_id":{},"j":{},"l":{}}})",
+                    R"({{"i":{},"n":"{}","x":{:.2f},"y":{:.2f},"z":{:.2f},"z_id":{},"j":{},"l":{},"b":{}}})",
                     PChar->id, jsonName(PChar->name),
                     PChar->loc.p.x, PChar->loc.p.y, PChar->loc.p.z,
                     PChar->getZone(),
-                    static_cast<int>(PChar->GetMJob()), PChar->GetMLevel());
+                    static_cast<int>(PChar->GetMJob()), PChar->GetMLevel(),
+                    PChar->loc.boundary);
             });
             zone->ForEachNpc([&](CNpcEntity* PNpc)
             {
                 if (!fn) npcs += ',';
                 fn = false;
                 npcs += fmt::format(
-                    R"({{"i":{},"n":"{}","x":{:.2f},"y":{:.2f},"z":{:.2f},"z_id":{}}})",
+                    R"({{"i":{},"n":"{}","x":{:.2f},"y":{:.2f},"z":{:.2f},"z_id":{},"b":{}}})",
                     PNpc->id, jsonName(PNpc->name),
                     PNpc->loc.p.x, PNpc->loc.p.y, PNpc->loc.p.z,
-                    PNpc->getZone());
+                    PNpc->getZone(), PNpc->loc.boundary);
             });
             zone->ForEachMob([&](CMobEntity* PMob)
             {
                 if (!fm) mobs += ',';
                 fm = false;
                 mobs += fmt::format(
-                    R"({{"i":{},"n":"{}","x":{:.2f},"y":{:.2f},"z":{:.2f},"z_id":{}}})",
+                    R"({{"i":{},"n":"{}","x":{:.2f},"y":{:.2f},"z":{:.2f},"z_id":{},"b":{}}})",
                     PMob->id, jsonName(PMob->name),
                     PMob->loc.p.x, PMob->loc.p.y, PMob->loc.p.z,
-                    PMob->getZone());
+                    PMob->getZone(), PMob->loc.boundary);
             });
         });
 
