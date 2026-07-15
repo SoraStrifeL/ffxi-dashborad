@@ -10,6 +10,9 @@ import type { MobEntry, NpcEntry, PosEntry, Zone, CalibrationBounds, PopEntry, E
 // ── Constants ─────────────────────────────────────────────────────────────────
 const ECOSYSTEM_COLOR: Record<number, number> = {1:0x96cc3a,2:0xd4823a,3:0x3acc7a,4:0x3a8adc,5:0x5ab83a,6:0x9868d8,7:0xd8386a,8:0x3ac8a8,9:0xd838d0,10:0x7898b8,11:0xd8a838};
 const DETECT_LABELS: Record<number, string> = {1:'Sight',2:'Sound',4:'Magic',8:'LowHP',16:'Asleep',32:'TP',64:'Blood',256:'Scent'};
+const KEY_TO_DIR: Record<string, 'up' | 'down' | 'left' | 'right'> = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+};
 const JOB = ['','WAR','MNK','WHM','BLM','RDM','THF','PLD','DRK','BST','BRD','RNG','SAM','NIN','DRG','SMN','BLU','COR','PUP','DNC','SCH','GEO','RUN'];
 const POP_RING_TTL = 30000;
 
@@ -180,6 +183,7 @@ export function MapPage() {
   const mapAdj = useRef({ ox: 0, oy: 0, sx: 1, sy: 1, pad: 0 });
   const stageTransform = useRef({ zoom: 1, panX: 0, panY: 0 });
   const panRepeatRef = useRef<{ timeout: ReturnType<typeof setTimeout> | null; interval: ReturnType<typeof setInterval> | null }>({ timeout: null, interval: null });
+  const activePanKeyRef = useRef<string | null>(null);
   const dragRef = useRef({ active: false, startX: 0, startY: 0, startPanX: 0, startPanY: 0, moved: false });
   const layersFlagsRef = useRef(layers);                  // up-to-date layers flags for PIXI ticker (no stale closure)
   const zoneDrawRef   = useRef<number | null>(null);      // mirrors zone for drawOverlay ticker
@@ -857,6 +861,33 @@ export function MapPage() {
 
   // Stop any in-progress pan hold-repeat if the page unmounts mid-press
   useEffect(() => stopPanRepeat, []);
+
+  // Arrow-key panning — reuses the same startPanRepeat/stopPanRepeat the
+  // D-pad buttons use, so hold timing is identical between input methods.
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (zoneDrawRef.current === null) return;
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLSelectElement) return;
+      const dir = KEY_TO_DIR[e.key];
+      if (!dir) return;
+      e.preventDefault();
+      if (e.repeat) return; // browser's own OS-level key-repeat — we drive repeat ourselves
+      activePanKeyRef.current = e.key;
+      startPanRepeat(dir);
+    }
+    function onKeyUp(e: KeyboardEvent) {
+      if (e.key === activePanKeyRef.current) {
+        activePanKeyRef.current = null;
+        stopPanRepeat();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
+  }, []);
 
 
   // Re-draw on layer/filter change
