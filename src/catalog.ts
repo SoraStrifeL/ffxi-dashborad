@@ -71,7 +71,7 @@ export function makeUploader(dest: string): ReturnType<ReturnType<typeof multer>
 // ── Zone → map filename(s) ─────────────────────────────────────────────────────
 export function normZoneName(s: string): string {
   return s.toLowerCase()
-    .replace(/['\[\]()]/g, '')
+    .replace(/['\[\]()#]/g, '')
     .replace(/[-\s]+/g, '_')
     .replace(/_+/g, '_')
     .replace(/^_|_$/g, '');
@@ -100,7 +100,7 @@ export async function buildZoneMaps(pool: Pool): Promise<void> {
 
   const result: Record<number, string[]> = {};
   Object.entries(groups).forEach(([base, fileList]) => {
-    const zoneId = nameToId[base];
+    const zoneId = nameToId[normZoneName(base)];
     if (zoneId != null) result[zoneId] = fileList;
     else console.log(`[maps] no zone match for: ${base}`);
   });
