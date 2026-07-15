@@ -36,6 +36,18 @@ const isJunkNpc = (n: { name: string; pos_x: number; pos_z: number }) =>
 const isTeleportNpc = (name: string) =>
   /^(home[ _]?point|waypoint|survival[ _]guide|ethereal[ _]ingress)/i.test(name || '');
 
+// Upsert live-position updates into the full zone roster by id — keeps every
+// entity the roster already knows about (so counts/search stay complete) while
+// refreshing positions for whichever subset the live feed currently reports.
+function mergeById<T>(base: T[], updates: T[], keyFn: (t: T) => number): T[] {
+  if (updates.length === 0) return base;
+  const byId = new Map(updates.map((u) => [keyFn(u), u]));
+  const merged = base.map((b) => byId.get(keyFn(b)) ?? b);
+  const knownIds = new Set(base.map(keyFn));
+  const extra = updates.filter((u) => !knownIds.has(keyFn(u)));
+  return extra.length ? [...merged, ...extra] : merged;
+}
+
 // ── Pixi map hook ─────────────────────────────────────────────────────────────
 function usePixi(canvasRef: React.RefObject<HTMLCanvasElement | null>) {
   const appRef    = useRef<PIXI.Application | null>(null);
@@ -134,6 +146,11 @@ export function MapPage() {
   const prevMobIdsRef = useRef<Set<number>>(new Set());
   const prevMobNamesRef = useRef<Map<number, string>>(new Map());
   const mobStaticMapRef = useRef<Map<number, Partial<MobEntry>>>(new Map());
+  // Mirror dbMobs/dbNpcs into refs so the WS handler (whose closure isn't
+  // recreated on every dbMobs/dbNpcs change) can merge live positions into
+  // the current full roster without reading a stale snapshot.
+  const dbMobsRef = useRef<MobEntry[]>([]);
+  const dbNpcsRef = useRef<NpcEntry[]>([]);
 
   // Toast
   const [toast, setToast] = useState<{ msg: string; color: string; x?: number; z?: number } | null>(null);
@@ -207,7 +224,12 @@ export function MapPage() {
     setFloorCount(fc);
     setFloor(0);
 
+    const requestedZone = zone;
     Promise.all([api.mobs(zone), api.npcs(zone)]).then(([mobs, npcs]) => {
+      // A newer zone may have been selected while this fetch was in flight —
+      // zoneDrawRef mirrors the current zone synchronously, so if it no
+      // longer matches what we requested, drop this stale response.
+      if (zoneDrawRef.current !== requestedZone) return;
       mobs.forEach((m) => mobStaticMapRef.current.set(m.mobid, { detects: m.detects, aggro: m.aggro, links: m.links, ecosystem: m.ecosystem, family: m.family, mJob: m.mJob }));
       setDbMobs(mobs);
       setDbNpcs(npcs);
@@ -238,6 +260,10 @@ export function MapPage() {
     const img = new Image();
     img.onload = () => {
       if (appRef.current !== app) return; // app was destroyed while image was loading
+      // A newer zone/floor may have been selected while this image was
+      // loading — image loads aren't cancelable and can resolve out of
+      // order, so drop this response if it's no longer what's selected.
+      if (zoneDrawRef.current !== z || floorRef.current !== f) return;
       removeOldSprite(); // swap only once the new image is ready — no blank flash
       const tex = PIXI.Texture.from(img); // image is ready; tex.valid = true immediately
       const sprite = new PIXI.Sprite(tex);
@@ -250,6 +276,7 @@ export function MapPage() {
       // New image failed to load — drop the old zone's map so entities aren't
       // drawn over the wrong background
       if (appRef.current !== app) return;
+      if (zoneDrawRef.current !== z || floorRef.current !== f) return;
       removeOldSprite();
     };
     img.src = url;
@@ -649,7 +676,13 @@ export function MapPage() {
     const watched = watchList.some((w) => mob.name.toLowerCase().includes(w.toLowerCase()));
     const now = Date.now();
     recentPopsRef.current.set(mob.mobid, { ts: now, pos_x: mob.pos_x, pos_z: mob.pos_z, name: mob.name, watched });
-    setTimeout(() => { recentPopsRef.current.delete(mob.mobid); }, POP_RING_TTL);
+    // Only delete if this timer's pop is still the most recent one — a
+    // faster-respawning mob may have refreshed the entry with a newer `ts`
+    // in the meantime, which schedules its own deletion for later.
+    setTimeout(() => {
+      const entry = recentPopsRef.current.get(mob.mobid);
+      if (entry && entry.ts === now) recentPopsRef.current.delete(mob.mobid);
+    }, POP_RING_TTL);
     setPopLog((prev) => [{ name: mob.name, mobid: mob.mobid, pos_x: mob.pos_x, pos_z: mob.pos_z, ts: now, watched }, ...prev].slice(0, 30));
     showToast((watched ? '★ ' : '') + mob.name + ' popped!', watched ? 'var(--color-amber)' : 'var(--color-red)', mob.pos_x, mob.pos_z);
   }
@@ -726,7 +759,14 @@ export function MapPage() {
         npcid: n.i, name: n.n, pos_x: n.x, pos_y: n.y, pos_z: n.z,
       }));
 
-      drawEntities(updatedMobs, updatedNpcs, layers, detectFilter);
+      // Merge (not replace) into the full roster — the live feed only reports
+      // currently-loaded entities, so persisting it as-is would drop every
+      // entity it doesn't mention and shrink the Mobs/NPCs counts.
+      const mergedMobs = mergeById(dbMobsRef.current, updatedMobs, (m) => m.mobid);
+      const mergedNpcs = mergeById(dbNpcsRef.current, updatedNpcs, (n) => n.npcid);
+      setDbMobs(mergedMobs);
+      setDbNpcs(mergedNpcs);
+      drawEntities(mergedMobs, mergedNpcs, layers, detectFilter);
     }
   }, [zone, layers, detectFilter, watchList, evtDefs]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -777,6 +817,8 @@ export function MapPage() {
   // Keep ticker refs in sync with state so drawOverlay never uses stale closures
   useEffect(() => { zoneDrawRef.current   = zone;   }, [zone]);
   useEffect(() => { boundsDrawRef.current = bounds; }, [bounds]);
+  useEffect(() => { dbMobsRef.current = dbMobs; }, [dbMobs]);
+  useEffect(() => { dbNpcsRef.current = dbNpcs; }, [dbNpcs]);
 
 
   // Re-draw on layer/filter change
