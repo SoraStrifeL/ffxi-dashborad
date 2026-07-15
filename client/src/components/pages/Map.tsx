@@ -821,6 +821,10 @@ export function MapPage() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function onCanvasPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    // Don't capture the pointer (and thus start a pan-drag) when the press
+    // starts on an overlaid button (zoom, collapse, reset, toast) — capture
+    // would steal the subsequent click from the button.
+    if ((e.target as HTMLElement).closest('button')) return;
     dragRef.current = { active: true, moved: false, startX: e.clientX, startY: e.clientY, startPanX: stageTransform.current.panX, startPanY: stageTransform.current.panY };
     (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
   }
